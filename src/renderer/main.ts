@@ -14,6 +14,7 @@ import { WakeTrainerUI } from './ui/wake-trainer-ui'
 import { SettingsModal } from './ui/settings-modal'
 import { NeuralBackground } from './scene/neural-background'
 import { showHudToast } from './ui/toast'
+import { initModuleInfoModal } from './ui/module-info-modal'
 
 // Audio & 3D Core instances
 const audioPlayer = new AudioPlayer()
@@ -120,13 +121,23 @@ async function init(): Promise<void> {
     getAvatar: () => avatar,
     setBloomEnabled,
     setNeuralBgEnabled: (enabled) => neuralBackground.setVisible(enabled),
+    setEyeTrackingEnabled: (enabled) => avatar?.setEyeTrackingEnabled(enabled),
     setIsWakeWordEnabled: (val) => { isWakeWordEnabled = val },
     reinitWakeWord: async () => { await wakeWordManager.init() },
     wakeTrainerUI
   })
 
+  initModuleInfoModal()
+
   // Window Controls & Fullscreen
   const updateFullscreenUI = (isFs: boolean): void => {
+    // Hide action bar / complete header when in fullscreen mode (F12)
+    const titlebar = document.getElementById('titlebar')
+    if (titlebar) {
+      titlebar.classList.toggle('hidden', isFs)
+    }
+    DOM.app?.classList.toggle('is-fullscreen', isFs)
+
     const iconEnter = document.getElementById('icon-fs-enter')
     const iconExit = document.getElementById('icon-fs-exit')
     if (iconEnter && iconExit) {
@@ -140,6 +151,9 @@ async function init(): Promise<void> {
     if (DOM.btnSettingsFullscreen) {
       DOM.btnSettingsFullscreen.textContent = isFs ? 'Sair da Tela Cheia (F12)' : 'Alternar Tela Cheia (F12)'
     }
+
+    // Trigger window resize so Three.js 3D viewport smoothly updates bounds
+    window.dispatchEvent(new Event('resize'))
   }
 
   DOM.btnFullscreen?.addEventListener('click', async () => {
@@ -173,6 +187,7 @@ async function init(): Promise<void> {
   isBloomEnabled = initialConfig.enableBloom !== false
   setBloomEnabled(isBloomEnabled)
   neuralBackground.setVisible(initialConfig.enableNeuralBg !== false)
+  avatar?.setEyeTrackingEnabled(initialConfig.enableEyeTracking !== false)
   isConnected = initialConfig.isConnected
 
   if (!initialConfig.hasFullKey) {

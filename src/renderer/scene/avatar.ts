@@ -128,6 +128,7 @@ export class AvatarController {
   private targetMoodWeights: Record<string, number> = {}
 
   // Mouse eye interaction
+  private isEyeTrackingEnabled = true
   private targetMouseEyeYaw = 0
   private targetMouseEyePitch = 0
   private currentMouseEyeYaw = 0
@@ -277,11 +278,42 @@ export class AvatarController {
 
   private setupMouseTracking(): void {
     window.addEventListener('mousemove', (e) => {
+      if (!this.isEyeTrackingEnabled) {
+        this.targetMouseEyeYaw = 0
+        this.targetMouseEyePitch = 0
+        return
+      }
+
       const normX = (e.clientX / window.innerWidth) * 2 - 1
       const normY = (e.clientY / window.innerHeight) * 2 - 1
+
+      // Horizontal yaw: left/right tracking
       this.targetMouseEyeYaw = normX * 0.22
-      this.targetMouseEyePitch = -normY * 0.16
+
+      // Vertical pitch:
+      // normY = -1 (mouse at top) => pitch should look UP (+pitch)
+      // normY = +1 (mouse at bottom) => pitch should look DOWN (-pitch)
+      // Provide full responsive amplitude when looking towards the top:
+      if (normY < 0) {
+        // Upper region of screen: lift eyes up responsively
+        this.targetMouseEyePitch = -normY * 0.25
+      } else {
+        // Lower region of screen: look down naturally
+        this.targetMouseEyePitch = -normY * 0.20
+      }
     })
+  }
+
+  public setEyeTrackingEnabled(enabled: boolean): void {
+    this.isEyeTrackingEnabled = enabled
+    if (!enabled) {
+      this.targetMouseEyeYaw = 0
+      this.targetMouseEyePitch = 0
+    }
+  }
+
+  public getEyeTrackingEnabled(): boolean {
+    return this.isEyeTrackingEnabled
   }
 
   /**
@@ -412,6 +444,11 @@ export class AvatarController {
     this.currentEyePitch += (this.targetEyePitch - this.currentEyePitch) * 0.15
 
     // Smooth lerp mouse eye gaze
+    if (!this.isEyeTrackingEnabled) {
+      this.targetMouseEyeYaw = 0
+      this.targetMouseEyePitch = 0
+    }
+
     this.currentMouseEyeYaw += (this.targetMouseEyeYaw - this.currentMouseEyeYaw) * 0.12
     this.currentMouseEyePitch += (this.targetMouseEyePitch - this.currentMouseEyePitch) * 0.12
 
@@ -420,23 +457,25 @@ export class AvatarController {
 
     // Rotate the eyeball nodes (grp_eyeLeft and grp_eyeRight) along the correct axes
     // In facecap.glb, parent grp_scale has a +90 deg rotation on X.
+    // The base pose in this GLB has a -0.146 rad downward bias. By applying a -0.146 rad correction,
+    // the neutral gaze points straight forward at the camera.
     // - Local Z controls horizontal eye rotation (-yaw looks Right, +yaw looks Left in World space)
     // - Local X controls vertical eye rotation (-pitch looks Up, +pitch looks Down in World space)
     // - Local Y controls roll (twist), which must remain at baseEyeRot.y!
+    const basePitchOffset = -0.146
     if (this.grpEyeLeft) {
       this.grpEyeLeft.rotation.z = this.baseEyeLeftRot.z - totalEyeYaw
-      this.grpEyeLeft.rotation.x = this.baseEyeLeftRot.x - totalEyePitch
+      this.grpEyeLeft.rotation.x = this.baseEyeLeftRot.x + basePitchOffset - totalEyePitch
       this.grpEyeLeft.rotation.y = this.baseEyeLeftRot.y
     }
     if (this.grpEyeRight) {
       this.grpEyeRight.rotation.z = this.baseEyeRightRot.z - totalEyeYaw
-      this.grpEyeRight.rotation.x = this.baseEyeRightRot.x - totalEyePitch
+      this.grpEyeRight.rotation.x = this.baseEyeRightRot.x + basePitchOffset - totalEyePitch
       this.grpEyeRight.rotation.y = this.baseEyeRightRot.y
     }
 
-    // ARKit Eye gaze blendshapes - subtle eyelid follow-through only (capped to 0.15 max)
-    const eyelidYawWeight = Math.min(0.15, Math.abs(totalEyeYaw) * 0.6)
-    const eyelidPitchWeight = Math.min(0.15, Math.abs(totalEyePitch) * 0.6)
+    // ARKit Eye gaze blendshapes - natural eyelid follow-through
+    const eyelidYawWeight = Math.min(0.20, Math.abs(totalEyeYaw) * 0.7)
 
     if (totalEyeYaw > 0) {
       // Looking Right: Left eye (viewer's left) turns IN to nose, Right eye (viewer's right) turns OUT
@@ -453,17 +492,23 @@ export class AvatarController {
     }
 
     if (totalEyePitch > 0) {
-      // Looking Up: Eyelids follow Up
-      this.setMorphTarget('eyeLookUp_L', eyelidPitchWeight)
-      this.setMorphTarget('eyeLookUp_R', eyelidPitchWeight)
+      // Looking Up: Raise upper eyelids naturally and subtly widen eyes so pupil is fully visible
+      const eyelidUpWeight = Math.min(0.42, totalEyePitch * 1.6)
+      this.setMorphTarget('eyeLookUp_L', eyelidUpWeight)
+      this.setMorphTarget('eyeLookUp_R', eyelidUpWeight)
+      this.setMorphTarget('eyeWide_L', eyelidUpWeight * 0.35)
+      this.setMorphTarget('eyeWide_R', eyelidUpWeight * 0.35)
       this.setMorphTarget('eyeLookDown_L', 0)
       this.setMorphTarget('eyeLookDown_R', 0)
     } else {
-      // Looking Down: Eyelids follow Down
-      this.setMorphTarget('eyeLookDown_L', eyelidPitchWeight)
-      this.setMorphTarget('eyeLookDown_R', eyelidPitchWeight)
+      // Looking Down: Eyelids follow Down naturally
+      const eyelidDownWeight = Math.min(0.35, Math.abs(totalEyePitch) * 1.5)
+      this.setMorphTarget('eyeLookDown_L', eyelidDownWeight)
+      this.setMorphTarget('eyeLookDown_R', eyelidDownWeight)
       this.setMorphTarget('eyeLookUp_L', 0)
       this.setMorphTarget('eyeLookUp_R', 0)
+      this.setMorphTarget('eyeWide_L', 0)
+      this.setMorphTarget('eyeWide_R', 0)
     }
 
     // 3. Natural Eye Blinking (ARKit eyeBlinkLeft / eyeBlinkRight)

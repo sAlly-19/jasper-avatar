@@ -40,3 +40,13 @@ body, html {
   outline: none;
 }
 
+/* Fullscreen mode adaptations */
+#app.is-fullscreen #titlebar {
+  display: none !important;
+}
+
+#app.is-fullscreen #canvas-container {
+  top: 0;
+  height: 100%;
+}
+

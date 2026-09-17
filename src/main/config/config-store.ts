@@ -18,6 +18,7 @@ class ConfigStore {
     enableWakeWord: true,
     enableBloom: true,
     enableNeuralBg: true,
+    enableEyeTracking: true,
     // Autonomy services
     enableScreenAwareness: true,
     enableWindowTracker: true,
@@ -67,6 +68,7 @@ class ConfigStore {
         if (data.enableWakeWord !== undefined) this.config.enableWakeWord = data.enableWakeWord
         if (data.enableBloom !== undefined) this.config.enableBloom = data.enableBloom
         if (data.enableNeuralBg !== undefined) this.config.enableNeuralBg = data.enableNeuralBg
+        if (data.enableEyeTracking !== undefined) this.config.enableEyeTracking = data.enableEyeTracking
         if (data.enableScreenAwareness !== undefined) this.config.enableScreenAwareness = data.enableScreenAwareness
         if (data.enableWindowTracker !== undefined) this.config.enableWindowTracker = data.enableWindowTracker
         if (data.enableClipboardWatcher !== undefined) this.config.enableClipboardWatcher = data.enableClipboardWatcher
@@ -118,6 +120,7 @@ class ConfigStore {
     if (payload.enableWakeWord !== undefined) this.config.enableWakeWord = payload.enableWakeWord
     if (payload.enableBloom !== undefined) this.config.enableBloom = payload.enableBloom
     if (payload.enableNeuralBg !== undefined) this.config.enableNeuralBg = payload.enableNeuralBg
+    if (payload.enableEyeTracking !== undefined) this.config.enableEyeTracking = payload.enableEyeTracking
     if (payload.enableScreenAwareness !== undefined) this.config.enableScreenAwareness = payload.enableScreenAwareness
     if (payload.enableWindowTracker !== undefined) this.config.enableWindowTracker = payload.enableWindowTracker
     if (payload.enableClipboardWatcher !== undefined) this.config.enableClipboardWatcher = payload.enableClipboardWatcher
@@ -154,6 +157,7 @@ class ConfigStore {
       enableWakeWord: this.config.enableWakeWord,
       enableBloom: this.config.enableBloom,
       enableNeuralBg: this.config.enableNeuralBg,
+      enableEyeTracking: this.config.enableEyeTracking,
       enableScreenAwareness: this.config.enableScreenAwareness,
       enableWindowTracker: this.config.enableWindowTracker,
       enableClipboardWatcher: this.config.enableClipboardWatcher,

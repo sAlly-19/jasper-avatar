@@ -9,6 +9,11 @@
   backdrop-filter: blur(12px);
   border-bottom: var(--hud-border);
   z-index: 1000;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#titlebar.hidden {
+  display: none !important;
 }
 
 .drag-region {

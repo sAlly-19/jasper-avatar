@@ -89,7 +89,7 @@ Para que **todas** as ferramentas e módulos funcionem perfeitamente, veja abaix
 ### 1. Clonar ou Baixar o Projeto
 Abra o terminal (PowerShell ou Command Prompt) na pasta do projeto:
 ```powershell
-cd "c:\Users\alisson.santos\Documents\Arquivos\hud ai"
+cd jasper-avatar
 ```
 
 ### 2. Instalar Dependências

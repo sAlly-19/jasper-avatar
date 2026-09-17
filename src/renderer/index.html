@@ -237,6 +237,20 @@
                 </label>
               </div>
 
+              <!-- Eye Tracking Switch Card -->
+              <div class="settings-card">
+                <label class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <span class="hud-switch-title">Rastreamento Ocular (Olhar Segue o Mouse)</span>
+                    <span class="hud-switch-desc">Permite aos olhos do avatar acompanhar organicamente o ponteiro do mouse pela tela.</span>
+                  </div>
+                  <div class="hud-toggle">
+                    <input type="checkbox" id="check-eye-tracking" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </div>
+                </label>
+              </div>
+
               <!-- Full Screen Mode Card -->
               <div class="settings-card">
                 <div class="settings-card-header">
@@ -385,30 +399,36 @@
             <div id="tab-tools" class="settings-tab-pane">
               <!-- System Tools Card -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">Ações de Sistema & Aplicativos</span>
-                    <span class="hud-switch-desc">Permite ao agente abrir utilitários locais (Bloco de Notas, Calculadora), fazer cálculos e organizar pastas.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-system-tools">Ações de Sistema & Aplicativos</label>
+                      <button type="button" class="btn-module-info" data-module="system-tools" title="Como funciona este módulo?">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-system-tools">Permite ao agente abrir utilitários locais (Bloco de Notas, Calculadora), fazer cálculos e organizar pastas.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-system-tools">
                     <input type="checkbox" id="check-system-tools" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- Media & Web Tools Card -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">Mídia & Pesquisas na Web</span>
-                    <span class="hud-switch-desc">Permite ao agente reproduzir músicas no Spotify, buscar vídeos no YouTube e realizar pesquisas no Google.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-media-tools">Mídia & Pesquisas na Web</label>
+                      <button type="button" class="btn-module-info" data-module="media-tools" title="Como funciona este módulo?">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-media-tools">Permite ao agente reproduzir músicas no Spotify, buscar vídeos no YouTube e realizar pesquisas no Google.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-media-tools">
                     <input type="checkbox" id="check-media-tools" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -442,247 +462,298 @@
                   <span class="card-icon">⚡</span>
                   <div>
                     <h4>Serviços Autônomos em Segundo Plano</h4>
-                    <p>Ative ou desative individualmente as capacidades proativas e monitores contínuos do Jasper.</p>
+                    <p>Ative ou desative individualmente as capacidades proativas e monitores contínuos do Jasper. Clique no botão <strong>"!"</strong> para ver detalhes completos.</p>
                   </div>
                 </div>
               </div>
 
               <!-- 1. Screen Awareness -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">1. Visão de Tela (Screen Awareness)</span>
-                    <span class="hud-switch-desc">Permite ao Jasper capturar e analisar visualmente a tela do monitor sob demanda.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-screen-awareness">1. Visão de Tela (Screen Awareness)</label>
+                      <button type="button" class="btn-module-info" data-module="screen-awareness" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-screen-awareness">Permite ao Jasper capturar e analisar visualmente a tela do monitor sob demanda.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-screen-awareness">
                     <input type="checkbox" id="check-screen-awareness" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 2. Active Window Tracker -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">2. Rastreador de Janela em Foco</span>
-                    <span class="hud-switch-desc">Identifica o aplicativo ativo no Windows (VS Code, Chrome, Terminal) para alternar o contexto de raciocínio.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-window-tracker">2. Rastreador de Janela em Foco</label>
+                      <button type="button" class="btn-module-info" data-module="window-tracker" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-window-tracker">Identifica o aplicativo ativo no Windows (VS Code, Chrome, Terminal) para alternar o contexto de raciocínio.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-window-tracker">
                     <input type="checkbox" id="check-window-tracker" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 3. Clipboard Watcher -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">3. Monitor de Clipboard (Ctrl+C)</span>
-                    <span class="hud-switch-desc">Analisa automaticamente textos copiados e sugere auxílio para erros, stack traces e links.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-clipboard-watcher">3. Monitor de Clipboard (Ctrl+C)</label>
+                      <button type="button" class="btn-module-info" data-module="clipboard-watcher" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-clipboard-watcher">Analisa automaticamente textos copiados e sugere auxílio para erros, stack traces e links.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-clipboard-watcher">
                     <input type="checkbox" id="check-clipboard-watcher" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 4. Cron Engine -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">4. Motor de Agendamentos & Despertador</span>
-                    <span class="hud-switch-desc">Permite agendar lembretes persistentes com notificações por voz e avisos visuais no HUD.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-cron-engine">4. Motor de Agendamentos & Despertador</label>
+                      <button type="button" class="btn-module-info" data-module="cron-engine" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-cron-engine">Permite agendar lembretes persistentes com notificações por voz e avisos visuais no HUD.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-cron-engine">
                     <input type="checkbox" id="check-cron-engine" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 5. Daily Briefing -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">5. Briefing Matinal & Noturno Proativo</span>
-                    <span class="hud-switch-desc">Gera relatórios diários de status com saudações contextuais pelo horário do dia.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-daily-briefing">5. Briefing Matinal & Noturno Proativo</label>
+                      <button type="button" class="btn-module-info" data-module="daily-briefing" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-daily-briefing">Gera relatórios diários de status com saudações contextuais pelo horário do dia.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-daily-briefing">
                     <input type="checkbox" id="check-daily-briefing" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 6. System Health -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">6. Monitor de Saúde do Sistema & Hardware</span>
-                    <span class="hud-switch-desc">Monitora CPU, RAM e disco com alertas automáticos se a memória atingir níveis críticos (>90%).</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-system-health">6. Monitor de Saúde do Sistema & Hardware</label>
+                      <button type="button" class="btn-module-info" data-module="system-health" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-system-health">Monitora CPU, RAM e disco com alertas automáticos se a memória atingir níveis críticos (>90%).</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-system-health">
                     <input type="checkbox" id="check-system-health" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 7. Semantic Memory -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">7. Memória Semântica Vetorial (RAG Local)</span>
-                    <span class="hud-switch-desc">Busca por similaridade de significado em fatos e conversas anteriores, superando buscas exatas.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-semantic-memory">7. Memória Semântica Vetorial (RAG Local)</label>
+                      <button type="button" class="btn-module-info" data-module="semantic-memory" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-semantic-memory">Busca por similaridade de significado em fatos e conversas anteriores, superando buscas exatas.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-semantic-memory">
                     <input type="checkbox" id="check-semantic-memory" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 8. Knowledge Graph -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">8. Grafo de Conhecimento do Usuário</span>
-                    <span class="hud-switch-desc">Mapeia conexões e relações entre projetos, ferramentas e conceitos do seu dia a dia.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-knowledge-graph">8. Grafo de Conhecimento do Usuário</label>
+                      <button type="button" class="btn-module-info" data-module="knowledge-graph" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-knowledge-graph">Mapeia conexões e relações entre projetos, ferramentas e conceitos do seu dia a dia.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-knowledge-graph">
                     <input type="checkbox" id="check-knowledge-graph" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 9. Code Interpreter -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">9. Interpretador de Código Sandboxed Local</span>
-                    <span class="hud-switch-desc">Permite ao Jasper escrever e rodar scripts Python e Node.js locais de forma segura para processar dados e gerar arquivos.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-code-interpreter">9. Interpretador de Código Sandboxed Local</label>
+                      <button type="button" class="btn-module-info" data-module="code-interpreter" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-code-interpreter">Permite ao Jasper escrever e rodar scripts Python e Node.js locais de forma segura para processar dados e gerar arquivos.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-code-interpreter">
                     <input type="checkbox" id="check-code-interpreter" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 10. Headless Browser -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">10. Navegador Headless Invisível</span>
-                    <span class="hud-switch-desc">Navega silenciosamente pela web usando Chromium offscreen nativo para ler artigos, documentações e capturar telas sem abrir janelas.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-headless-browser">10. Navegador Headless Invisível</label>
+                      <button type="button" class="btn-module-info" data-module="headless-browser" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-headless-browser">Navega silenciosamente pela web usando Chromium offscreen nativo para ler artigos, documentações e capturar telas sem abrir janelas.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-headless-browser">
                     <input type="checkbox" id="check-headless-browser" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 11. Git Watcher -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">11. Git Watcher & Commits Semânticos</span>
-                    <span class="hud-switch-desc">Monitora repositórios locais via Git nativo, detecta arquivos pendentes e sugere mensagens padronizadas (feat, fix, docs).</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-git-watcher">11. Git Watcher & Commits Semânticos</label>
+                      <button type="button" class="btn-module-info" data-module="git-watcher" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-git-watcher">Monitora repositórios locais via Git nativo, detecta arquivos pendentes e sugere mensagens padronizadas (feat, fix, docs).</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-git-watcher">
                     <input type="checkbox" id="check-git-watcher" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 12. Folder Organizer -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">12. Organizador de Downloads & Desktop</span>
-                    <span class="hud-switch-desc">Detecta arquivos duplicados por hash MD5, instaladores velhos (>30 dias) e organiza pastas por categorias com suporte a simulação segura.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-folder-organizer">12. Organizador de Downloads & Desktop</label>
+                      <button type="button" class="btn-module-info" data-module="folder-organizer" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-folder-organizer">Detecta arquivos duplicados por hash MD5, instaladores velhos (>30 dias) e organiza pastas por categorias com suporte a simulação segura.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-folder-organizer">
                     <input type="checkbox" id="check-folder-organizer" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 13. Subagent Orchestrator -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">13. Orquestrador de Subagentes Paralelos</span>
-                    <span class="hud-switch-desc">Permite ao Jasper instanciar subagentes em background (pesquisa, testes, código) consolidando o resultado sem travar a voz.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-subagents">13. Orquestrador de Subagentes Paralelos</label>
+                      <button type="button" class="btn-module-info" data-module="subagents" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-subagents">Permite ao Jasper instanciar subagentes em background (pesquisa, testes, código) consolidando o resultado sem travar a voz.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-subagents">
                     <input type="checkbox" id="check-subagents" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 14. Reflexion Guard -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">14. Loop de Auto-Reflexão & Bloqueio de Risco</span>
-                    <span class="hud-switch-desc">Audita comandos antes da execução e bloqueia preventivamente ações perigosas no sistema, solicitando confirmação explícita.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-reflexion-loop">14. Loop de Auto-Reflexão & Bloqueio de Risco</label>
+                      <button type="button" class="btn-module-info" data-module="reflexion-loop" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-reflexion-loop">Audita comandos antes da execução e bloqueia preventivamente ações perigosas no sistema, solicitando confirmação explícita.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-reflexion-loop">
                     <input type="checkbox" id="check-reflexion-loop" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 15. Calendar & Email -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">15. Agenda & Resumo de E-mails</span>
-                    <span class="hud-switch-desc">Gerencia compromissos locais em padrão iCal (.ics), avisa 10 minutos antes de reuniões e resume mensagens urgentes.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-calendar-email">15. Agenda & Resumo de E-mails</label>
+                      <button type="button" class="btn-module-info" data-module="calendar-email" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-calendar-email">Gerencia compromissos locais em padrão iCal (.ics), avisa 10 minutos antes de reuniões e resume mensagens urgentes.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-calendar-email">
                     <input type="checkbox" id="check-calendar-email" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 16. Webhooks (n8n / Zapier / Make) -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">16. Gatilhos de Webhook (n8n, Zapier, Make)</span>
-                    <span class="hud-switch-desc">Dispara chamadas HTTP para pipelines locais do n8n ou plataformas em nuvem para automação de tarefas e notificações.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-webhooks">16. Gatilhos de Webhook (n8n, Zapier, Make)</label>
+                      <button type="button" class="btn-module-info" data-module="webhooks" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-webhooks">Dispara chamadas HTTP para pipelines locais do n8n ou plataformas em nuvem para automação de tarefas e notificações.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-webhooks">
                     <input type="checkbox" id="check-webhooks" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
 
               <!-- 17. Smart Home (Home Assistant) -->
               <div class="settings-card">
-                <label class="hud-switch-item">
+                <div class="hud-switch-item">
                   <div class="hud-switch-text">
-                    <span class="hud-switch-title">17. Controle de Casa Inteligente (Home Assistant)</span>
-                    <span class="hud-switch-desc">Comanda iluminação, tomadas e climatização por voz através da API REST e WebSocket do Home Assistant.</span>
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-smart-home">17. Controle de Casa Inteligente (Home Assistant)</label>
+                      <button type="button" class="btn-module-info" data-module="smart-home" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-smart-home">Comanda iluminação, tomadas e climatização por voz através da API REST e WebSocket do Home Assistant.</label>
                   </div>
-                  <div class="hud-toggle">
+                  <label class="hud-toggle" for="check-smart-home">
                     <input type="checkbox" id="check-smart-home" checked />
                     <span class="hud-toggle-slider"></span>
-                  </div>
-                </label>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -694,6 +765,62 @@
               <button type="button" id="btn-cancel-settings" class="btn-secondary">Cancelar</button>
               <button type="button" id="btn-save-settings" class="btn-primary">Salvar & Conectar</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module Detailed Explanation Modal -->
+      <div id="modal-module-detail" class="module-detail-backdrop hidden">
+        <div class="module-detail-card">
+          <!-- Modal Header -->
+          <div class="modal-header">
+            <div class="modal-title-wrap">
+              <div class="module-detail-icon" id="module-detail-icon">⚡</div>
+              <div>
+                <h3 id="module-detail-title">Nome do Módulo</h3>
+                <span class="modal-subtitle" id="module-detail-subtitle">Serviço de Autonomia do Jasper AI</span>
+              </div>
+            </div>
+            <button id="btn-close-module-detail" class="modal-close" title="Fechar">&times;</button>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="module-detail-body">
+            <!-- Section 1: Overview -->
+            <div class="detail-section">
+              <h5 class="detail-section-title"><span class="section-icon">🎯</span> O Que Este Módulo Faz</h5>
+              <p id="module-detail-overview" class="detail-text"></p>
+            </div>
+
+            <!-- Section 2: How It Works -->
+            <div class="detail-section">
+              <h5 class="detail-section-title"><span class="section-icon">⚙️</span> Como Funciona nos Bastidores</h5>
+              <p id="module-detail-how" class="detail-text"></p>
+            </div>
+
+            <!-- Section 3: Voice Command Examples -->
+            <div class="detail-section">
+              <h5 class="detail-section-title"><span class="section-icon">🗣️</span> Exemplos Práticos de Comandos de Voz</h5>
+              <ul id="module-detail-examples" class="detail-examples-list"></ul>
+            </div>
+
+            <!-- Section 4: External Requirements -->
+            <div class="detail-section">
+              <h5 class="detail-section-title"><span class="section-icon">🔌</span> Softwares & Requisitos Externos</h5>
+              <p id="module-detail-requirements" class="detail-text"></p>
+            </div>
+
+            <!-- Section 5: Badges -->
+            <div class="detail-badge-footer">
+              <span class="detail-badge-pill"><span class="dot-live"></span> 100% Gratuito & Local</span>
+              <span class="detail-badge-pill" id="module-detail-badge">Disparo sob demanda • Sem gravação em disco</span>
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="modal-footer">
+            <div></div>
+            <button type="button" id="btn-ack-module-detail" class="btn-primary" style="padding: 8px 24px; font-size: 11px;">Entendido</button>
           </div>
         </div>
       </div>

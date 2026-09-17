@@ -8,6 +8,7 @@ export interface JasperConfig {
   enableWakeWord: boolean
   enableBloom: boolean
   enableNeuralBg: boolean
+  enableEyeTracking: boolean
   // Autonomy services
   enableScreenAwareness: boolean
   enableWindowTracker: boolean
@@ -38,6 +39,7 @@ export interface UpdateConfigPayload {
   enableWakeWord?: boolean
   enableBloom?: boolean
   enableNeuralBg?: boolean
+  enableEyeTracking?: boolean
   // Autonomy services
   enableScreenAwareness?: boolean
   enableWindowTracker?: boolean
@@ -69,6 +71,7 @@ export interface ConfigSummary {
   enableWakeWord: boolean
   enableBloom: boolean
   enableNeuralBg: boolean
+  enableEyeTracking: boolean
   // Autonomy services
   enableScreenAwareness: boolean
   enableWindowTracker: boolean

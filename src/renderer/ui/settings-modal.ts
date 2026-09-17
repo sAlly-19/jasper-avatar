@@ -8,6 +8,7 @@ export interface SettingsModalOptions {
   getAvatar: () => AvatarController | null
   setBloomEnabled: (enabled: boolean) => void
   setNeuralBgEnabled: (enabled: boolean) => void
+  setEyeTrackingEnabled: (enabled: boolean) => void
   setIsWakeWordEnabled: (enabled: boolean) => void
   reinitWakeWord: () => Promise<void>
   wakeTrainerUI: WakeTrainerUI
@@ -60,6 +61,7 @@ export class SettingsModal {
       checkWakeWord,
       checkBloom,
       checkNeuralBg,
+      checkEyeTracking,
       checkSystemTools,
       checkMediaTools,
       checkScreenAwareness,
@@ -142,6 +144,9 @@ export class SettingsModal {
       }
       if (checkNeuralBg) {
         checkNeuralBg.checked = config.enableNeuralBg !== false
+      }
+      if (checkEyeTracking) {
+        checkEyeTracking.checked = config.enableEyeTracking !== false
       }
       if (checkSystemTools) {
         checkSystemTools.checked = config.enableSystemTools !== false
@@ -256,6 +261,7 @@ export class SettingsModal {
       const enableWakeWord = checkWakeWord ? checkWakeWord.checked : true
       const enableBloom = checkBloom ? checkBloom.checked : true
       const enableNeuralBg = checkNeuralBg ? checkNeuralBg.checked : true
+      const enableEyeTracking = checkEyeTracking ? checkEyeTracking.checked : true
       const enableSystemTools = checkSystemTools ? checkSystemTools.checked : true
       const enableMediaTools = checkMediaTools ? checkMediaTools.checked : true
 
@@ -264,6 +270,7 @@ export class SettingsModal {
       this.options.setIsWakeWordEnabled(enableWakeWord)
       this.options.setBloomEnabled(enableBloom)
       this.options.setNeuralBgEnabled(enableNeuralBg)
+      this.options.setEyeTrackingEnabled(enableEyeTracking)
 
       settingsStatus.textContent = 'Salvando e conectando...'
       settingsStatus.className = 'modal-status'
@@ -276,6 +283,7 @@ export class SettingsModal {
         enableWakeWord,
         enableBloom,
         enableNeuralBg,
+        enableEyeTracking,
         enableSystemTools,
         enableMediaTools,
         enableScreenAwareness: checkScreenAwareness ? checkScreenAwareness.checked : true,

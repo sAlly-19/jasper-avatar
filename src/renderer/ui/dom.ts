@@ -4,6 +4,7 @@
 export const DOM = {
   // Main Viewport & Layout
   app: document.getElementById('app') as HTMLElement | null,
+  titlebar: document.getElementById('titlebar') as HTMLElement | null,
   canvasContainer: document.getElementById('canvas-container') as HTMLElement,
 
   // Status & Brand
@@ -53,6 +54,7 @@ export const DOM = {
   checkWakeWord: document.getElementById('check-wake-word') as HTMLInputElement | null,
   checkBloom: document.getElementById('check-bloom') as HTMLInputElement | null,
   checkNeuralBg: document.getElementById('check-neural-bg') as HTMLInputElement | null,
+  checkEyeTracking: document.getElementById('check-eye-tracking') as HTMLInputElement | null,
   checkSystemTools: document.getElementById('check-system-tools') as HTMLInputElement | null,
   checkMediaTools: document.getElementById('check-media-tools') as HTMLInputElement | null,
 
