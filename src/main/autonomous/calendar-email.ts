@@ -152,7 +152,7 @@ export class CalendarEmailService {
             this.onNotification({
               id: `alert-${event.id}`,
               type: 'reminder',
-              title: '📅 Reunião em 10 Minutos',
+              title: 'Reunião em 10 Minutos',
               message: `O evento "${event.title}" começa em ${Math.round(diffMinutes)} minutos.${
                 event.location ? ` Local: ${event.location}` : ''
               }`,
@@ -174,18 +174,18 @@ export class CalendarEmailService {
       {
         id: 'mail-1',
         from: 'diretoria@empresa.com',
-        subject: '[URGENTE] Revisão de entrega do trimestre',
+        subject: '[SIMULADO] [URGENTE] Revisão de entrega do trimestre',
         date: Date.now() - 15 * 60 * 1000,
-        snippet: 'Precisamos validar os números de desempenho até as 17h de hoje.',
+        snippet: '[Demonstração Local]: Precisamos validar os números de desempenho até as 17h de hoje.',
         isUrgent: true,
         unread: true
       },
       {
         id: 'mail-2',
         from: 'github@notifications.com',
-        subject: 'Pull request #42 aprovado por review',
+        subject: '[SIMULADO] Pull request #42 aprovado por review',
         date: Date.now() - 2 * 3600 * 1000,
-        snippet: 'Todos os testes automatizados passaram no CI/CD.',
+        snippet: '[Demonstração Local]: Todos os testes automatizados passaram no CI/CD.',
         isUrgent: false,
         unread: true
       }

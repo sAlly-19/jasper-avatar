@@ -11,12 +11,14 @@ O assistente permite que você converse naturalmente por voz, compartilhe sua te
 - [Visão Geral e Para Que Serve](#-visão-geral-e-para-que-serve)
 - [Como o Programa Funciona (Arquitetura)](#-como-o-programa-funciona-arquitetura)
 - [Aplicativos e Requisitos Externos Necessários](#-aplicativos-e-requisitos-externos-necessários)
+- [Matriz de Status Operacional dos Módulos](#-matriz-de-status-operacional-dos-módulos)
+- [Painéis de Configuração Avançada dos Módulos](#-painéis-de-configuração-avançada-dos-módulos)
 - [Guia Rápido de Instalação e Execução](#-guia-rápido-de-instalação-e-execução)
 - [Controles e Modos de Visualização](#-controles-e-modos-de-visualização)
 - [Catálogo Completo das Ferramentas do Sistema](#-catálogo-completo-das-ferramentas-do-sistema)
 - [Os 17 Módulos de Autonomia Explicados com Exemplos](#-os-17-módulos-de-autonomia-explicados-com-exemplos)
 - [Loop de Auto-Reflexão e Segurança (Reflexion Guard)](#-loop-de-auto-reflexão-e-segurança-reflexion-guard)
-- [Privacidade, Segurança e Armazenamento Local](#-privacidade-segurança-e-armazenamento-local)
+- [Privacidade, Segurança e Criptografia Local (Zero-Trust)](#-privacidade-segurança-e-criptografia-local-zero-trust)
 - [Perguntas Frequentes (FAQ)](#-perguntas-frequentes-faq)
 
 ---
@@ -81,6 +83,66 @@ Para que **todas** as ferramentas e módulos funcionem perfeitamente, veja abaix
 | **Spotify (Desktop)** | *Opcional* | Tocar faixas, artistas e playlists pelo comando de mídia `play_music`. | Caso não use Spotify, o assistente abre automaticamente a busca no YouTube. |
 | **n8n / Zapier / Make** | *Opcional* | Disparar fluxos de automação através do **Webhook Manager**. | O [n8n](https://n8n.io/) é 100% open source e pode ser executado localmente de graça com o comando `npx n8n`. |
 | **Home Assistant** | *Opcional* | Controlar lâmpadas inteligentes, ar-condicionado e tomadas via **Smart Home**. | Caso você não possua um servidor Home Assistant na sua rede, o assistente opera em modo de simulação contextual. |
+
+---
+
+## 📊 Matriz de Status Operacional dos Módulos
+
+O Jasper AI HUD opera sob o princípio de **Transparência Operacional Total**. Cada ferramenta executada pelo assistente indica explicitamente se a ação foi realizada de maneira real no sistema operacional ou se operou em modo de demonstração/simulação segura caso algum serviço externo não esteja configurado:
+
+| Nº | Módulo | Tipo de Operação | Sem Configuração Externa | Com Configuração no Painel | Proteção / Segurança |
+| :---: | :--- | :--- | :--- | :--- | :--- |
+| **01** | **Visão de Tela** | **100% Nativo** | Captura frame real via `desktopCapturer` | Totalmente autônomo | Frame JPEG base64 enviado diretamente via WebSocket |
+| **02** | **Rastreador de Janelas** | **100% Nativo** | Lê a janela em foco via API do Windows | Totalmente autônomo | Leitura somente-leitura com polling de 4s |
+| **03** | **Observador do Clipboard** | **100% Nativo** | Monitora texto copiado localmente | Totalmente autônomo | Redação automática de credenciais e chaves de API |
+| **04** | **Motor Cron & Lembretes** | **100% Nativo** | Fila de timers em JSON local | Totalmente autônomo | Proteção contra disparos duplicados pós-suspensão |
+| **05** | **Monitor de Saúde** | **100% Nativo** | Mede CPU, RAM e Disco C: | Totalmente autônomo | Cache de métricas de disco por 60s (zero lag) |
+| **06** | **Briefing Diário** | **100% Nativo** | Agrega turno, agenda, hardware e janela | Totalmente autônomo | Leitura consolidada em memória |
+| **07** | **Memória Semântica** | **100% Nativo** | TF-IDF e Similaridade por Cosseno | Totalmente autônomo | 100% matemático local, sem banco vetorial pago |
+| **08** | **Grafo de Conhecimento** | **100% Nativo** | Estrutura de grafos persistida em JSON | Totalmente autônomo | Gravação atômica em disco |
+| **09** | **Code Interpreter** | **100% Nativo** | Execução sandboxed Python/Node.js | Habilitado sob demanda | Desativado por padrão; sanitização total de env vars |
+| **10** | **Navegador Headless** | **100% Nativo** | Instância Chromium off-screen Electron | Totalmente autônomo | Limpeza de scripts e timeout com liberação de memória |
+| **11** | **Git Watcher** | **100% Nativo** | Usa diretório de execução atual | Repositório específico via Seletor | Executa apenas comandos seguros (`git add -u`, etc.) |
+| **12** | **Organizador de Pastas** | **100% Nativo** | Organiza pasta Downloads padrão | Pasta personalizada via Seletor | Modo dry-run prévio; proteção de arquivos travados |
+| **13** | **Subagentes Paralelos** | **100% Nativo** | Pool assíncrono em segundo plano | Totalmente autônomo | Ciclo de vida com cancelamento via AbortController |
+| **14** | **Reflexion Guard** | **100% Nativo** | Motor heurístico de segurança ativo | Totalmente autônomo | Bloqueia comandos destrutivos; requer autorização no HUD |
+| **15** | **Agenda & E-mails** | **Híbrido** | iCal nativo; E-mails com tag `[Demonstração Local]` | Conecta ao servidor IMAP informado | Senha do e-mail criptografada via DPAPI do Windows |
+| **16** | **Disparador de Webhooks**| **Híbrido** | Requer URL de destino fornecida no comando | Endpoint salvo com botão "Testar" | Bloqueio rigoroso de SSRF (loopback/RFC1918 restritos) |
+| **17** | **Casa Inteligente (HA)** | **Híbrido** | Retorna simulação contextual com `[SIMULADO]` | Executa chamadas reais via REST API | Token criptografado via DPAPI; Domain Allowlist ativo |
+
+> 🏷️ **Tags de Transparência do Sistema**:
+> - **`[EXECUTADO]`**: Confirmação de que a chamada HTTP ou comando de sistema foi enviado e aceito com sucesso pelo serviço real.
+> - **`[SIMULADO]`**: Informa ao usuário e ao modelo que a ação foi simulada localmente porque o serviço externo (ex: Home Assistant) não foi configurado.
+> - **`[REQUER CONFIGURAÇÃO]`**: Alerta amigável indicando qual campo de credencial precisa ser preenchido no painel de configurações.
+
+---
+
+## ⚙️ Painéis de Configuração Avançada dos Módulos
+
+Na aba **Autonomia** do Painel de Configurações, os módulos que aceitam caminhos locais ou credenciais externas contam com sub-painéis integrados com design sci-fi e botões de ação nativos:
+
+### 🏠 1. Casa Inteligente (Home Assistant)
+- **URL da Instância**: Insira a URL do seu servidor Home Assistant (ex: `http://homeassistant.local:8123` ou `http://192.168.1.100:8123`).
+- **Token de Acesso (Bearer)**: Gere um Token de Acesso de Longa Duração no seu perfil do Home Assistant. O token é **criptografado via DPAPI do Windows** antes de ser salvo no disco.
+- **Botão "Testar Conexão"**: Testa imediatamente o endpoint `/api/` com o token informado, exibindo o status de conexão em tempo real sem precisar reiniciar o app.
+
+### 🐙 2. Git Watcher (Repositório de Trabalho)
+- **Caminho do Repositório**: Define qual pasta de projeto o Git Watcher deve inspecionar.
+- **Botão "Procurar"**: Abre a janela de seleção nativa de diretórios do Windows Explorer (`dialog.showOpenDialog`) para selecionar qualquer repositório com um clique.
+
+### 📁 3. Organizador de Pastas (Pasta Alvo Padrão)
+- **Caminho da Pasta**: Permite apontar uma pasta customizada para organização periódica (ex: `D:\Triagem`, `C:\Users\...\Desktop`).
+- **Botão "Procurar"**: Seletor nativo de diretórios do Windows Explorer.
+
+### ⚡ 4. Disparador de Webhooks (Endpoint Padrão)
+- **URL Padrão**: Define a URL base para envios de webhooks (ex: seu webhook de entrada no n8n: `http://localhost:5678/webhook/jasper`).
+- **Botão "Testar Disparo"**: Dispara um payload JSON de teste (`{"event":"test_ping","source":"jasper_hud"}`) para confirmar a conectividade com o seu webhook.
+
+### 📅 5. Agenda & E-mails (Servidor IMAP)
+- **Host IMAP**: Endereço do servidor de e-mail (ex: `imap.gmail.com`, `outlook.office365.com`).
+- **Porta**: Porta segura SSL/TLS (padrão `993`).
+- **Usuário**: Seu endereço de e-mail de login.
+- **Senha de Aplicativo**: Senha de app específica (como as geradas pelo Google ou Microsoft). **Criptografada via DPAPI do Windows**.
 
 ---
 
@@ -369,17 +431,43 @@ Painel de Controle -> Aba 5 [Autonomia]
 
 ---
 
-## 🔒 Privacidade, Segurança e Armazenamento Local
+## 🔒 Privacidade, Segurança e Criptografia Local (Zero-Trust)
 
-- **Zero Telemetria ou Envio Oculto**: Todo o código é aberto e executado na sua máquina. Nenhuma conversa ou arquivo é enviado para servidores de terceiros além da API do Google Gemini para processar a fala.
-- **Armazenamento de Dados**: Todas as configurações, memórias e grafos ficam guardados localmente na pasta de dados do usuário:
-  `C:\Users\<SEU_USUARIO>\AppData\Roaming\jasper-avatar\`
-  - `config.json`: Chave de API, vozes e toggles de módulos.
-  - `jasper-memory.json`: Fatos e preferências memorizados.
-  - `jasper-semantic-memory.json`: Banco de dados textual indexado por TF-IDF.
-  - `jasper-knowledge-graph.json`: Nós e relações conceituais.
-  - `jasper-schedules.json`: Lembretes e tarefas cron.
-  - `sandbox/`: Diretório descartável para execução de códigos e geração de gráficos.
+O Jasper AI HUD foi desenhado sob princípios rigorosos de **Defesa em Profundidade** e **Zero-Trust**, garantindo que seus dados, arquivos e segredos permaneçam seguros no seu computador:
+
+1. **Criptografia DPAPI de Credenciais (`electron.safeStorage`)**:
+   - A sua **Chave de API do Gemini**, o **Token Bearer do Home Assistant** e a **Senha de Aplicativo do IMAP** nunca ficam salvos em texto puro no disco.
+   - São cifrados pelo motor nativo de proteção de dados do Windows (`Data Protection API - DPAPI`) com o prefixo `enc:`. Apenas a sua conta de usuário ativa do Windows consegue decifrar os dados em runtime.
+
+2. **Proteção Anti-SSRF (Server-Side Request Forgery) em Webhooks**:
+   - O motor de webhooks possui um firewall interno que impede o modelo de enviar requisições para endereços de loopback (`localhost`, `127.0.0.1`), instâncias de metadados em nuvem (`169.254.169.254`) ou sub-redes privadas RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), a menos que o endpoint seja explicitamente registrado e validado por você no painel de configurações.
+
+3. **Zero-Trust Domain Allowlist no Smart Home**:
+   - Apenas entidades de conforto e climatização são permitidas para execução (`light`, `switch`, `climate`, `fan`, `media_player`).
+   - Dispositivos de segurança física (`lock`, `alarm_control_panel`, `cover`, `garage`, `camera`) possuem **bloqueio total no código**, impedindo que a IA destranque portas, altere alarmes ou abra garagens acidentalmente.
+
+4. **Isolamento e Sanitização do Code Interpreter**:
+   - Vem **desativado por padrão**.
+   - Ao executar código, cria subprocessos em diretório sandbox isolado com **ambiente limpo**: todas as variáveis de ambiente sensíveis do sistema (`GEMINI_API_KEY`, tokens, senhas) são suprimidas de `process.env`, passando apenas variáveis essenciais do sistema operacional (`PATH`, `SYSTEMROOT`, `TEMP`).
+
+5. **Redação Automática de Segredos no Clipboard**:
+   - O observador da área de transferência mascara automaticamente padrões conhecidos de credenciais (`AIzaSy...`, `sk-...`, Bearer tokens) antes de processar ou enviar resumos ao modelo de linguagem.
+
+6. **Injeção Multimodal Direta via WebSocket**:
+   - A captura de tela gera frames JPEG em memória e os injeta instantaneamente no canal WebSocket aberto do Gemini Live (`realtimeInput.mediaChunks`), sem gravar arquivos temporários no disco e sem intermediários.
+
+7. **Gravação Atômica de Arquivos**:
+   - Arquivos vitais de estado (`config.json`, `jasper-memory.json`, `jasper-knowledge-graph.json`) são escritos primeiro em arquivos temporários (`.tmp`) e depois renomeados atomicamente, prevenindo corrupção em caso de desligamento súbito da máquina.
+
+8. **Armazenamento 100% Local**:
+   - Todas as configurações e bancos de conhecimento residem exclusivamente na pasta do usuário:
+     `C:\Users\<SEU_USUARIO>\AppData\Roaming\jasper-avatar\`
+     - `config.json`: Chaves criptografadas e preferências de voz.
+     - `jasper-memory.json`: Fatos e histórico de preferências.
+     - `jasper-semantic-memory.json`: Índice semântico TF-IDF local.
+     - `jasper-knowledge-graph.json`: Grafo de conhecimento em JSON.
+     - `jasper-schedules.json`: Fila de tarefas agendadas.
+     - `sandbox/`: Área isolada temporária de execução de código.
 
 ---
 

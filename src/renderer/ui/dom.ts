@@ -96,6 +96,24 @@ export const DOM = {
   btnSampleNoise: document.getElementById('btn-sample-noise') as HTMLButtonElement | null,
   btnTrainCustomModel: document.getElementById('btn-train-custom-model') as HTMLButtonElement | null,
   btnResetCustomModel: document.getElementById('btn-reset-custom-model') as HTMLButtonElement | null,
-  trainerFeedback: document.getElementById('trainer-feedback-msg') as HTMLElement | null
+  trainerFeedback: document.getElementById('trainer-feedback-msg') as HTMLElement | null,
+
+  // Module Specific Config Elements
+  inputGitRepoPath: document.getElementById('input-git-repo-path') as HTMLInputElement | null,
+  btnBrowseGitRepo: document.getElementById('btn-browse-git-repo') as HTMLButtonElement | null,
+  selectFolderTarget: document.getElementById('select-folder-target') as HTMLSelectElement | null,
+  inputEmailHost: document.getElementById('input-email-host') as HTMLInputElement | null,
+  inputEmailPort: document.getElementById('input-email-port') as HTMLInputElement | null,
+  inputEmailUser: document.getElementById('input-email-user') as HTMLInputElement | null,
+  inputEmailPassword: document.getElementById('input-email-password') as HTMLInputElement | null,
+  btnToggleEmailPw: document.getElementById('btn-toggle-email-pw') as HTMLButtonElement | null,
+  inputWebhookUrl: document.getElementById('input-webhook-url') as HTMLInputElement | null,
+  btnTestWebhook: document.getElementById('btn-test-webhook') as HTMLButtonElement | null,
+  webhookTestFeedback: document.getElementById('webhook-test-feedback') as HTMLElement | null,
+  inputHassUrl: document.getElementById('input-hass-url') as HTMLInputElement | null,
+  inputHassToken: document.getElementById('input-hass-token') as HTMLInputElement | null,
+  btnToggleHassToken: document.getElementById('btn-toggle-hass-token') as HTMLButtonElement | null,
+  btnTestHass: document.getElementById('btn-test-hass') as HTMLButtonElement | null,
+  hassTestFeedback: document.getElementById('hass-test-feedback') as HTMLElement | null
 }
 

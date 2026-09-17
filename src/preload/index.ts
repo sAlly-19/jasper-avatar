@@ -203,6 +203,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   confirmReflexionAction: (confirmationId: string): Promise<boolean> => {
     return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_REFLEXION_CONFIRMATION, confirmationId)
   },
+  testSmartHomeConnection: (url?: string, token?: string): Promise<{ success: boolean; message: string }> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_SMART_HOME_TEST_CONNECTION, url, token)
+  },
+  testWebhook: (url: string): Promise<WebhookTriggerResult> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_WEBHOOK_TEST, url)
+  },
+  selectDirectory: (): Promise<string | null> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY)
+  },
   onAutonomyNotification: (callback: (notif: AutonomyNotification) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, notif: AutonomyNotification): void => callback(notif)
     ipcRenderer.on(IPC_CHANNELS.AUTONOMY_NOTIFICATION, handler)

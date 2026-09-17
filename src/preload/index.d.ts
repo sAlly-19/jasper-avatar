@@ -77,6 +77,9 @@ export interface ElectronAPI {
   getSmartHomeDevices: (domain?: string) => Promise<SmartHomeEntity[]>
   executeSmartHome: (domain: string, service: string, entityId: string, serviceData?: any) => Promise<SmartHomeActionResult>
   confirmReflexionAction: (confirmationId: string) => Promise<boolean>
+  testSmartHomeConnection: (url?: string, token?: string) => Promise<{ success: boolean; message: string }>
+  testWebhook: (url: string) => Promise<WebhookTriggerResult>
+  selectDirectory: () => Promise<string | null>
   onAutonomyNotification: (callback: (notif: AutonomyNotification) => void) => () => void
 }
 

@@ -10,6 +10,14 @@ export interface ClipboardAnalysis {
   timestamp: number
 }
 
+export function redactSecrets(text: string): string {
+  return text
+    .replace(/\bAIzaSy[A-Za-z0-9_-]{20,}\b/g, '[REDACTED_API_KEY]')
+    .replace(/\bsk-[A-Za-z0-9_-]{20,}\b/g, '[REDACTED_SECRET_KEY]')
+    .replace(/\bBearer\s+[A-Za-z0-9_.-]{20,}\b/gi, 'Bearer [REDACTED_TOKEN]')
+    .replace(/\bpassword\s*[:=]\s*["'][^"']+["']/gi, 'password: "[REDACTED]"')
+}
+
 export class ClipboardWatcherService {
   private isEnabled: boolean = true
   private pollIntervalMs: number = 1500
@@ -54,11 +62,12 @@ export class ClipboardWatcherService {
   }
 
   public readClipboard(): string {
-    return clipboard.readText()
+    return redactSecrets(clipboard.readText())
   }
 
   public analyzeText(text: string): ClipboardAnalysis {
-    const trimmed = text.trim()
+    const sanitized = redactSecrets(text.trim())
+    const trimmed = sanitized
 
     // 1. Error or Stack Trace
     const errorRegex = /(Exception|Error:|Traceback \(most recent call last\)|NullReferenceException|TypeError|ReferenceError|SyntaxError|UnhandledPromiseRejection|FATAL|panic:)/i
@@ -131,7 +140,7 @@ export class ClipboardWatcherService {
         const notification: AutonomyNotification = {
           id: `clip-${Date.now()}`,
           type: 'clipboard',
-          title: analysis.type === 'error_trace' ? '⚠️ Erro Copiado no Clipboard' : '🔗 Link Detectado',
+          title: analysis.type === 'error_trace' ? 'Erro Copiado no Clipboard' : 'Link Detectado',
           message: analysis.summary,
           timestamp: Date.now(),
           data: { analysis }

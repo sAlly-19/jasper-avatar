@@ -1,3 +1,5 @@
+import { SVG_ICONS } from './icons'
+
 export interface ModuleInfo {
   icon: string
   title: string
@@ -11,7 +13,7 @@ export interface ModuleInfo {
 
 export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   'screen-awareness': {
-    icon: '👁️',
+    icon: SVG_ICONS.eye,
     title: '1. Visão de Tela (Screen Awareness)',
     category: 'Visão Computacional Multimodal',
     overview: 'Permite que o assistente "veja" o que está no seu monitor no momento exato em que você pedir ajuda. Ideal para analisar linhas de código, gráficos, relatórios, documentos ou mensagens de erro.',
@@ -26,7 +28,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'window-tracker': {
-    icon: '🪟',
+    icon: SVG_ICONS.window,
     title: '2. Rastreador de Janela em Foco (Context Switcher)',
     category: 'Consciência de Contexto do SO',
     overview: 'Mantém o Jasper ciente de qual aplicativo você está utilizando ativamente (ex: VS Code, Chrome, Figma, Spotify, Terminal), adaptando o tom e o assunto das respostas ao que você está fazendo.',
@@ -41,7 +43,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'clipboard-watcher': {
-    icon: '📋',
+    icon: SVG_ICONS.clipboard,
     title: '3. Monitor de Clipboard (Ctrl+C Proativo)',
     category: 'Produtividade Proativa',
     overview: 'Auxilia você antes mesmo de você pedir! Ao copiar qualquer texto com erro de programação (stack trace), URL ou objeto JSON, o Jasper detecta e oferece ajuda imediatamente na tela.',
@@ -56,7 +58,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'cron-engine': {
-    icon: '⏰',
+    icon: SVG_ICONS.clock,
     title: '4. Motor de Agendamentos & Despertador Persistente',
     category: 'Gerenciamento de Tempo',
     overview: 'Permite criar alarmes, avisos e rotinas com horário marcado. Os lembretes são salvos no computador e nunca são esquecidos, mesmo se você fechar e reabrir o aplicativo.',
@@ -71,7 +73,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'daily-briefing': {
-    icon: '☀️',
+    icon: SVG_ICONS.sun,
     title: '5. Briefing Matinal & Noturno Proativo',
     category: 'Assistente Executivo',
     overview: 'Gera um relatório rápido e motivador do seu dia ao estilo "JARVIS": saudação conforme o horário (manhã, tarde, noite), data completa, saúde do computador, compromissos na agenda e sua janela de trabalho em foco.',
@@ -86,7 +88,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'system-health': {
-    icon: '📊',
+    icon: SVG_ICONS.activity,
     title: '6. Monitor de Saúde do Sistema & Hardware',
     category: 'Diagnóstico de Recursos',
     overview: 'Acompanha a temperatura e o uso dos componentes da sua máquina (processador, memória RAM e espaço em disco C:). Caso a memória atinja níveis perigosos (>90%), ele te alerta para evitar lentidão.',
@@ -101,7 +103,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'semantic-memory': {
-    icon: '🧠',
+    icon: SVG_ICONS.brain,
     title: '7. Memória Semântica Vetorial (RAG Local)',
     category: 'Inteligência e Aprendizado Contínuo',
     overview: 'Permite ao Jasper lembrar do significado e do contexto de conversas e fatos passados, mesmo quando você pesquisa usando palavras diferentes daquelas que usou quando conversou.',
@@ -116,7 +118,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'knowledge-graph': {
-    icon: '🕸️',
+    icon: SVG_ICONS.graph,
     title: '8. Grafo de Conhecimento Relacional',
     category: 'Estruturação de Dados',
     overview: 'Mapeia relações e conexões lógicas entre pessoas, projetos, linguagens e ferramentas para que o assistente compreenda como as peças da sua vida profissional e pessoal se conectam.',
@@ -131,7 +133,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'code-interpreter': {
-    icon: '💻',
+    icon: SVG_ICONS.terminal,
     title: '9. Interpretador de Código Sandboxed Local',
     category: 'Automação & Processamento de Dados',
     overview: 'Capacidade de escrever e rodar scripts Python e JavaScript em uma área isolada do computador para manipular planilhas, gerar gráficos, calcular equações ou processar dados complexos.',
@@ -146,7 +148,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'headless-browser': {
-    icon: '🌐',
+    icon: SVG_ICONS.globe,
     title: '10. Navegador Headless Invisível (Chromium Worker)',
     category: 'Automação Web & Extração de Dados',
     overview: 'Abre um navegador web invisível em segundo plano para consultar documentações, pesquisar preços ou ler artigos online, devolvendo as informações já resumidas sem abrir abas na sua tela.',
@@ -161,7 +163,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'git-watcher': {
-    icon: '🐙',
+    icon: SVG_ICONS.gitBranch,
     title: '11. Git Watcher & Assistente de Commits Semânticos',
     category: 'Desenvolvimento de Software',
     overview: 'Monitora repositórios Git no seu computador, lista arquivos alterados não commitados, sugere mensagens de commit padronizadas (Conventional Commits) e executa baterias de testes unitários.',
@@ -176,7 +178,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'folder-organizer': {
-    icon: '📁',
+    icon: SVG_ICONS.folder,
     title: '12. Organizador de Downloads & Área de Trabalho',
     category: 'Manutenção do Sistema Operacional',
     overview: 'Elimina a bagunça nas suas pastas! Localiza arquivos duplicados, identifica instaladores velhos esquecidos (>30 dias) e organiza arquivos soltos em pastas por categoria.',
@@ -191,7 +193,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'subagents': {
-    icon: '👥',
+    icon: SVG_ICONS.users,
     title: '13. Orquestrador de Subagentes Paralelos',
     category: 'Arquitetura Multi-Agente',
     overview: 'Permite ao assistente instanciar "subagentes" em segundo plano para realizar tarefas pesadas e demoradas (pesquisa web, execução de testes, análise de hardware) sem congelar a interface ou travar a conversa de voz.',
@@ -206,7 +208,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'reflexion-loop': {
-    icon: '🛡️',
+    icon: SVG_ICONS.shield,
     title: '14. Loop de Auto-Reflexão & Bloqueio de Alto Risco',
     category: 'Segurança & Validação Preventiva',
     overview: 'O guarda-costas digital do seu sistema operacional! Audita todos os comandos antes da execução e bloqueia qualquer operação potencialmente perigosa ou destrutiva, exigindo sua confirmação expressa na tela.',
@@ -220,7 +222,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'calendar-email': {
-    icon: '📅',
+    icon: SVG_ICONS.calendar,
     title: '15. Agenda de Compromissos (iCal) & E-mails',
     category: 'Produtividade & Gestão Pessoal',
     overview: 'Gerencia sua agenda localmente, cria arquivos de calendário padrão compatíveis com Google Agenda e Outlook, e dispara um alarme no HUD exatamente 10 minutos antes de cada compromisso marcado.',
@@ -235,7 +237,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'webhooks': {
-    icon: '⚡',
+    icon: SVG_ICONS.bolt,
     title: '16. Gatilhos de Webhook (n8n, Zapier, Make, Slack)',
     category: 'Automação Corporativa & Integrações',
     overview: 'Conecta o Jasper a centenas de plataformas de automação (n8n, Zapier, Make, canais do Slack e Discord), permitindo disparar fluxos inteiros com uma única instrução falada.',
@@ -250,7 +252,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'smart-home': {
-    icon: '🏠',
+    icon: SVG_ICONS.home,
     title: '17. Controle de Casa Inteligente (Home Assistant)',
     category: 'Internet das Coisas (IoT)',
     overview: 'Permite controlar iluminação, ar-condicionado, tomadas e persianas por comando de voz direto através da API oficial do Home Assistant (a maior plataforma open-source de automação residencial).',
@@ -265,7 +267,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'system-tools': {
-    icon: '⚙️',
+    icon: SVG_ICONS.sliders,
     title: 'Ações de Sistema & Utilitários Locais',
     category: 'Ferramentas de Sistema',
     overview: 'Permite ao assistente interagir com aplicativos e utilitários instalados no seu computador, como calculadora, bloco de notas, terminal e organizador de pastas.',
@@ -280,7 +282,7 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
   },
 
   'media-tools': {
-    icon: '🎵',
+    icon: SVG_ICONS.music,
     title: 'Mídia & Pesquisas na Web',
     category: 'Mídia & Entretenimento',
     overview: 'Permite controlar reprodução musical no Spotify Desktop, abrir buscas de vídeo no YouTube e realizar pesquisas diretas no Google.',
@@ -329,7 +331,7 @@ export class ModuleInfoModal {
     const data = MODULE_INFO_DATA[moduleId]
     if (!data) return
 
-    if (this.iconEl) this.iconEl.textContent = data.icon
+    if (this.iconEl) this.iconEl.innerHTML = data.icon
     if (this.titleEl) this.titleEl.textContent = data.title
     if (this.subtitleEl) this.subtitleEl.textContent = data.category
     if (this.categoryEl) this.categoryEl.textContent = data.category

@@ -60,7 +60,10 @@ export const IPC_CHANNELS = {
   AUTONOMY_WEBHOOK_LIST: 'autonomy:webhook-list',
   AUTONOMY_SMART_HOME_GET_DEVICES: 'autonomy:smart-home-get-devices',
   AUTONOMY_SMART_HOME_EXECUTE: 'autonomy:smart-home-execute',
-  AUTONOMY_REFLEXION_CONFIRMATION: 'autonomy:reflexion-confirmation'
+  AUTONOMY_SMART_HOME_TEST_CONNECTION: 'autonomy:smart-home-test-connection',
+  AUTONOMY_REFLEXION_CONFIRMATION: 'autonomy:reflexion-confirmation',
+  AUTONOMY_WEBHOOK_TEST: 'autonomy:webhook-test',
+  DIALOG_SELECT_DIRECTORY: 'dialog:select-directory'
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

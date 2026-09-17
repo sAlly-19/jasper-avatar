@@ -177,7 +177,9 @@
               <!-- Agent Name Customization Card -->
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">🏷️</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                  </span>
                   <div>
                     <h4>Nome do Agente Assistente</h4>
                     <p>Altera a identidade em toda a interface, na ativação por voz e no prompt de IA.</p>
@@ -194,7 +196,9 @@
               <!-- Facial Expressions Card -->
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">🎭</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a5 5 0 0 0 5 5 8 8 0 0 1 5 2 8 8 0 0 1 5-2 5 5 0 0 0 5-5V7h-20v5z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/></svg>
+                  </span>
                   <div>
                     <h4>Expressão Facial do Avatar</h4>
                     <p>Altera o humor e as microexpressões faciais em tempo real.</p>
@@ -254,7 +258,9 @@
               <!-- Full Screen Mode Card -->
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">⛶</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                  </span>
                   <div>
                     <h4>Modo Tela Cheia (F12)</h4>
                     <p>Expande a interface holográfica para ocupar 100% do monitor. Pressione <strong>F12</strong> a qualquer momento para entrar ou sair.</p>
@@ -269,7 +275,9 @@
               <!-- Gemini API Key Card -->
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">🔑</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-2.5-2.5"/></svg>
+                  </span>
                   <div>
                     <h4>GOOGLE_API_KEY (Gemini Multimodal Live)</h4>
                     <p>Necessária para comunicação bidirecional de áudio e inteligência artificial.</p>
@@ -287,7 +295,9 @@
               <!-- TensorFlow.js Speech Commands Engine Card (100% Free & Local) -->
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">🎙️</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                  </span>
                   <div>
                     <h4>Ativação por Voz (Nome do Agente)</h4>
                     <p>Detecção neural personalizada com TensorFlow.js. Ativa exclusivamente ao ouvir o nome do assistente.</p>
@@ -307,7 +317,7 @@
 
                 <!-- Status Box -->
                 <div id="wake-word-status-box" class="wake-word-status-box" style="margin-top: 12px; padding: 10px 14px; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 8px; font-size: 0.82rem; color: var(--text-dim); display: flex; align-items: center; gap: 10px;">
-                  <span id="wake-status-icon" style="font-size: 1.1rem;">⚡</span>
+                  <span id="wake-status-icon" style="display: inline-flex; align-items: center; justify-content: center; color: var(--cyan-neon);"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                   <div>
                     <strong id="wake-status-title" style="color: var(--accent-cyan); display: block; margin-bottom: 2px;">Calibração de Voz para: <span class="lbl-agent-target-name">Jasper</span></strong>
                     <span id="wake-status-desc">Grave 3 amostras rápidas dizendo o nome do seu assistente e 2 de silêncio para treinar a rede neural local (leva menos de 10 segundos).</span>
@@ -339,20 +349,24 @@
 
                   <!-- Trainer Buttons -->
                   <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button type="button" id="btn-sample-name" class="btn-trainer" style="flex: 1; min-width: 150px; padding: 8px 12px; background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 6px; color: var(--accent-cyan); font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.2s;">
-                      🎙️ Gravar "<span class="lbl-agent-target-name">Jasper</span>"
+                    <button type="button" id="btn-sample-name" class="btn-trainer" style="flex: 1; min-width: 150px; padding: 8px 12px; background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 6px; color: var(--accent-cyan); font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                      Gravar "<span class="lbl-agent-target-name">Jasper</span>"
                     </button>
-                    <button type="button" id="btn-sample-noise" class="btn-trainer" style="flex: 1; min-width: 150px; padding: 8px 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.2s;">
-                      🤫 Gravar Silêncio
+                    <button type="button" id="btn-sample-noise" class="btn-trainer" style="flex: 1; min-width: 150px; padding: 8px 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: var(--text-primary); font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                      Gravar Silêncio
                     </button>
                   </div>
 
                   <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <button type="button" id="btn-train-custom-model" class="btn-trainer" disabled style="flex: 2; padding: 8px 14px; background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.2); border-radius: 6px; color: #00ff88; font-size: 0.82rem; font-weight: 600; cursor: not-allowed; opacity: 0.5; transition: all 0.2s;">
-                      ⚡ Treinar Modelo Neural (1s)
+                    <button type="button" id="btn-train-custom-model" class="btn-trainer" disabled style="flex: 2; padding: 8px 14px; background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.2); border-radius: 6px; color: #00ff88; font-size: 0.82rem; font-weight: 600; cursor: not-allowed; opacity: 0.5; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                      Treinar Modelo Neural (1s)
                     </button>
-                    <button type="button" id="btn-reset-custom-model" class="btn-trainer" style="flex: 1; padding: 8px 10px; background: rgba(255, 68, 68, 0.08); border: 1px solid rgba(255, 68, 68, 0.2); border-radius: 6px; color: #ff6666; font-size: 0.78rem; cursor: pointer; transition: all 0.2s;">
-                      🗑️ Resetar
+                    <button type="button" id="btn-reset-custom-model" class="btn-trainer" style="flex: 1; padding: 8px 10px; background: rgba(255, 68, 68, 0.08); border: 1px solid rgba(255, 68, 68, 0.2); border-radius: 6px; color: #ff6666; font-size: 0.78rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      Resetar
                     </button>
                   </div>
 
@@ -365,7 +379,9 @@
               <!-- Voice & Model Card -->
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">🔊</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                  </span>
                   <div>
                     <h4>Voz e Modelo de Síntese</h4>
                     <p>Personalize o tom vocal e o motor de linguagem nativo.</p>
@@ -436,7 +452,9 @@
             <div id="tab-memory" class="settings-tab-pane">
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">🧠</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"/></svg>
+                  </span>
                   <div class="memory-header-info">
                     <h4>Banco de Memória de Longo Prazo</h4>
                     <p>Fatos e preferências memorizados automaticamente durante suas conversas.</p>
@@ -459,7 +477,9 @@
             <div id="tab-autonomy" class="settings-tab-pane">
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="card-icon">⚡</span>
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  </span>
                   <div>
                     <h4>Serviços Autônomos em Segundo Plano</h4>
                     <p>Ative ou desative individualmente as capacidades proativas e monitores contínuos do Jasper. Clique no botão <strong>"!"</strong> para ver detalhes completos.</p>
@@ -652,6 +672,19 @@
                     <span class="hud-toggle-slider"></span>
                   </label>
                 </div>
+                <div class="module-config-panel" id="panel-config-git-watcher">
+                  <div class="config-field-group">
+                    <label for="input-git-repo-path" class="config-field-label">Pasta do Repositório Git Local:</label>
+                    <div class="input-with-action">
+                      <input type="text" id="input-git-repo-path" placeholder="Caminho do repositório ou deixe em branco para pasta atual" />
+                      <button type="button" id="btn-browse-git-repo" class="btn-subaction" title="Procurar Pasta">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        Procurar
+                      </button>
+                    </div>
+                    <small class="config-field-hint">O assistente verificará este repositório periodicamente para sugerir commits inteligentes.</small>
+                  </div>
+                </div>
               </div>
 
               <!-- 12. Folder Organizer -->
@@ -668,6 +701,15 @@
                     <input type="checkbox" id="check-folder-organizer" checked />
                     <span class="hud-toggle-slider"></span>
                   </label>
+                </div>
+                <div class="module-config-panel" id="panel-config-folder-organizer">
+                  <div class="config-field-group">
+                    <label for="select-folder-target" class="config-field-label">Diretório Padrão de Organização:</label>
+                    <select id="select-folder-target">
+                      <option value="downloads">Pasta de Downloads (Padrão do Windows)</option>
+                      <option value="desktop">Área de Trabalho (Desktop)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -720,6 +762,34 @@
                     <span class="hud-toggle-slider"></span>
                   </label>
                 </div>
+                <div class="module-config-panel" id="panel-config-calendar-email">
+                  <div class="config-field-group">
+                    <div class="config-row-2col">
+                      <div class="form-group flex-1">
+                        <label for="input-email-host" class="config-field-label">Servidor IMAP:</label>
+                        <input type="text" id="input-email-host" placeholder="imap.gmail.com" />
+                      </div>
+                      <div class="form-group" style="width: 100px;">
+                        <label for="input-email-port" class="config-field-label">Porta:</label>
+                        <input type="number" id="input-email-port" placeholder="993" />
+                      </div>
+                    </div>
+                    <div class="config-row-2col">
+                      <div class="form-group flex-1">
+                        <label for="input-email-user" class="config-field-label">E-mail / Usuário:</label>
+                        <input type="text" id="input-email-user" placeholder="seu-email@gmail.com" />
+                      </div>
+                      <div class="form-group flex-1">
+                        <label for="input-email-password" class="config-field-label">Senha de App:</label>
+                        <div class="input-password-wrap">
+                          <input type="password" id="input-email-password" placeholder="Senha do app" />
+                          <button type="button" id="btn-toggle-email-pw" class="btn-toggle">Mostrar</button>
+                        </div>
+                      </div>
+                    </div>
+                    <small class="config-field-hint">Deixe em branco para usar o modo de demonstração simulado local sem conectar a um servidor real.</small>
+                  </div>
+                </div>
               </div>
 
               <!-- 16. Webhooks (n8n / Zapier / Make) -->
@@ -737,6 +807,20 @@
                     <span class="hud-toggle-slider"></span>
                   </label>
                 </div>
+                <div class="module-config-panel" id="panel-config-webhooks">
+                  <div class="config-field-group">
+                    <label for="input-webhook-url" class="config-field-label">URL do Endpoint Webhook Padrão:</label>
+                    <div class="input-with-action">
+                      <input type="text" id="input-webhook-url" placeholder="http://localhost:5678/webhook/jasper" />
+                      <button type="button" id="btn-test-webhook" class="btn-subaction">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        Testar
+                      </button>
+                    </div>
+                    <div id="webhook-test-feedback" class="config-test-feedback"></div>
+                    <small class="config-field-hint">Suporta n8n, Zapier, Make, Slack ou qualquer serviço HTTP POST seguro.</small>
+                  </div>
+                </div>
               </div>
 
               <!-- 17. Smart Home (Home Assistant) -->
@@ -753,6 +837,26 @@
                     <input type="checkbox" id="check-smart-home" checked />
                     <span class="hud-toggle-slider"></span>
                   </label>
+                </div>
+                <div class="module-config-panel" id="panel-config-smart-home">
+                  <div class="config-field-group">
+                    <label for="input-hass-url" class="config-field-label">URL do Servidor Home Assistant:</label>
+                    <input type="text" id="input-hass-url" placeholder="http://homeassistant.local:8123 (ou IP da sua rede)" />
+                    
+                    <label for="input-hass-token" class="config-field-label" style="margin-top: 8px;">Token de Acesso de Longa Duração (Bearer):</label>
+                    <div class="input-password-wrap">
+                      <input type="password" id="input-hass-token" placeholder="Cole o token gerado no perfil do Home Assistant" />
+                      <button type="button" id="btn-toggle-hass-token" class="btn-toggle">Mostrar</button>
+                    </div>
+                    <div class="config-action-row" style="margin-top: 10px;">
+                      <button type="button" id="btn-test-hass" class="btn-subaction">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 8v6M8 8H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4m8-8h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4"/></svg>
+                        Testar Conexão
+                      </button>
+                      <div id="hass-test-feedback" class="config-test-feedback"></div>
+                    </div>
+                    <small class="config-field-hint">Deixe o token em branco para usar o modo de simulação local sem alterar dispositivos reais.</small>
+                  </div>
                 </div>
               </div>
             </div>
@@ -775,7 +879,9 @@
           <!-- Modal Header -->
           <div class="modal-header">
             <div class="modal-title-wrap">
-              <div class="module-detail-icon" id="module-detail-icon">⚡</div>
+              <div class="module-detail-icon" id="module-detail-icon">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
               <div>
                 <h3 id="module-detail-title">Nome do Módulo</h3>
                 <span class="modal-subtitle" id="module-detail-subtitle">Serviço de Autonomia do Jasper AI</span>
@@ -788,25 +894,45 @@
           <div class="module-detail-body">
             <!-- Section 1: Overview -->
             <div class="detail-section">
-              <h5 class="detail-section-title"><span class="section-icon">🎯</span> O Que Este Módulo Faz</h5>
+              <h5 class="detail-section-title">
+                <span class="section-icon">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                </span>
+                O Que Este Módulo Faz
+              </h5>
               <p id="module-detail-overview" class="detail-text"></p>
             </div>
 
             <!-- Section 2: How It Works -->
             <div class="detail-section">
-              <h5 class="detail-section-title"><span class="section-icon">⚙️</span> Como Funciona nos Bastidores</h5>
+              <h5 class="detail-section-title">
+                <span class="section-icon">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </span>
+                Como Funciona nos Bastidores
+              </h5>
               <p id="module-detail-how" class="detail-text"></p>
             </div>
 
             <!-- Section 3: Voice Command Examples -->
             <div class="detail-section">
-              <h5 class="detail-section-title"><span class="section-icon">🗣️</span> Exemplos Práticos de Comandos de Voz</h5>
+              <h5 class="detail-section-title">
+                <span class="section-icon">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </span>
+                Exemplos Práticos de Comandos de Voz
+              </h5>
               <ul id="module-detail-examples" class="detail-examples-list"></ul>
             </div>
 
             <!-- Section 4: External Requirements -->
             <div class="detail-section">
-              <h5 class="detail-section-title"><span class="section-icon">🔌</span> Softwares & Requisitos Externos</h5>
+              <h5 class="detail-section-title">
+                <span class="section-icon">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 8v6M8 8H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4m8-8h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4"/></svg>
+                </span>
+                Softwares & Requisitos Externos
+              </h5>
               <p id="module-detail-requirements" class="detail-text"></p>
             </div>
 

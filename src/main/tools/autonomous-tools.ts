@@ -17,6 +17,7 @@ import {
   webhookManager,
   smartHome
 } from '../autonomous'
+import { getGlobalGeminiClient } from '../gemini-live'
 import type { SubagentRole } from '@shared'
 
 export async function executeAutonomyTool(toolName: string, args: Record<string, any>): Promise<string> {
@@ -44,7 +45,12 @@ async function executeToolInternal(toolName: string, args: Record<string, any>):
       if (!res.success) {
         return `Não foi possível capturar a tela: ${res.error}`
       }
-      return `Tela capturada com sucesso (${res.width}x${res.height}). O arquivo está disponível para análise visual.`
+      // Inject visual screenshot frame into active Gemini Live session
+      const client = getGlobalGeminiClient()
+      if (client && res.base64Image) {
+        client.sendRealtimeMediaChunk('image/jpeg', res.base64Image)
+      }
+      return `Tela capturada com sucesso (${res.width}x${res.height}) e enviada para o canal de visão multimodal. Você pode analisar o que está visível.`
     }
 
     case 'get_active_window': {

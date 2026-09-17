@@ -1,5 +1,8 @@
 import type { SmartHomeEntity, SmartHomeActionResult } from '@shared'
 
+const ALLOWED_DOMAINS = new Set(['light', 'switch', 'climate', 'fan', 'media_player'])
+const BLOCKED_DOMAINS = new Set(['lock', 'alarm_control_panel', 'cover', 'garage', 'camera'])
+
 export class SmartHomeService {
   private enabled: boolean = true
   private baseUrl: string = process.env.HASS_URL || 'http://homeassistant.local:8123'
@@ -15,7 +18,51 @@ export class SmartHomeService {
 
   public setConfig(url: string, token: string): void {
     if (url) this.baseUrl = url.trim().replace(/\/$/, '')
-    if (token) this.token = token.trim()
+    if (token !== undefined) this.token = token.trim()
+  }
+
+  public async testConnection(url?: string, token?: string): Promise<{ success: boolean; message: string }> {
+    const targetUrl = (url || this.baseUrl).trim().replace(/\/$/, '')
+    const targetToken = token !== undefined ? token.trim() : this.token
+
+    if (!targetUrl) {
+      return { success: false, message: 'URL do Home Assistant não informada.' }
+    }
+    if (!targetToken) {
+      return { success: false, message: 'Token de Acesso não informado.' }
+    }
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 6000)
+
+      const res = await fetch(`${targetUrl}/api/`, {
+        headers: {
+          Authorization: `Bearer ${targetToken}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
+      })
+      clearTimeout(timeout)
+
+      if (res.ok) {
+        const data: any = await res.json()
+        return {
+          success: true,
+          message: `Conectado com sucesso ao Home Assistant! (${data.message || 'API ativa'})`
+        }
+      } else {
+        return {
+          success: false,
+          message: `Home Assistant retornou erro HTTP ${res.status}: ${res.statusText}`
+        }
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Falha na conexão: ${err.message || 'Servidor inacessível'}`
+      }
+    }
   }
 
   public async getEntities(filterDomain?: string): Promise<SmartHomeEntity[]> {
@@ -40,6 +87,9 @@ export class SmartHomeService {
             state: item.state,
             attributes: item.attributes
           }))
+
+          // Apply security filter to hide blocked/sensitive domains
+          list = list.filter((e) => !BLOCKED_DOMAINS.has(e.domain))
 
           if (filterDomain) {
             list = list.filter((e) => e.domain === filterDomain)
@@ -97,7 +147,27 @@ export class SmartHomeService {
     const cleanService = service.toLowerCase().trim()
     const cleanEntity = entityId.trim()
 
-    // If live token is present, dispatch to Home Assistant
+    // 1. Security Check: Block dangerous physical access domains
+    if (BLOCKED_DOMAINS.has(cleanDomain)) {
+      return {
+        success: false,
+        entityId: cleanEntity,
+        action: `${cleanDomain}.${cleanService}`,
+        message: `[SEGURANÇA BLOQUEADA] O domínio "${cleanDomain}" controla acessos físicos (portas/travas/garagens) e está restrito por política Zero-Trust.`
+      }
+    }
+
+    // 2. Security Check: Enforce allowed domains
+    if (!ALLOWED_DOMAINS.has(cleanDomain)) {
+      return {
+        success: false,
+        entityId: cleanEntity,
+        action: `${cleanDomain}.${cleanService}`,
+        message: `[DOMÍNIO NÃO PERMITIDO] Somente os domínios [${Array.from(ALLOWED_DOMAINS).join(', ')}] são autorizados.`
+      }
+    }
+
+    // 3. If live token is present, dispatch to Home Assistant
     if (this.token) {
       try {
         const res = await fetch(`${this.baseUrl}/api/services/${cleanDomain}/${cleanService}`, {
@@ -117,7 +187,14 @@ export class SmartHomeService {
             success: true,
             entityId: cleanEntity,
             action: `${cleanDomain}.${cleanService}`,
-            message: `Comando executado no Home Assistant: ${cleanEntity} -> ${cleanService}`
+            message: `[EXECUTED] Comando executado no Home Assistant: ${cleanEntity} -> ${cleanService}`
+          }
+        } else {
+          return {
+            success: false,
+            entityId: cleanEntity,
+            action: `${cleanDomain}.${cleanService}`,
+            message: `Home Assistant retornou erro ${res.status}: ${res.statusText}`
           }
         }
       } catch (err: any) {
@@ -130,17 +207,16 @@ export class SmartHomeService {
       }
     }
 
-    // Simulated response with feedback
+    // 4. Simulated response with transparent feedback
     const friendlyAction =
       cleanService === 'turn_on' ? 'ligado' : cleanService === 'turn_off' ? 'desligado' : cleanService
     return {
       success: true,
       entityId: cleanEntity,
       action: `${cleanDomain}.${cleanService}`,
-      message: `[Simulação Smart Home]: Dispositivo "${cleanEntity}" foi ${friendlyAction} com sucesso.`
+      message: `[SIMULATED] Dispositivo "${cleanEntity}" foi ${friendlyAction} com sucesso em modo de demonstração local (sem Home Assistant conectado).`
     }
   }
 }
 
 export const smartHome = new SmartHomeService()
-

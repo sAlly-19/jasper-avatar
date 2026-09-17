@@ -8,6 +8,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "node --test test/security-hardening.test.mjs",
     "setup:assets": "node scripts/setup-assets.mjs",
     "postinstall": "node scripts/setup-assets.mjs"
   },

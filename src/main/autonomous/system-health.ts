@@ -150,7 +150,7 @@ export class SystemHealthService {
       const notif: AutonomyNotification = {
         id: `ram-warning-${Date.now()}`,
         type: 'warning',
-        title: '⚠️ Atenção: Memória RAM Crítica',
+        title: 'Atenção: Memória RAM Crítica',
         message: `O uso de memória atingiu ${health.ramUsagePercent}% (${health.usedRamGb}GB de ${health.totalRamGb}GB). Considere fechar abas ou programas pesados.`,
         timestamp: Date.now(),
         data: health

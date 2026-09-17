@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, safeStorage } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import dotenv from 'dotenv'
@@ -6,6 +6,50 @@ import type { JasperConfig, UpdateConfigPayload, ConfigSummary } from '@shared'
 
 // Load environment variables from .env
 dotenv.config()
+
+function encryptSecret(val: string): string {
+  if (!val) return ''
+  try {
+    if (safeStorage && safeStorage.isEncryptionAvailable()) {
+      return `enc:${safeStorage.encryptString(val).toString('base64')}`
+    }
+  } catch (err) {
+    console.warn('[ConfigStore] safeStorage encryption failed, saving unencrypted:', err)
+  }
+  return val
+}
+
+function decryptSecret(val: string): string {
+  if (!val) return ''
+  if (val.startsWith('enc:')) {
+    try {
+      if (safeStorage && safeStorage.isEncryptionAvailable()) {
+        const buf = Buffer.from(val.slice(4), 'base64')
+        return safeStorage.decryptString(buf)
+      }
+    } catch (err) {
+      console.warn('[ConfigStore] safeStorage decryption failed:', err)
+      return ''
+    }
+  }
+  return val
+}
+
+function atomicWriteFileSync(filePath: string, data: string): void {
+  const tmpPath = `${filePath}.tmp.${Date.now()}`
+  fs.writeFileSync(tmpPath, data, 'utf-8')
+  try {
+    fs.renameSync(tmpPath, filePath)
+  } catch (err) {
+    // Windows fallback if destination is locked
+    try {
+      fs.copyFileSync(tmpPath, filePath)
+      fs.unlinkSync(tmpPath)
+    } catch {
+      fs.writeFileSync(filePath, data, 'utf-8')
+    }
+  }
+}
 
 class ConfigStore {
   private config: JasperConfig = {
@@ -28,7 +72,7 @@ class ConfigStore {
     enableSystemHealth: true,
     enableSemanticMemory: true,
     enableKnowledgeGraph: true,
-    enableCodeInterpreter: true,
+    enableCodeInterpreter: false, // Security: Disabled by default
     enableHeadlessBrowser: true,
     enableGitWatcher: true,
     enableFolderOrganizer: true,
@@ -36,7 +80,17 @@ class ConfigStore {
     enableReflexionLoop: true,
     enableCalendarEmail: true,
     enableWebhooks: true,
-    enableSmartHome: true
+    enableSmartHome: true,
+    // Module specific configurations
+    hassUrl: process.env.HASS_URL || 'http://homeassistant.local:8123',
+    hassToken: process.env.HASS_TOKEN || '',
+    gitRepoPath: process.cwd(),
+    webhookDefaultUrl: 'http://localhost:5678/webhook/jasper',
+    emailUser: '',
+    emailImapHost: 'imap.gmail.com',
+    emailImapPort: 993,
+    emailPassword: '',
+    folderDefaultTarget: 'downloads'
   }
 
   constructor() {
@@ -53,13 +107,15 @@ class ConfigStore {
     this.config.voiceName = process.env.GEMINI_VOICE || 'Charon'
     this.config.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-latest'
     this.config.agentName = process.env.AGENT_NAME || 'Jasper'
+    this.config.hassUrl = process.env.HASS_URL || 'http://homeassistant.local:8123'
+    this.config.hassToken = process.env.HASS_TOKEN || ''
 
     // 2. Overlay persisted settings from userData
     try {
       const cfgPath = this.getConfigFilePath()
       if (fs.existsSync(cfgPath)) {
         const data = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'))
-        if (data.apiKey) this.config.apiKey = data.apiKey
+        if (data.apiKey) this.config.apiKey = decryptSecret(data.apiKey)
         if (data.voiceName) this.config.voiceName = data.voiceName
         if (data.model) this.config.model = data.model
         if (data.enableSystemTools !== undefined) this.config.enableSystemTools = data.enableSystemTools
@@ -86,6 +142,18 @@ class ConfigStore {
         if (data.enableCalendarEmail !== undefined) this.config.enableCalendarEmail = data.enableCalendarEmail
         if (data.enableWebhooks !== undefined) this.config.enableWebhooks = data.enableWebhooks
         if (data.enableSmartHome !== undefined) this.config.enableSmartHome = data.enableSmartHome
+
+        // Module-specific configs
+        if (data.hassUrl !== undefined) this.config.hassUrl = data.hassUrl
+        if (data.hassToken !== undefined) this.config.hassToken = decryptSecret(data.hassToken)
+        if (data.gitRepoPath !== undefined) this.config.gitRepoPath = data.gitRepoPath
+        if (data.webhookDefaultUrl !== undefined) this.config.webhookDefaultUrl = data.webhookDefaultUrl
+        if (data.emailUser !== undefined) this.config.emailUser = data.emailUser
+        if (data.emailImapHost !== undefined) this.config.emailImapHost = data.emailImapHost
+        if (data.emailImapPort !== undefined) this.config.emailImapPort = data.emailImapPort
+        if (data.emailPassword !== undefined) this.config.emailPassword = decryptSecret(data.emailPassword)
+        if (data.folderDefaultTarget !== undefined) this.config.folderDefaultTarget = data.folderDefaultTarget
+
         console.log('[ConfigStore] Loaded settings from userData/jasper-config.json')
       }
     } catch (err) {
@@ -98,8 +166,14 @@ class ConfigStore {
   public savePersistedConfig(): void {
     try {
       const cfgPath = this.getConfigFilePath()
-      const content = JSON.stringify(this.config, null, 2)
-      fs.writeFileSync(cfgPath, content, 'utf-8')
+      const dataToPersist = {
+        ...this.config,
+        apiKey: encryptSecret(this.config.apiKey),
+        hassToken: encryptSecret(this.config.hassToken || ''),
+        emailPassword: encryptSecret(this.config.emailPassword || '')
+      }
+      const content = JSON.stringify(dataToPersist, null, 2)
+      atomicWriteFileSync(cfgPath, content)
       console.log('[ConfigStore] Saved configuration successfully to', cfgPath)
     } catch (err) {
       console.warn('[ConfigStore] Error saving config to userData:', err)
@@ -139,6 +213,17 @@ class ConfigStore {
     if (payload.enableWebhooks !== undefined) this.config.enableWebhooks = payload.enableWebhooks
     if (payload.enableSmartHome !== undefined) this.config.enableSmartHome = payload.enableSmartHome
 
+    // Module-specific configs
+    if (payload.hassUrl !== undefined) this.config.hassUrl = payload.hassUrl.trim()
+    if (payload.hassToken !== undefined) this.config.hassToken = payload.hassToken.trim()
+    if (payload.gitRepoPath !== undefined) this.config.gitRepoPath = payload.gitRepoPath.trim()
+    if (payload.webhookDefaultUrl !== undefined) this.config.webhookDefaultUrl = payload.webhookDefaultUrl.trim()
+    if (payload.emailUser !== undefined) this.config.emailUser = payload.emailUser.trim()
+    if (payload.emailImapHost !== undefined) this.config.emailImapHost = payload.emailImapHost.trim()
+    if (payload.emailImapPort !== undefined) this.config.emailImapPort = payload.emailImapPort
+    if (payload.emailPassword !== undefined) this.config.emailPassword = payload.emailPassword.trim()
+    if (payload.folderDefaultTarget !== undefined) this.config.folderDefaultTarget = payload.folderDefaultTarget.trim()
+
     this.savePersistedConfig()
     return this.getConfig()
   }
@@ -175,6 +260,16 @@ class ConfigStore {
       enableCalendarEmail: this.config.enableCalendarEmail,
       enableWebhooks: this.config.enableWebhooks,
       enableSmartHome: this.config.enableSmartHome,
+      // Module-specific configs
+      hassUrl: this.config.hassUrl || 'http://homeassistant.local:8123',
+      hasHassToken: Boolean(this.config.hassToken && this.config.hassToken.length > 5),
+      gitRepoPath: this.config.gitRepoPath || process.cwd(),
+      webhookDefaultUrl: this.config.webhookDefaultUrl || 'http://localhost:5678/webhook/jasper',
+      emailUser: this.config.emailUser || '',
+      emailImapHost: this.config.emailImapHost || 'imap.gmail.com',
+      emailImapPort: this.config.emailImapPort || 993,
+      hasEmailPassword: Boolean(this.config.emailPassword && this.config.emailPassword.length > 0),
+      folderDefaultTarget: this.config.folderDefaultTarget || 'downloads',
       isConnected
     }
   }

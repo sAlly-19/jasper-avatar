@@ -79,18 +79,21 @@ export class GitWatcher {
     const lastCommit = logRes.stdout || 'Nenhum commit ainda'
 
     const statusRes = await this.execGit(['status', '--porcelain'], repoPath)
-    const lines = statusRes.stdout ? statusRes.stdout.split('\n').map((l) => l.trim()).filter(Boolean) : []
+    const rawLines = statusRes.stdout ? statusRes.stdout.split(/\r?\n/).filter(Boolean) : []
 
     const modifiedFiles: string[] = []
     const untrackedFiles: string[] = []
     const deletedFiles: string[] = []
 
-    for (const line of lines) {
-      const code = line.slice(0, 2).trim()
+    for (const line of rawLines) {
+      if (line.length < 4) continue
+      const statusX = line.charAt(0)
+      const statusY = line.charAt(1)
       const filePath = line.slice(3).trim()
-      if (code === '??') {
+
+      if (statusX === '?' && statusY === '?') {
         untrackedFiles.push(filePath)
-      } else if (code === 'D') {
+      } else if (statusX === 'D' || statusY === 'D') {
         deletedFiles.push(filePath)
       } else {
         modifiedFiles.push(filePath)
@@ -144,12 +147,17 @@ export class GitWatcher {
     }
   }
 
-  public async commitChanges(message: string, repoPath: string = this.defaultRepoPath): Promise<{ success: boolean; output: string }> {
+  public async commitChanges(message: string, repoPath: string = this.defaultRepoPath, specificFiles?: string[]): Promise<{ success: boolean; output: string }> {
     if (!message || !message.trim()) {
       return { success: false, output: 'Mensagem de commit não informada.' }
     }
 
-    const addRes = await this.execGit(['add', '-A'], repoPath)
+    // Safety: only add specific files or tracked updates to avoid accidentally staging .env or node_modules
+    const addArgs = specificFiles && specificFiles.length > 0
+      ? ['add', '--', ...specificFiles]
+      : ['add', '-u']
+
+    const addRes = await this.execGit(addArgs, repoPath)
     if (addRes.code !== 0) {
       return { success: false, output: `Falha ao executar git add: ${addRes.stderr}` }
     }

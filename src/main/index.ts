@@ -3,7 +3,7 @@ import { IPC_CHANNELS } from '@shared'
 import { configStore } from './config/config-store'
 import { createMainWindow, safeSend } from './windows/main-window'
 import { registerIpcHandlers } from './ipc/register-ipc'
-import { GeminiLiveClient } from './gemini-live'
+import { GeminiLiveClient, setGlobalGeminiClient } from './gemini-live'
 import { autonomyCoordinator } from './autonomous'
 
 let geminiClient: GeminiLiveClient | null = null
@@ -54,6 +54,7 @@ function initGeminiClient(): GeminiLiveClient {
 
 app.whenReady().then(() => {
   geminiClient = initGeminiClient()
+  setGlobalGeminiClient(geminiClient)
   registerIpcHandlers(() => geminiClient)
   createMainWindow()
   autonomyCoordinator.init()

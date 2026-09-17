@@ -100,7 +100,7 @@ export function createMainWindow(): BrowserWindow {
       try {
         if (mainWindow && !mainWindow.isDestroyed()) {
           const image = await mainWindow.webContents.capturePage()
-          const outDir = 'C:\\Users\\alisson.santos\\.gemini\\antigravity\\brain\\9066b575-575b-44a5-9bd7-cb7571afa42c'
+          const outDir = process.env.SCREENSHOT_OUT_DIR || app.getPath('temp')
           const outPath = join(outDir, 'app_screenshot.png')
           fs.writeFileSync(outPath, image.toPNG())
           console.log('[Capture] Screenshot saved successfully to', outPath)

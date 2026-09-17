@@ -327,4 +327,29 @@ export const AUTONOMY_FUNCTION_DECLARATIONS = [
   }
 ]
 
+export function getActiveAutonomyDeclarations(cfg: Record<string, any>): any[] {
+  const result: any[] = []
+  for (const decl of AUTONOMY_FUNCTION_DECLARATIONS) {
+    if (decl.name === 'capture_screen' && cfg.enableScreenAwareness === false) continue
+    if (decl.name === 'get_active_window' && cfg.enableWindowTracker === false) continue
+    if (decl.name === 'read_clipboard' && cfg.enableClipboardWatcher === false) continue
+    if (decl.name === 'create_reminder' && cfg.enableCronEngine === false) continue
+    if (decl.name === 'get_system_health' && cfg.enableSystemHealth === false) continue
+    if (decl.name === 'get_daily_briefing' && cfg.enableDailyBriefing === false) continue
+    if (decl.name === 'query_semantic_memory' && cfg.enableSemanticMemory === false) continue
+    if ((decl.name === 'query_knowledge_graph' || decl.name === 'add_knowledge_relation') && cfg.enableKnowledgeGraph === false) continue
+    if (decl.name === 'execute_code' && !cfg.enableCodeInterpreter) continue
+    if (decl.name === 'browse_page' && cfg.enableHeadlessBrowser === false) continue
+    if (decl.name.startsWith('git_') && cfg.enableGitWatcher === false) continue
+    if ((decl.name === 'scan_duplicates_and_old_files' || decl.name === 'organize_directory') && cfg.enableFolderOrganizer === false) continue
+    if ((decl.name === 'spawn_subagent' || decl.name === 'get_subagent_tasks') && cfg.enableSubagents === false) continue
+    if ((decl.name === 'manage_calendar' || decl.name === 'check_emails') && cfg.enableCalendarEmail === false) continue
+    if (decl.name === 'trigger_webhook' && cfg.enableWebhooks === false) continue
+    if (decl.name === 'control_smart_home' && cfg.enableSmartHome === false) continue
+
+    result.push(decl)
+  }
+  return result
+}
+
 

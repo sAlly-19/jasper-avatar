@@ -3,6 +3,33 @@ import { join } from 'path'
 import fs from 'fs'
 import type { WebhookConfig, WebhookTriggerResult } from '@shared'
 
+export function isPrivateOrLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().trim()
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+    return true
+  }
+
+  // Cloud metadata services
+  if (host === '169.254.169.254' || host.startsWith('169.254.')) {
+    return true
+  }
+
+  // IPv4 Private subnets
+  const ipParts = host.split('.').map(Number)
+  if (ipParts.length === 4 && ipParts.every((p) => !isNaN(p) && p >= 0 && p <= 255)) {
+    // 10.0.0.0/8
+    if (ipParts[0] === 10) return true
+    // 172.16.0.0/12
+    if (ipParts[0] === 172 && ipParts[1] >= 16 && ipParts[1] <= 31) return true
+    // 192.168.0.0/16
+    if (ipParts[0] === 192 && ipParts[1] === 168) return true
+    // 127.0.0.0/8
+    if (ipParts[0] === 127) return true
+  }
+
+  return false
+}
+
 export class WebhookManager {
   private enabled: boolean = true
   private storageFile: string
@@ -98,6 +125,40 @@ export class WebhookManager {
 
     const targetUrl = registered ? registered.url : nameOrUrl
     const method = customMethod || (registered?.method || 'POST')
+
+    // SSRF Validation
+    try {
+      const parsed = new URL(targetUrl)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return {
+          success: false,
+          status: 0,
+          responseBody: '',
+          executionTimeMs: 0,
+          error: `[SSRF Bloqueado] Protocolo não suportado: "${parsed.protocol}". Apenas http e https são permitidos.`
+        }
+      }
+
+      // If it's not a pre-registered endpoint saved explicitly by the user, block private/loopback/cloud metadata
+      if (!registered && isPrivateOrLoopbackHost(parsed.hostname)) {
+        return {
+          success: false,
+          status: 0,
+          responseBody: '',
+          executionTimeMs: 0,
+          error: `[SSRF Bloqueado] Requisições para redes locais (${parsed.hostname}) só são permitidas para Webhooks pré-cadastrados nas configurações.`
+        }
+      }
+    } catch (urlErr: any) {
+      return {
+        success: false,
+        status: 0,
+        responseBody: '',
+        executionTimeMs: 0,
+        error: `URL inválida para disparo de Webhook: "${targetUrl}".`
+      }
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': 'Jasper-AI-HUD/2.0',
@@ -147,4 +208,3 @@ export class WebhookManager {
 }
 
 export const webhookManager = new WebhookManager()
-

@@ -7,6 +7,7 @@ import { systemHealth } from './system-health'
 export class SubagentOrchestrator {
   private enabled: boolean = true
   private tasks: Map<string, SubagentTask> = new Map()
+  private abortControllers: Map<string, AbortController> = new Map()
   private onNotification?: (notif: AutonomyNotification) => void
 
   public setEnabled(enabled: boolean): void {
@@ -35,6 +36,11 @@ export class SubagentOrchestrator {
       task.status = 'failed'
       task.error = 'Cancelado pelo usuário.'
       task.endTime = Date.now()
+      const controller = this.abortControllers.get(id)
+      if (controller) {
+        controller.abort()
+        this.abortControllers.delete(id)
+      }
       return true
     }
     return false
@@ -61,12 +67,17 @@ export class SubagentOrchestrator {
       return subTask
     }
 
+    const controller = new AbortController()
+    this.abortControllers.set(taskId, controller)
+
     // Execute in background asynchronously without awaiting
     this.executeSubagentTask(subTask).catch((err) => {
       console.error(`[SubagentOrchestrator] Error executing task ${taskId}:`, err)
       subTask.status = 'failed'
       subTask.error = err.message
       subTask.endTime = Date.now()
+    }).finally(() => {
+      this.abortControllers.delete(taskId)
     })
 
     return subTask

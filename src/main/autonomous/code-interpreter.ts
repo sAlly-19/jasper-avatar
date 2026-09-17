@@ -105,12 +105,23 @@ export class CodeInterpreter {
     const command = language === 'python' ? 'python' : 'node'
     const args = language === 'python' ? ['-u', scriptFileName] : [scriptFileName]
 
+    // Sanitized environment: strip API keys, tokens, and app secrets
+    const sanitizedEnv: Record<string, string> = {
+      PATH: process.env.PATH || '',
+      PATHEXT: process.env.PATHEXT || '',
+      SYSTEMROOT: process.env.SYSTEMROOT || 'C:\\Windows',
+      WINDIR: process.env.WINDIR || 'C:\\Windows',
+      TEMP: this.sandboxDir,
+      TMP: this.sandboxDir
+    }
+
     return new Promise<CodeExecutionResult>((resolve) => {
       execFile(
         command,
         args,
         {
           cwd: this.sandboxDir,
+          env: sanitizedEnv,
           timeout: timeoutMs,
           maxBuffer: 5 * 1024 * 1024,
           windowsHide: true

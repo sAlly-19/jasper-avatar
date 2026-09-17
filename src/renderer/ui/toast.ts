@@ -1,4 +1,19 @@
 import { DOM } from './dom'
+import { SVG_ICONS } from './icons'
+
+function getToastIcon(type: string): string {
+  switch (type) {
+    case 'warning':
+      return SVG_ICONS.warning
+    case 'error':
+      return SVG_ICONS.error
+    case 'reminder':
+      return SVG_ICONS.clock
+    case 'info':
+    default:
+      return SVG_ICONS.info
+  }
+}
 
 export function showHudToast(
   title: string,
@@ -16,15 +31,29 @@ export function showHudToast(
   const header = document.createElement('div')
   header.className = 'hud-toast-header'
 
+  const titleWrap = document.createElement('div')
+  titleWrap.style.display = 'inline-flex'
+  titleWrap.style.alignItems = 'center'
+  titleWrap.style.gap = '6px'
+
+  const iconSpan = document.createElement('span')
+  iconSpan.style.display = 'inline-flex'
+  iconSpan.style.alignItems = 'center'
+  iconSpan.style.justifyContent = 'center'
+  iconSpan.innerHTML = getToastIcon(type)
+
   const titleSpan = document.createElement('span')
   titleSpan.className = 'hud-toast-title'
   titleSpan.textContent = title
+
+  titleWrap.appendChild(iconSpan)
+  titleWrap.appendChild(titleSpan)
 
   const closeBtn = document.createElement('button')
   closeBtn.className = 'hud-toast-close'
   closeBtn.innerHTML = '&times;'
 
-  header.appendChild(titleSpan)
+  header.appendChild(titleWrap)
   header.appendChild(closeBtn)
 
   const msgDiv = document.createElement('div')

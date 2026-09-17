@@ -2,6 +2,7 @@ import { DOM } from './dom'
 import { WakeWordManager } from '../audio/wake-word-manager'
 import { playTone, playWakeChime } from '../audio/audio-cues'
 import { MicRecorder } from '../audio/mic-recorder'
+import { SVG_ICONS } from './icons'
 
 export interface WakeTrainerOptions {
   getAgentName: () => string
@@ -65,7 +66,7 @@ export class WakeTrainerUI {
       if (wakeStatusDesc) {
         wakeStatusDesc.textContent = `Pronto! Diga "${currentAgentName}" no microfone para ativar o assistente. (Executado 100% localmente)`
       }
-      if (wakeStatusIcon) wakeStatusIcon.textContent = '✅'
+      if (wakeStatusIcon) wakeStatusIcon.innerHTML = SVG_ICONS.check
     } else {
       if (badgeModelState) {
         badgeModelState.textContent = 'Pendente de Calibração'
@@ -79,7 +80,7 @@ export class WakeTrainerUI {
       if (wakeStatusDesc) {
         wakeStatusDesc.textContent = `Grave 3 amostras rápidas dizendo "${currentAgentName}" e 2 de silêncio para a IA aprender sua voz e responder ao seu chamado.`
       }
-      if (wakeStatusIcon) wakeStatusIcon.textContent = '⚡'
+      if (wakeStatusIcon) wakeStatusIcon.innerHTML = SVG_ICONS.bolt
     }
   }
 
@@ -121,16 +122,16 @@ export class WakeTrainerUI {
         if (btnSampleNoise) btnSampleNoise.disabled = true
         playTone(880, 0.12)
         if (trainerFeedback) {
-          trainerFeedback.textContent = `🔴 Gravando... Diga claramente "${currentAgentName}" agora!`
+          trainerFeedback.innerHTML = `${SVG_ICONS.dotRecord} Gravando... Diga claramente "${currentAgentName}" agora!`
           trainerFeedback.style.color = 'var(--accent-cyan)'
         }
-        btnSampleName.textContent = '🔴 Gravando...'
+        btnSampleName.innerHTML = `${SVG_ICONS.dotRecord} Gravando...`
 
         const result = await engine.collectCustomSample(targetName)
 
         playTone(523.25, 0.15)
         if (trainerFeedback) {
-          trainerFeedback.textContent = `✅ Amostra de "${currentAgentName}" gravada com sucesso! (${result.count}/3)`
+          trainerFeedback.innerHTML = `${SVG_ICONS.check} Amostra de "${currentAgentName}" gravada com sucesso! (${result.count}/3)`
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()
@@ -142,7 +143,7 @@ export class WakeTrainerUI {
         }
       } finally {
         btnSampleName.disabled = false
-        btnSampleName.innerHTML = `🎙️ Gravar "<span class="lbl-agent-target-name">${currentAgentName}</span>"`
+        btnSampleName.innerHTML = `${SVG_ICONS.mic} Gravar "<span class="lbl-agent-target-name">${currentAgentName}</span>"`
         if (btnSampleNoise) btnSampleNoise.disabled = false
       }
     })
@@ -163,16 +164,16 @@ export class WakeTrainerUI {
         if (btnSampleName) btnSampleName.disabled = true
         playTone(659.25, 0.12)
         if (trainerFeedback) {
-          trainerFeedback.textContent = '🤫 Gravando ruído ambiente... Fique em silêncio por 1 segundo.'
+          trainerFeedback.innerHTML = `${SVG_ICONS.micOff} Gravando ruído ambiente... Fique em silêncio por 1 segundo.`
           trainerFeedback.style.color = 'var(--accent-cyan)'
         }
-        btnSampleNoise.textContent = '🤫 Gravando...'
+        btnSampleNoise.innerHTML = `${SVG_ICONS.dotRecord} Gravando...`
 
         const result = await engine.collectCustomSample('_background_noise_')
 
         playTone(523.25, 0.15)
         if (trainerFeedback) {
-          trainerFeedback.textContent = `✅ Silêncio capturado com sucesso! (${result.count}/2)`
+          trainerFeedback.innerHTML = `${SVG_ICONS.check} Silêncio capturado com sucesso! (${result.count}/2)`
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()
@@ -184,7 +185,7 @@ export class WakeTrainerUI {
         }
       } finally {
         btnSampleNoise.disabled = false
-        btnSampleNoise.textContent = '🤫 Gravar Silêncio'
+        btnSampleNoise.innerHTML = `${SVG_ICONS.micOff} Gravar Silêncio`
         if (btnSampleName) btnSampleName.disabled = false
       }
     })
@@ -197,7 +198,7 @@ export class WakeTrainerUI {
       try {
         btnTrainCustomModel.disabled = true
         if (trainerFeedback) {
-          trainerFeedback.textContent = `⚡ Compilando e treinando modelo neural local para "${currentAgentName}"...`
+          trainerFeedback.innerHTML = `${SVG_ICONS.bolt} Compilando e treinando modelo neural local para "${currentAgentName}"...`
           trainerFeedback.style.color = 'var(--accent-cyan)'
         }
 
@@ -209,7 +210,7 @@ export class WakeTrainerUI {
 
         playWakeChime()
         if (trainerFeedback) {
-          trainerFeedback.textContent = `🎉 Sucesso! O assistente agora responde exclusivamente ao nome "${currentAgentName}".`
+          trainerFeedback.innerHTML = `${SVG_ICONS.sparkle} Sucesso! O assistente agora responde exclusivamente ao nome "${currentAgentName}".`
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()

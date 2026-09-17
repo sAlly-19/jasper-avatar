@@ -74,6 +74,9 @@ export class AutonomyCoordinator {
 
     // 11. Git Watcher & Commit Assistant
     gitWatcher.setEnabled(cfg.enableGitWatcher !== false)
+    if (cfg.gitRepoPath) {
+      gitWatcher.setDefaultRepoPath(cfg.gitRepoPath)
+    }
     gitWatcher.setOnNotification((notif) => {
       this.dispatchNotification(notif)
     })
@@ -104,6 +107,7 @@ export class AutonomyCoordinator {
 
     // 17. Smart Home Integration (Home Assistant REST/WebSocket)
     smartHome.setEnabled(cfg.enableSmartHome !== false)
+    smartHome.setConfig(cfg.hassUrl || '', cfg.hassToken || '')
 
     console.log('[AutonomyCoordinator] All autonomous services initialized successfully.')
   }
@@ -126,12 +130,16 @@ export class AutonomyCoordinator {
     codeInterpreter.setEnabled(cfg.enableCodeInterpreter !== false)
     headlessBrowser.setEnabled(cfg.enableHeadlessBrowser !== false)
     gitWatcher.setEnabled(cfg.enableGitWatcher !== false)
+    if (cfg.gitRepoPath) {
+      gitWatcher.setDefaultRepoPath(cfg.gitRepoPath)
+    }
     folderOrganizer.setEnabled(cfg.enableFolderOrganizer !== false)
     subagentOrchestrator.setEnabled(cfg.enableSubagents !== false)
     reflexionEngine.setEnabled(cfg.enableReflexionLoop !== false)
     calendarEmail.setEnabled(cfg.enableCalendarEmail !== false)
     webhookManager.setEnabled(cfg.enableWebhooks !== false)
     smartHome.setEnabled(cfg.enableSmartHome !== false)
+    smartHome.setConfig(cfg.hassUrl || '', cfg.hassToken || '')
   }
 
   public stopAll(): void {

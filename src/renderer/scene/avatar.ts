@@ -97,6 +97,7 @@ export class AvatarController {
   private headMesh: THREE.Mesh | null = null
   private morphDictionary: MorphTargetMap = {}
   private morphInfluences: number[] | null = null
+  private morphCache: Map<string, number> = new Map()
 
   // Procedural Nodes
   private grpTransform: THREE.Object3D | null = null
@@ -216,6 +217,7 @@ export class AvatarController {
                 this.headMesh = mesh
                 this.morphDictionary = mesh.morphTargetDictionary
                 this.morphInfluences = mesh.morphTargetInfluences
+                this.buildMorphCache()
                 mesh.material = headMaterial
                 console.log(
                   `[AvatarController] Found head mesh with ${Object.keys(this.morphDictionary).length} blendshapes. Applied pure white material.`,
@@ -316,48 +318,54 @@ export class AvatarController {
     return this.isEyeTrackingEnabled
   }
 
-  /**
-   * Safe setter for morph target supporting both ARKit naming styles (e.g. mouthSmile_L and mouthSmileLeft)
-   */
-  public setMorphTarget(name: string, value: number): void {
-    if (!this.morphInfluences || !this.morphDictionary) return
+  private buildMorphCache(): void {
+    this.morphCache.clear()
+    for (const [key, idx] of Object.entries(this.morphDictionary)) {
+      this.morphCache.set(key, idx)
+      this.morphCache.set(key.toLowerCase(), idx)
 
-    // Try direct match
-    if (this.morphDictionary[name] !== undefined) {
-      this.morphInfluences[this.morphDictionary[name]] = value
-      return
-    }
-
-    // Try _L / _R to Left / Right mapping
-    let altName = ''
-    if (name.endsWith('_L')) {
-      altName = name.slice(0, -2) + 'Left'
-    } else if (name.endsWith('_R')) {
-      altName = name.slice(0, -2) + 'Right'
-    } else if (name.endsWith('Left')) {
-      altName = name.slice(0, -4) + '_L'
-    } else if (name.endsWith('Right')) {
-      altName = name.slice(0, -5) + '_R'
-    }
-
-    if (altName && this.morphDictionary[altName] !== undefined) {
-      this.morphInfluences[this.morphDictionary[altName]] = value
-      return
-    }
-
-    // Try case-insensitive lookup
-    const lower = name.toLowerCase()
-    for (const key in this.morphDictionary) {
-      if (key.toLowerCase() === lower) {
-        this.morphInfluences[this.morphDictionary[key]] = value
-        return
+      if (key.endsWith('_L')) {
+        const alt = key.slice(0, -2) + 'Left'
+        this.morphCache.set(alt, idx)
+        this.morphCache.set(alt.toLowerCase(), idx)
+      } else if (key.endsWith('_R')) {
+        const alt = key.slice(0, -2) + 'Right'
+        this.morphCache.set(alt, idx)
+        this.morphCache.set(alt.toLowerCase(), idx)
+      } else if (key.endsWith('Left')) {
+        const alt = key.slice(0, -4) + '_L'
+        this.morphCache.set(alt, idx)
+        this.morphCache.set(alt.toLowerCase(), idx)
+      } else if (key.endsWith('Right')) {
+        const alt = key.slice(0, -5) + '_R'
+        this.morphCache.set(alt, idx)
+        this.morphCache.set(alt.toLowerCase(), idx)
       }
     }
   }
 
+  /**
+   * O(1) high-performance setter for morph targets supporting ARKit blendshape naming variations
+   */
+  public setMorphTarget(name: string, value: number): void {
+    if (!this.morphInfluences) return
+
+    let idx = this.morphCache.get(name)
+    if (idx === undefined) {
+      idx = this.morphCache.get(name.toLowerCase())
+    }
+
+    if (idx !== undefined) {
+      this.morphInfluences[idx] = value
+    }
+  }
+
   public getMorphTarget(name: string): number {
-    if (!this.morphInfluences || !this.morphDictionary) return 0
-    const idx = this.morphDictionary[name]
+    if (!this.morphInfluences) return 0
+    let idx = this.morphCache.get(name)
+    if (idx === undefined) {
+      idx = this.morphCache.get(name.toLowerCase())
+    }
     return idx !== undefined ? this.morphInfluences[idx] : 0
   }
 

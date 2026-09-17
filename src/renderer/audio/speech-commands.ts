@@ -71,7 +71,7 @@ export class SpeechCommandsWakeWord {
     try {
       await transfer.load()
       this.isCustomModelTrained = true
-      console.log(`[SpeechCommands] ✅ Modelo personalizado "${modelKey}" carregado do IndexedDB:`, transfer.wordLabels())
+      console.log(`[SpeechCommands] [OK] Modelo personalizado "${modelKey}" carregado do IndexedDB:`, transfer.wordLabels())
     } catch {
       this.isCustomModelTrained = false
       console.log(`[SpeechCommands] Nenhum modelo personalizado salvo ainda para "${this.options.agentName}".`)
@@ -258,7 +258,7 @@ export class SpeechCommandsWakeWord {
 
     await this.transferRecognizer.save()
     this.isCustomModelTrained = true
-    console.log(`[SpeechCommands] ✅ Modelo personalizado "${this.getModelName()}" salvo no IndexedDB!`)
+    console.log(`[SpeechCommands] [OK] Modelo personalizado "${this.getModelName()}" salvo no IndexedDB!`)
 
     await this.start()
   }

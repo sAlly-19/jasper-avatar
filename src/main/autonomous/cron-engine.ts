@@ -119,7 +119,7 @@ export class CronEngineService {
         const notification: AutonomyNotification = {
           id: `reminder-${task.id}`,
           type: 'reminder',
-          title: '⏰ Lembrete Agendado',
+          title: 'Lembrete Agendado',
           message: task.title + (task.description ? `: ${task.description}` : ''),
           timestamp: now,
           data: { task }

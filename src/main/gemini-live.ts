@@ -2,11 +2,12 @@ import WebSocket from 'ws'
 import {
   SYSTEM_FUNCTION_DECLARATIONS,
   MEDIA_FUNCTION_DECLARATIONS,
-  AUTONOMY_FUNCTION_DECLARATIONS,
+  getActiveAutonomyDeclarations,
   executeSystemTool,
   executeMediaTool,
   executeAutonomyTool
 } from './tools'
+import { configStore } from './config/config-store'
 import { getMemorySummary } from './memory'
 import type { GeminiLiveOptions, GeminiStatus } from '@shared'
 
@@ -122,7 +123,8 @@ export class GeminiLiveClient {
         const activeName = this.agentName || 'Jasper'
         this.onStatus?.('connected', `${activeName} Online`)
 
-        // Build active function declarations based on user configuration
+        // Build active function declarations dynamically based on user configuration
+        const cfg = configStore.getConfig()
         const decls: any[] = []
         if (this.enableSystemTools) {
           decls.push(...SYSTEM_FUNCTION_DECLARATIONS)
@@ -130,7 +132,7 @@ export class GeminiLiveClient {
         if (this.enableMediaTools) {
           decls.push(...MEDIA_FUNCTION_DECLARATIONS)
         }
-        decls.push(...AUTONOMY_FUNCTION_DECLARATIONS)
+        decls.push(...getActiveAutonomyDeclarations(cfg))
 
         const modelPath = this.model.startsWith('models/') ? this.model : `models/${this.model}`
         const memoryContext = getMemorySummary()
@@ -249,14 +251,14 @@ ${memoryContext}`
         for (const call of message.toolCall.functionCalls) {
           let output = ''
           try {
-            if (this.enableSystemTools && SYSTEM_FUNCTION_DECLARATIONS.some((d) => d.name === call.name)) {
+            if (this.enableSystemTools && SYSTEM_FUNCTION_DECLARATIONS.some((d: any) => d.name === call.name)) {
               output = await executeSystemTool(call.name, call.args || {})
-            } else if (this.enableMediaTools && MEDIA_FUNCTION_DECLARATIONS.some((d) => d.name === call.name)) {
+            } else if (this.enableMediaTools && MEDIA_FUNCTION_DECLARATIONS.some((d: any) => d.name === call.name)) {
               output = await executeMediaTool(call.name, call.args || {})
-            } else if (AUTONOMY_FUNCTION_DECLARATIONS.some((d) => d.name === call.name)) {
+            } else if (getActiveAutonomyDeclarations(configStore.getConfig()).some((d: any) => d.name === call.name)) {
               output = await executeAutonomyTool(call.name, call.args || {})
             } else {
-              output = `A ferramenta ${call.name} não está ativada nas configurações do sistema.`
+              output = `A ferramenta "${call.name}" não está ativada ou permitida nas configurações do sistema.`
             }
           } catch (err: any) {
             output = `Erro ao executar ${call.name}: ${err.message}`
@@ -388,6 +390,30 @@ ${memoryContext}`
     }
   }
 
+  public sendRealtimeMediaChunk(mimeType: string, base64Data: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('[GeminiLive] Cannot send media chunk, WebSocket is not open.')
+      return
+    }
+
+    try {
+      const message = {
+        realtimeInput: {
+          mediaChunks: [
+            {
+              mimeType,
+              data: base64Data
+            }
+          ]
+        }
+      }
+      this.ws.send(JSON.stringify(message))
+      console.log(`[GeminiLive] Realtime media chunk injected successfully (${mimeType}, ~${Math.round(base64Data.length / 1024)} KB)`)
+    } catch (err) {
+      console.error('[GeminiLive] Error sending realtime media chunk:', err)
+    }
+  }
+
   public disconnect(): void {
     this.intentionalDisconnect = true
     if (this.reconnectTimeout) {
@@ -408,5 +434,15 @@ ${memoryContext}`
     this.isConnected = false
     this.onStatus?.('disconnected', 'Desconectado')
   }
+}
+
+let activeGlobalClient: GeminiLiveClient | null = null
+
+export function setGlobalGeminiClient(client: GeminiLiveClient | null): void {
+  activeGlobalClient = client
+}
+
+export function getGlobalGeminiClient(): GeminiLiveClient | null {
+  return activeGlobalClient
 }
 

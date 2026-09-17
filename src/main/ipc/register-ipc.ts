@@ -1,9 +1,10 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import { IPC_CHANNELS, type UpdateConfigPayload } from '@shared'
 import { GeminiLiveClient } from '../gemini-live'
 import { configStore } from '../config/config-store'
 import { loadMemory, saveMemory } from '../memory'
 import {
+  getMainWindow,
   togglePipMode,
   toggleFullScreenMode,
   minimizeWindow,
@@ -230,5 +231,25 @@ export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | nu
 
   ipcMain.handle(IPC_CHANNELS.AUTONOMY_REFLEXION_CONFIRMATION, (_event, confirmationId: string) => {
     return reflexionEngine.confirmAction(confirmationId)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTONOMY_SMART_HOME_TEST_CONNECTION, async (_event, url?: string, token?: string) => {
+    return smartHome.testConnection(url, token)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.AUTONOMY_WEBHOOK_TEST, async (_event, url: string) => {
+    return webhookManager.triggerWebhook(url, { test: true, ping: 'Jasper HUD AI' }, 'POST')
+  })
+
+  ipcMain.handle(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY, async () => {
+    const win = getMainWindow()
+    const result = await dialog.showOpenDialog(win || (undefined as any), {
+      properties: ['openDirectory'],
+      title: 'Selecionar Diretório do Repositório Git'
+    })
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0]
+    }
+    return null
   })
 }

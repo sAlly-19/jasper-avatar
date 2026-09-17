@@ -1,6 +1,7 @@
 import { DOM } from './dom'
 import { AvatarController, MoodType } from '../scene/avatar'
 import { WakeTrainerUI } from './wake-trainer-ui'
+import { SVG_ICONS } from './icons'
 
 export interface SettingsModalOptions {
   getAgentName: () => string
@@ -81,7 +82,23 @@ export class SettingsModal {
       checkCalendarEmail,
       checkWebhooks,
       checkSmartHome,
-      btnClearMemory
+      btnClearMemory,
+      inputGitRepoPath,
+      btnBrowseGitRepo,
+      selectFolderTarget,
+      inputEmailHost,
+      inputEmailPort,
+      inputEmailUser,
+      inputEmailPassword,
+      btnToggleEmailPw,
+      inputWebhookUrl,
+      btnTestWebhook,
+      webhookTestFeedback,
+      inputHassUrl,
+      inputHassToken,
+      btnToggleHassToken,
+      btnTestHass,
+      hassTestFeedback
     } = DOM
 
     // Live update of agent name preview badge
@@ -206,6 +223,45 @@ export class SettingsModal {
         checkSmartHome.checked = config.enableSmartHome !== false
       }
 
+      // Populate module specific settings
+      if (inputGitRepoPath) {
+        inputGitRepoPath.value = config.gitRepoPath || ''
+      }
+      if (selectFolderTarget) {
+        selectFolderTarget.value = config.folderDefaultTarget || 'downloads'
+      }
+      if (inputEmailHost) {
+        inputEmailHost.value = config.emailImapHost || ''
+      }
+      if (inputEmailPort) {
+        inputEmailPort.value = config.emailImapPort ? String(config.emailImapPort) : '993'
+      }
+      if (inputEmailUser) {
+        inputEmailUser.value = config.emailUser || ''
+      }
+      if (inputEmailPassword) {
+        inputEmailPassword.value = ''
+        inputEmailPassword.placeholder = config.hasEmailPassword ? 'Senha salva (digite para alterar)' : 'Senha do app'
+      }
+      if (inputWebhookUrl) {
+        inputWebhookUrl.value = config.webhookDefaultUrl || ''
+      }
+      if (inputHassUrl) {
+        inputHassUrl.value = config.hassUrl || ''
+      }
+      if (inputHassToken) {
+        inputHassToken.value = ''
+        inputHassToken.placeholder = config.hasHassToken ? 'Token salvo (digite para alterar)' : 'Cole o token gerado no perfil'
+      }
+      if (hassTestFeedback) {
+        hassTestFeedback.textContent = ''
+        hassTestFeedback.className = 'config-test-feedback'
+      }
+      if (webhookTestFeedback) {
+        webhookTestFeedback.textContent = ''
+        webhookTestFeedback.className = 'config-test-feedback'
+      }
+
       settingsStatus.textContent = config.isConnected ? 'Conectado ao Gemini Live.' : 'Desconectado.'
       settingsStatus.className = 'modal-status'
 
@@ -250,6 +306,89 @@ export class SettingsModal {
       if (confirm('Tem certeza de que deseja apagar a memória acumulada do agente?')) {
         await window.electronAPI.clearMemory()
         await this.refreshMemoryUI()
+      }
+    })
+
+    // Module-specific interactive handlers
+    btnBrowseGitRepo?.addEventListener('click', async () => {
+      try {
+        const dir = await window.electronAPI.selectDirectory()
+        if (dir && inputGitRepoPath) {
+          inputGitRepoPath.value = dir
+        }
+      } catch (err) {
+        console.warn('Error selecting directory:', err)
+      }
+    })
+
+    btnToggleEmailPw?.addEventListener('click', () => {
+      if (!inputEmailPassword) return
+      if (inputEmailPassword.type === 'password') {
+        inputEmailPassword.type = 'text'
+        btnToggleEmailPw.textContent = 'Ocultar'
+      } else {
+        inputEmailPassword.type = 'password'
+        btnToggleEmailPw.textContent = 'Mostrar'
+      }
+    })
+
+    btnToggleHassToken?.addEventListener('click', () => {
+      if (!inputHassToken) return
+      if (inputHassToken.type === 'password') {
+        inputHassToken.type = 'text'
+        btnToggleHassToken.textContent = 'Ocultar'
+      } else {
+        inputHassToken.type = 'password'
+        btnToggleHassToken.textContent = 'Mostrar'
+      }
+    })
+
+    btnTestHass?.addEventListener('click', async () => {
+      if (!hassTestFeedback) return
+      const url = inputHassUrl?.value.trim()
+      const token = inputHassToken?.value.trim() || undefined
+      hassTestFeedback.textContent = 'Testando...'
+      hassTestFeedback.className = 'config-test-feedback loading'
+
+      try {
+        const res = await window.electronAPI.testSmartHomeConnection(url, token)
+        if (res.success) {
+          hassTestFeedback.innerHTML = `${SVG_ICONS.check} ${res.message}`
+          hassTestFeedback.className = 'config-test-feedback success'
+        } else {
+          hassTestFeedback.innerHTML = `${SVG_ICONS.error} ${res.message}`
+          hassTestFeedback.className = 'config-test-feedback error'
+        }
+      } catch (err: any) {
+        hassTestFeedback.innerHTML = `${SVG_ICONS.error} Erro: ${err.message || 'Falha'}`
+        hassTestFeedback.className = 'config-test-feedback error'
+      }
+    })
+
+    btnTestWebhook?.addEventListener('click', async () => {
+      if (!webhookTestFeedback) return
+      const url = inputWebhookUrl?.value.trim()
+      if (!url) {
+        webhookTestFeedback.innerHTML = `${SVG_ICONS.error} Informe uma URL primeiro`
+        webhookTestFeedback.className = 'config-test-feedback error'
+        return
+      }
+
+      webhookTestFeedback.textContent = 'Disparando teste...'
+      webhookTestFeedback.className = 'config-test-feedback loading'
+
+      try {
+        const res = await window.electronAPI.testWebhook(url)
+        if (res.success) {
+          webhookTestFeedback.innerHTML = `${SVG_ICONS.check} Sucesso! (HTTP ${res.status} em ${res.executionTimeMs}ms)`
+          webhookTestFeedback.className = 'config-test-feedback success'
+        } else {
+          webhookTestFeedback.innerHTML = `${SVG_ICONS.error} Falha: ${res.error || `HTTP ${res.status}`}`
+          webhookTestFeedback.className = 'config-test-feedback error'
+        }
+      } catch (err: any) {
+        webhookTestFeedback.innerHTML = `${SVG_ICONS.error} Erro: ${err.message || 'Falha'}`
+        webhookTestFeedback.className = 'config-test-feedback error'
       }
     })
 
@@ -302,7 +441,17 @@ export class SettingsModal {
         enableReflexionLoop: checkReflexionLoop ? checkReflexionLoop.checked : true,
         enableCalendarEmail: checkCalendarEmail ? checkCalendarEmail.checked : true,
         enableWebhooks: checkWebhooks ? checkWebhooks.checked : true,
-        enableSmartHome: checkSmartHome ? checkSmartHome.checked : true
+        enableSmartHome: checkSmartHome ? checkSmartHome.checked : true,
+        // Module specific configurations
+        gitRepoPath: inputGitRepoPath?.value.trim() || undefined,
+        folderDefaultTarget: selectFolderTarget?.value || 'downloads',
+        emailImapHost: inputEmailHost?.value.trim() || undefined,
+        emailImapPort: inputEmailPort?.value ? Number(inputEmailPort.value) : undefined,
+        emailUser: inputEmailUser?.value.trim() || undefined,
+        emailPassword: inputEmailPassword?.value.trim() || undefined,
+        webhookDefaultUrl: inputWebhookUrl?.value.trim() || undefined,
+        hassUrl: inputHassUrl?.value.trim() || undefined,
+        hassToken: inputHassToken?.value.trim() || undefined
       })
 
       // Reinitialize TensorFlow.js Speech Commands engine with updated settings

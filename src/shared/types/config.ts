@@ -27,6 +27,16 @@ export interface JasperConfig {
   enableCalendarEmail: boolean
   enableWebhooks: boolean
   enableSmartHome: boolean
+  // Module specific configurations
+  hassUrl?: string
+  hassToken?: string
+  gitRepoPath?: string
+  webhookDefaultUrl?: string
+  emailUser?: string
+  emailImapHost?: string
+  emailImapPort?: number
+  emailPassword?: string
+  folderDefaultTarget?: string
 }
 
 export interface UpdateConfigPayload {
@@ -58,6 +68,16 @@ export interface UpdateConfigPayload {
   enableCalendarEmail?: boolean
   enableWebhooks?: boolean
   enableSmartHome?: boolean
+  // Module specific configurations
+  hassUrl?: string
+  hassToken?: string
+  gitRepoPath?: string
+  webhookDefaultUrl?: string
+  emailUser?: string
+  emailImapHost?: string
+  emailImapPort?: number
+  emailPassword?: string
+  folderDefaultTarget?: string
 }
 
 export interface ConfigSummary {
@@ -90,6 +110,16 @@ export interface ConfigSummary {
   enableCalendarEmail: boolean
   enableWebhooks: boolean
   enableSmartHome: boolean
+  // Module specific configurations
+  hassUrl?: string
+  hasHassToken?: boolean
+  gitRepoPath?: string
+  webhookDefaultUrl?: string
+  emailUser?: string
+  emailImapHost?: string
+  emailImapPort?: number
+  hasEmailPassword?: boolean
+  folderDefaultTarget?: string
   isConnected: boolean
 }
 

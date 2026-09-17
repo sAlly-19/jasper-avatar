@@ -35,7 +35,14 @@ export function loadMemory(): JasperMemory {
 export function saveMemory(memory: JasperMemory): void {
   try {
     const memPath = getMemoryFilePath()
-    fs.writeFileSync(memPath, JSON.stringify(memory, null, 2), 'utf-8')
+    const tmpPath = `${memPath}.tmp.${Date.now()}`
+    fs.writeFileSync(tmpPath, JSON.stringify(memory, null, 2), 'utf-8')
+    try {
+      fs.renameSync(tmpPath, memPath)
+    } catch {
+      fs.copyFileSync(tmpPath, memPath)
+      fs.unlinkSync(tmpPath)
+    }
     console.log('[Memory] Saved memory successfully to', memPath)
   } catch (err) {
     console.warn('[Memory] Error writing to jasper-memory.json:', err)
