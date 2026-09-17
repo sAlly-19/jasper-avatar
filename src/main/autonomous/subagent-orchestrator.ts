@@ -70,8 +70,8 @@ export class SubagentOrchestrator {
     const controller = new AbortController()
     this.abortControllers.set(taskId, controller)
 
-    // Execute in background asynchronously without awaiting
-    this.executeSubagentTask(subTask).catch((err) => {
+    // Execute in background asynchronously without awaiting, wiring the AbortSignal
+    this.executeSubagentTask(subTask, controller.signal).catch((err) => {
       console.error(`[SubagentOrchestrator] Error executing task ${taskId}:`, err)
       subTask.status = 'failed'
       subTask.error = err.message
@@ -83,10 +83,11 @@ export class SubagentOrchestrator {
     return subTask
   }
 
-  private async executeSubagentTask(subTask: SubagentTask): Promise<void> {
+  private async executeSubagentTask(subTask: SubagentTask, signal: AbortSignal): Promise<void> {
     console.log(`[SubagentOrchestrator] Started subagent [${subTask.role.toUpperCase()}] for: "${subTask.task}"`)
 
     try {
+      if (signal.aborted) throw new Error('Tarefa abortada antes da execução.')
       subTask.progressPercent = 30
 
       let resultText = ''
@@ -97,7 +98,7 @@ export class SubagentOrchestrator {
           const urlMatch = subTask.task.match(/https?:\/\/[^\s]+/i)
           if (urlMatch) {
             const url = urlMatch[0]
-            const scrape = await headlessBrowser.browse(url, { extractType: 'text' })
+            const scrape = await headlessBrowser.browse(url, { extractType: 'text', signal })
             resultText = scrape.success
               ? `Pesquisa na web concluída para "${scrape.title}":\n${scrape.content.slice(0, 1000)}...`
               : `Falha na pesquisa web: ${scrape.error}`
@@ -108,7 +109,7 @@ export class SubagentOrchestrator {
         }
 
         case 'coder': {
-          // Execute quick code analysis or calculation
+          // Execute quick code analysis or calculation with real abort signal
           const escapedTask = JSON.stringify(subTask.task)
           const pythonCode = `
 # Subagente Coder: Execução autônoma
@@ -116,7 +117,7 @@ import sys, math
 print("Execução de análise de código para:", ${escapedTask})
 print("Status: Rotina concluída com sucesso.")
 `
-          const codeRes = await codeInterpreter.execute('python', pythonCode, 20000)
+          const codeRes = await codeInterpreter.execute('python', pythonCode, 20000, signal)
           resultText = codeRes.success
             ? `Script executado pelo subagente (${codeRes.executionTimeMs}ms):\n${codeRes.stdout}`
             : `Erro no subagente coder: ${codeRes.stderr || codeRes.error}`
@@ -124,7 +125,7 @@ print("Status: Rotina concluída com sucesso.")
         }
 
         case 'tester': {
-          const testRes = await gitWatcher.runTests()
+          const testRes = await gitWatcher.runTests(undefined, undefined, signal)
           resultText = `Suíte de testes executada:\n${testRes.output}`
           break
         }

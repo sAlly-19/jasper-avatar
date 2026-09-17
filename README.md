@@ -92,23 +92,23 @@ O Jasper AI HUD opera sob o princípio de **Transparência Operacional Total**. 
 
 | Nº | Módulo | Tipo de Operação | Sem Configuração Externa | Com Configuração no Painel | Proteção / Segurança |
 | :---: | :--- | :--- | :--- | :--- | :--- |
-| **01** | **Visão de Tela** | **100% Nativo** | Captura frame real via `desktopCapturer` | Totalmente autônomo | Frame JPEG base64 enviado diretamente via WebSocket |
-| **02** | **Rastreador de Janelas** | **100% Nativo** | Lê a janela em foco via API do Windows | Totalmente autônomo | Leitura somente-leitura com polling de 4s |
-| **03** | **Observador do Clipboard** | **100% Nativo** | Monitora texto copiado localmente | Totalmente autônomo | Redação automática de credenciais e chaves de API |
+| **01** | **Visão de Tela** | **100% Nativo** | Captura frame real via `desktopCapturer` | Totalmente autônomo | Frame JPEG base64 injetado diretamente na sessão Gemini Live |
+| **02** | **Rastreador de Janelas** | **100% Nativo** | Lê a janela em foco via API do Windows | Totalmente autônomo | Leitura somente-leitura com polling seguro de 4s |
+| **03** | **Observador do Clipboard** | **100% Nativo** | Monitora texto copiado localmente | Totalmente autônomo | Redação automática de credenciais, Bearer tokens e chaves de API |
 | **04** | **Motor Cron & Lembretes** | **100% Nativo** | Fila de timers em JSON local | Totalmente autônomo | Proteção contra disparos duplicados pós-suspensão |
 | **05** | **Monitor de Saúde** | **100% Nativo** | Mede CPU, RAM e Disco C: | Totalmente autônomo | Cache de métricas de disco por 60s (zero lag) |
 | **06** | **Briefing Diário** | **100% Nativo** | Agrega turno, agenda, hardware e janela | Totalmente autônomo | Leitura consolidada em memória |
-| **07** | **Memória Semântica** | **100% Nativo** | TF-IDF e Similaridade por Cosseno | Totalmente autônomo | 100% matemático local, sem banco vetorial pago |
-| **08** | **Grafo de Conhecimento** | **100% Nativo** | Estrutura de grafos persistida em JSON | Totalmente autônomo | Gravação atômica em disco |
-| **09** | **Code Interpreter** | **100% Nativo** | Execução sandboxed Python/Node.js | Habilitado sob demanda | Desativado por padrão; sanitização total de env vars |
-| **10** | **Navegador Headless** | **100% Nativo** | Instância Chromium off-screen Electron | Totalmente autônomo | Limpeza de scripts e timeout com liberação de memória |
-| **11** | **Git Watcher** | **100% Nativo** | Usa diretório de execução atual | Repositório específico via Seletor | Executa apenas comandos seguros (`git add -u`, etc.) |
-| **12** | **Organizador de Pastas** | **100% Nativo** | Organiza pasta Downloads padrão | Pasta personalizada via Seletor | Modo dry-run prévio; proteção de arquivos travados |
-| **13** | **Subagentes Paralelos** | **100% Nativo** | Pool assíncrono em segundo plano | Totalmente autônomo | Ciclo de vida com cancelamento via AbortController |
-| **14** | **Reflexion Guard** | **100% Nativo** | Motor heurístico de segurança ativo | Totalmente autônomo | Bloqueia comandos destrutivos; requer autorização no HUD |
-| **15** | **Agenda & E-mails** | **Híbrido** | iCal nativo; E-mails com tag `[Demonstração Local]` | Conecta ao servidor IMAP informado | Senha do e-mail criptografada via DPAPI do Windows |
-| **16** | **Disparador de Webhooks**| **Híbrido** | Requer URL de destino fornecida no comando | Endpoint salvo com botão "Testar" | Bloqueio rigoroso de SSRF (loopback/RFC1918 restritos) |
-| **17** | **Casa Inteligente (HA)** | **Híbrido** | Retorna simulação contextual com `[SIMULADO]` | Executa chamadas reais via REST API | Token criptografado via DPAPI; Domain Allowlist ativo |
+| **07** | **Memória Semântica** | **100% Nativo** | TF-IDF e Similaridade por Cosseno | Totalmente autônomo | 100% matemático local, gravação atômica (.tmp + rename) |
+| **08** | **Grafo de Conhecimento** | **100% Nativo** | Grafo de relações persistido em JSON | Totalmente autônomo | Gravação atômica real em disco (.tmp + renameSync) |
+| **09** | **Code Interpreter** | **100% Nativo** | Execução sandboxed Python/Node.js | Habilitado sob demanda | Scanner estático (bloqueia subprocess, ctypes, eval), `python -I`, isolamento ao `sandboxDir` e `AbortSignal` |
+| **10** | **Navegador Headless** | **100% Nativo** | Instância Chromium off-screen isolada | Totalmente autônomo | Cerca anti-prompt injection `<untrusted_external_content>`, bloqueio SSRF e cancelamento com `AbortSignal` |
+| **11** | **Git Watcher** | **100% Nativo** | Repositório atual | Repositório específico via Seletor | Suporte a arquivos específicos (`files`), diff preview e confirmação obrigatória pelo Reflexion Guard |
+| **12** | **Organizador de Pastas** | **100% Nativo** | Organiza pasta Downloads padrão | Pasta personalizada via Seletor | Modo dry-run prévio; proteção estrita contra pastas do sistema Windows |
+| **13** | **Subagentes Paralelos** | **100% Nativo** | Pool assíncrono em segundo plano | Totalmente autônomo | Cancelamento real de processos filhos e requisições via `AbortSignal` |
+| **14** | **Reflexion Guard** | **100% Nativo** | Motor heurístico de segurança ativo | Totalmente autônomo | Central Policy Engine bloqueando comandos destrutivos e exigindo autorização prévia |
+| **15** | **Agenda & E-mails** | **Híbrido** | iCal nativo; E-mails exigem `[REQUER CONFIGURAÇÃO]` | Conecta ao servidor IMAP real via TLS (Porta 993) | Senha criptografada via DPAPI Windows (Fail-Closed); zero dados falsificados |
+| **16** | **Disparador de Webhooks**| **Híbrido** | Bloqueia SSRF e DNS Rebinding | Endpoints cadastrados pelo usuário | Resolução DNS ativa (`lookup`), bloqueio rigoroso de loopback/RFC1918/metadados |
+| **17** | **Casa Inteligente (HA)** | **Híbrido** | Simulação contextual com `[SIMULADO]` | Executa chamadas reais via REST API | Token criptografado via DPAPI; Domain Allowlist ativo (apenas light/switch/climate) |
 
 > 🏷️ **Tags de Transparência do Sistema**:
 > - **`[EXECUTADO]`**: Confirmação de que a chamada HTTP ou comando de sistema foi enviado e aceito com sucesso pelo serviço real.
@@ -484,6 +484,17 @@ O Jasper AI HUD foi desenhado sob princípios rigorosos de **Defesa em Profundid
 
 #### 4. Como silenciar ou desativar um módulo que não quero usar?
 > Abra as **Configurações** (ícone de engrenagem) e vá até a aba **Autonomia**. Lá você pode desligar qualquer uma das 17 opções com um clique. As alterações entram em vigor imediatamente.
+
+---
+
+## 🚀 Roadmap de Atualização do Electron & Versões
+
+| Componente | Versão Atual | Meta de Release | Status / Justificativa |
+| :--- | :---: | :---: | :--- |
+| **Electron** | `^33.4.11` | `v34+ / v44+ LTS` | Versão estável localmente homologada com Vite 5 e Three.js 0.170. O roadmap para distribuição ampla contempla a migração para a linha Electron com suporte estendido para obter patches de segurança atualizados do Chromium. |
+| **Node.js Runtime** | `v20+ / v22+` | `v22+ LTS` | Suporte nativo a strip-types, AbortSignal avançado e Node Test Runner embutido (`node --test`). |
+| **Three.js** | `0.170.0` | `0.170+` | Shader de olhos emissivos customizado com MeshPhysicalMaterial e cache O(1) de morph targets. |
+| **TensorFlow.js** | `3.21.0` | `4.x` | Speech Commands com transfer learning em IndexedDB e fallback fonético contínuo. |
 
 ---
 

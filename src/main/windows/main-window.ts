@@ -31,7 +31,7 @@ export function createMainWindow(): BrowserWindow {
       preload: fs.existsSync(join(__dirname, '../preload/index.mjs'))
         ? join(__dirname, '../preload/index.mjs')
         : join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -41,9 +41,29 @@ export function createMainWindow(): BrowserWindow {
     mainWindow?.show()
   })
 
+  // Block unauthorized external or scheme navigation
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    try {
+      const parsed = new URL(details.url)
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        shell.openExternal(details.url)
+      }
+    } catch {}
     return { action: 'deny' }
+  })
+
+  // Prevent renderer from navigating away from the app
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    try {
+      const currentUrl = mainWindow?.webContents.getURL() || ''
+      const currentOrigin = currentUrl ? new URL(currentUrl).origin : ''
+      const navOrigin = new URL(navigationUrl).origin
+      if (currentOrigin && navOrigin !== currentOrigin) {
+        event.preventDefault()
+      }
+    } catch {
+      event.preventDefault()
+    }
   })
 
   // Auto-grant media (microphone) permissions to the renderer window

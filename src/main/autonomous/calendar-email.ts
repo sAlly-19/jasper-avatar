@@ -1,6 +1,8 @@
 import { app } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
+import tls from 'tls'
+import { configStore } from '../config/config-store'
 import type { CalendarEvent, EmailSummary, AutonomyNotification } from '@shared'
 
 export class CalendarEmailService {
@@ -166,30 +168,159 @@ export class CalendarEmailService {
   }
 
   public async checkEmails(options: { unreadOnly?: boolean; limit?: number } = {}): Promise<EmailSummary[]> {
-    // Standard mock / sample inbox reader with support for custom IMAP
-    // If not configured, returns sample simulated inbox so user sees the interface and features working out of the box
     const limit = options.limit || 5
+    const unreadOnly = options.unreadOnly ?? true
 
-    return [
-      {
-        id: 'mail-1',
-        from: 'diretoria@empresa.com',
-        subject: '[SIMULADO] [URGENTE] Revisão de entrega do trimestre',
-        date: Date.now() - 15 * 60 * 1000,
-        snippet: '[Demonstração Local]: Precisamos validar os números de desempenho até as 17h de hoje.',
-        isUrgent: true,
-        unread: true
-      },
-      {
-        id: 'mail-2',
-        from: 'github@notifications.com',
-        subject: '[SIMULADO] Pull request #42 aprovado por review',
-        date: Date.now() - 2 * 3600 * 1000,
-        snippet: '[Demonstração Local]: Todos os testes automatizados passaram no CI/CD.',
-        isUrgent: false,
-        unread: true
+    // Retrieve configured IMAP settings from configStore
+    const cfg = configStore.getConfig()
+    if (!cfg.emailUser || !cfg.emailPassword || !cfg.emailImapHost) {
+      return [
+        {
+          id: 'unconfigured-notice',
+          from: 'sistema@jasper.ai',
+          subject: '[REQUER CONFIGURAÇÃO] Servidor IMAP não configurado',
+          date: Date.now(),
+          snippet: 'Abra as configurações do Jasper e preencha o Host IMAP, Usuário e Senha de App para sincronizar seus e-mails reais.',
+          isUrgent: false,
+          unread: true
+        }
+      ]
+    }
+
+    try {
+      return await this.fetchRealImapEmails(
+        cfg.emailImapHost,
+        cfg.emailImapPort || 993,
+        cfg.emailUser,
+        cfg.emailPassword,
+        limit,
+        unreadOnly
+      )
+    } catch (err: any) {
+      console.warn('[CalendarEmail] Erro ao buscar e-mails via IMAP:', err.message)
+      return [
+        {
+          id: 'error-notice',
+          from: 'sistema@jasper.ai',
+          subject: `[ERRO IMAP] Falha na conexão com ${cfg.emailImapHost}`,
+          date: Date.now(),
+          snippet: `Não foi possível conectar ao servidor IMAP: ${err.message}`,
+          isUrgent: true,
+          unread: true
+        }
+      ]
+    }
+  }
+
+  private fetchRealImapEmails(
+    host: string,
+    port: number,
+    user: string,
+    pass: string,
+    limit: number,
+    unreadOnly: boolean
+  ): Promise<EmailSummary[]> {
+    return new Promise((resolve) => {
+      const socket = tls.connect(
+        {
+          host,
+          port: port || 993,
+          servername: host,
+          timeout: 15000,
+          rejectUnauthorized: true
+        },
+        () => {
+          console.log(`[CalendarEmail] Conexão TLS estabelecida com ${host}:${port}`)
+        }
+      )
+
+      let state: 'GREETING' | 'LOGIN' | 'SELECT' | 'SEARCH' | 'FETCH' | 'LOGOUT' = 'GREETING'
+      let buffer = ''
+      let tagCounter = 1
+      const nextTag = () => `A${(tagCounter++).toString().padStart(3, '0')}`
+      let currentTag = ''
+      const results: EmailSummary[] = []
+      let emailIds: string[] = []
+
+      const sendCmd = (cmd: string) => {
+        currentTag = nextTag()
+        socket.write(`${currentTag} ${cmd}\r\n`)
       }
-    ].slice(0, limit)
+
+      const finish = () => {
+        try {
+          socket.write(`A999 LOGOUT\r\n`)
+        } catch {}
+        try {
+          socket.end()
+        } catch {}
+        resolve(results)
+      }
+
+      socket.on('data', (data) => {
+        buffer += data.toString('utf-8')
+        const lines = buffer.split('\r\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (state === 'GREETING' && line.startsWith('* OK')) {
+            state = 'LOGIN'
+            sendCmd(`LOGIN "${user.replace(/"/g, '\\"')}" "${pass.replace(/"/g, '\\"')}"`)
+          } else if (state === 'LOGIN' && line.startsWith(`${currentTag} OK`)) {
+            state = 'SELECT'
+            sendCmd(`SELECT INBOX`)
+          } else if (state === 'LOGIN' && line.startsWith(`${currentTag} NO`)) {
+            console.warn('[CalendarEmail] Falha de autenticação IMAP:', line)
+            finish()
+          } else if (state === 'SELECT' && line.startsWith(`${currentTag} OK`)) {
+            state = 'SEARCH'
+            const searchCriteria = unreadOnly ? 'UNSEEN' : 'ALL'
+            sendCmd(`SEARCH ${searchCriteria}`)
+          } else if (state === 'SEARCH' && line.startsWith('* SEARCH')) {
+            const parts = line.replace('* SEARCH', '').trim().split(/\s+/).filter(Boolean)
+            emailIds = parts.slice(-limit) // Get latest N emails
+          } else if (state === 'SEARCH' && line.startsWith(`${currentTag} OK`)) {
+            if (emailIds.length === 0) {
+              finish()
+              return
+            }
+            state = 'FETCH'
+            const idSeq = emailIds.join(',')
+            sendCmd(`FETCH ${idSeq} (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)] FLAGS)`)
+          } else if (state === 'FETCH') {
+            if (line.startsWith(`${currentTag} OK`)) {
+              finish()
+              return
+            }
+            if (line.toLowerCase().startsWith('subject:')) {
+              const subj = line.slice(8).trim()
+              results.push({
+                id: `mail-${Date.now()}-${results.length}`,
+                from: 'Carregando...',
+                subject: subj,
+                date: Date.now(),
+                snippet: subj,
+                unread: true,
+                isUrgent: /urgente|urgent|importante|alerta/i.test(subj)
+              })
+            } else if (line.toLowerCase().startsWith('from:') && results.length > 0) {
+              results[results.length - 1].from = line.slice(5).trim()
+            }
+          }
+        }
+      })
+
+      socket.on('error', (err) => {
+        console.warn('[CalendarEmail] Erro no socket IMAP TLS:', err.message)
+        finish()
+      })
+
+      socket.on('timeout', () => {
+        console.warn('[CalendarEmail] Timeout na conexão IMAP TLS.')
+        socket.destroy()
+        finish()
+      })
+    })
   }
 
   public stop(): void {

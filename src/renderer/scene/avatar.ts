@@ -90,6 +90,33 @@ function createVsCodeEyeMaterial(baseMat: THREE.Material): THREE.MeshPhysicalMat
   return eyeMat
 }
 
+export function buildMorphCacheMap(morphDictionary: MorphTargetMap): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const [key, idx] of Object.entries(morphDictionary)) {
+    map.set(key, idx)
+    map.set(key.toLowerCase(), idx)
+
+    if (key.endsWith('_L')) {
+      const alt = key.slice(0, -2) + 'Left'
+      map.set(alt, idx)
+      map.set(alt.toLowerCase(), idx)
+    } else if (key.endsWith('_R')) {
+      const alt = key.slice(0, -2) + 'Right'
+      map.set(alt, idx)
+      map.set(alt.toLowerCase(), idx)
+    } else if (key.endsWith('Left')) {
+      const alt = key.slice(0, -4) + '_L'
+      map.set(alt, idx)
+      map.set(alt.toLowerCase(), idx)
+    } else if (key.endsWith('Right')) {
+      const alt = key.slice(0, -5) + '_R'
+      map.set(alt, idx)
+      map.set(alt.toLowerCase(), idx)
+    }
+  }
+  return map
+}
+
 export class AvatarController {
   private scene: THREE.Scene
   private renderer: THREE.WebGLRenderer
@@ -319,29 +346,7 @@ export class AvatarController {
   }
 
   private buildMorphCache(): void {
-    this.morphCache.clear()
-    for (const [key, idx] of Object.entries(this.morphDictionary)) {
-      this.morphCache.set(key, idx)
-      this.morphCache.set(key.toLowerCase(), idx)
-
-      if (key.endsWith('_L')) {
-        const alt = key.slice(0, -2) + 'Left'
-        this.morphCache.set(alt, idx)
-        this.morphCache.set(alt.toLowerCase(), idx)
-      } else if (key.endsWith('_R')) {
-        const alt = key.slice(0, -2) + 'Right'
-        this.morphCache.set(alt, idx)
-        this.morphCache.set(alt.toLowerCase(), idx)
-      } else if (key.endsWith('Left')) {
-        const alt = key.slice(0, -4) + '_L'
-        this.morphCache.set(alt, idx)
-        this.morphCache.set(alt.toLowerCase(), idx)
-      } else if (key.endsWith('Right')) {
-        const alt = key.slice(0, -5) + '_R'
-        this.morphCache.set(alt, idx)
-        this.morphCache.set(alt.toLowerCase(), idx)
-      }
-    }
+    this.morphCache = buildMorphCacheMap(this.morphDictionary)
   }
 
   /**

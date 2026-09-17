@@ -186,7 +186,8 @@ async function executeToolInternal(toolName: string, args: Record<string, any>):
       const msg = String(args.message || '').trim()
       if (!msg) return 'Por favor, informe a mensagem do commit.'
       const repoPath = args.repoPath ? String(args.repoPath).trim() : undefined
-      const res = await gitWatcher.commitChanges(msg, repoPath)
+      const specificFiles = Array.isArray(args.files) && args.files.length > 0 ? args.files.map(String) : undefined
+      const res = await gitWatcher.commitChanges(msg, repoPath, specificFiles)
       if (!res.success) {
         return `Erro ao realizar commit: ${res.output}`
       }

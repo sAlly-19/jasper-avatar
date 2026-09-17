@@ -1,22 +1,30 @@
 import { app } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
+import dns from 'dns'
 import type { WebhookConfig, WebhookTriggerResult } from '@shared'
 
-export function isPrivateOrLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().trim()
-  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+export function isPrivateOrLoopbackIP(ip: string): boolean {
+  const cleanIp = ip.trim().toLowerCase()
+  if (cleanIp === '127.0.0.1' || cleanIp === '::1' || cleanIp === '0.0.0.0' || cleanIp === '::') {
     return true
   }
 
   // Cloud metadata services
-  if (host === '169.254.169.254' || host.startsWith('169.254.')) {
+  if (cleanIp === '169.254.169.254' || cleanIp.startsWith('169.254.')) {
+    return true
+  }
+
+  // IPv6 unique-local (fc00::/7) or link-local (fe80::/10)
+  if (cleanIp.startsWith('fc') || cleanIp.startsWith('fd') || cleanIp.startsWith('fe80:')) {
     return true
   }
 
   // IPv4 Private subnets
-  const ipParts = host.split('.').map(Number)
+  const ipParts = cleanIp.split('.').map(Number)
   if (ipParts.length === 4 && ipParts.every((p) => !isNaN(p) && p >= 0 && p <= 255)) {
+    // 0.0.0.0/8
+    if (ipParts[0] === 0) return true
     // 10.0.0.0/8
     if (ipParts[0] === 10) return true
     // 172.16.0.0/12
@@ -25,9 +33,51 @@ export function isPrivateOrLoopbackHost(hostname: string): boolean {
     if (ipParts[0] === 192 && ipParts[1] === 168) return true
     // 127.0.0.0/8
     if (ipParts[0] === 127) return true
+    // 100.64.0.0/10 (CGNAT)
+    if (ipParts[0] === 100 && ipParts[1] >= 64 && ipParts[1] <= 127) return true
+    // 224.0.0.0/4 (Multicast)
+    if (ipParts[0] >= 224) return true
   }
 
   return false
+}
+
+export function isPrivateOrLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().trim()
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+    return true
+  }
+
+  if (host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+    return true
+  }
+
+  return isPrivateOrLoopbackIP(host)
+}
+
+export async function resolveAndCheckSSRF(hostname: string): Promise<{ isSafe: boolean; resolvedIps: string[]; reason?: string }> {
+  if (isPrivateOrLoopbackHost(hostname)) {
+    return { isSafe: false, resolvedIps: [hostname], reason: `Hostname loopback ou privado detectado: "${hostname}".` }
+  }
+
+  try {
+    const lookupResults = await dns.promises.lookup(hostname, { all: true })
+    const resolvedIps = lookupResults.map((r) => r.address)
+
+    for (const res of lookupResults) {
+      if (isPrivateOrLoopbackIP(res.address)) {
+        return {
+          isSafe: false,
+          resolvedIps,
+          reason: `DNS Rebinding detectado: O hostname "${hostname}" resolve para o endereço IP privado/local "${res.address}".`
+        }
+      }
+    }
+
+    return { isSafe: true, resolvedIps }
+  } catch (err: any) {
+    return { isSafe: false, resolvedIps: [], reason: `Falha ao resolver DNS do host "${hostname}": ${err.message}` }
+  }
 }
 
 export class WebhookManager {
@@ -55,14 +105,8 @@ export class WebhookManager {
         const arr: WebhookConfig[] = JSON.parse(raw)
         arr.forEach((w) => this.webhooks.set(w.name.toLowerCase(), w))
       } else {
-        // Pre-populate with sample entries
+        // Pre-populate with legitimate public sample only (no auto-seeded localhost)
         const defaults: WebhookConfig[] = [
-          {
-            name: 'n8n-fluxo',
-            url: 'http://localhost:5678/webhook/jasper',
-            method: 'POST',
-            description: 'Webhook local do n8n para automação de tarefas'
-          },
           {
             name: 'slack-canal',
             url: 'https://hooks.slack.com/services/sample/webhook',
@@ -139,14 +183,17 @@ export class WebhookManager {
         }
       }
 
-      // If it's not a pre-registered endpoint saved explicitly by the user, block private/loopback/cloud metadata
-      if (!registered && isPrivateOrLoopbackHost(parsed.hostname)) {
-        return {
-          success: false,
-          status: 0,
-          responseBody: '',
-          executionTimeMs: 0,
-          error: `[SSRF Bloqueado] Requisições para redes locais (${parsed.hostname}) só são permitidas para Webhooks pré-cadastrados nas configurações.`
+      // If it's not a pre-registered endpoint saved explicitly by the user, perform real DNS resolution to block DNS rebinding
+      if (!registered) {
+        const check = await resolveAndCheckSSRF(parsed.hostname)
+        if (!check.isSafe) {
+          return {
+            success: false,
+            status: 0,
+            responseBody: '',
+            executionTimeMs: 0,
+            error: `[SSRF Bloqueado] ${check.reason} Requisições para redes locais só são permitidas para Webhooks pré-cadastrados nas configurações.`
+          }
         }
       }
     } catch (urlErr: any) {

@@ -220,12 +220,17 @@ export const AUTONOMY_FUNCTION_DECLARATIONS = [
   },
   {
     name: 'git_commit_changes',
-    description: 'Executa git add e git commit com a mensagem especificada no repositório informado.',
+    description: 'Executa git add e git commit com a mensagem especificada no repositório informado. Permite especificar a lista restrita de arquivos para comitar.',
     parameters: {
       type: 'OBJECT',
       properties: {
         message: { type: 'STRING', description: 'Mensagem de commit semântica a ser aplicada' },
-        repoPath: { type: 'STRING', description: 'Caminho do repositório (opcional)' }
+        repoPath: { type: 'STRING', description: 'Caminho do repositório (opcional)' },
+        files: {
+          type: 'ARRAY',
+          description: 'Lista específica de caminhos de arquivos a serem adicionados e comitados (recomendado para evitar comitar arquivos indesejados)',
+          items: { type: 'STRING' }
+        }
       },
       required: ['message']
     }

@@ -53,6 +53,7 @@ function initGeminiClient(): GeminiLiveClient {
 }
 
 app.whenReady().then(() => {
+  configStore.initialize()
   geminiClient = initGeminiClient()
   setGlobalGeminiClient(geminiClient)
   registerIpcHandlers(() => geminiClient)

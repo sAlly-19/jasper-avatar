@@ -9,14 +9,17 @@ dotenv.config()
 
 function encryptSecret(val: string): string {
   if (!val) return ''
+  if (val.startsWith('enc:')) return val // already encrypted
   try {
     if (safeStorage && safeStorage.isEncryptionAvailable()) {
       return `enc:${safeStorage.encryptString(val).toString('base64')}`
     }
   } catch (err) {
-    console.warn('[ConfigStore] safeStorage encryption failed, saving unencrypted:', err)
+    console.error('[ConfigStore] [FAIL-CLOSED] safeStorage encryption failed:', err)
+    return ''
   }
-  return val
+  console.warn('[ConfigStore] [FAIL-CLOSED] safeStorage is unavailable. Secret cannot be saved in plaintext.')
+  return ''
 }
 
 function decryptSecret(val: string): string {
@@ -26,12 +29,16 @@ function decryptSecret(val: string): string {
       if (safeStorage && safeStorage.isEncryptionAvailable()) {
         const buf = Buffer.from(val.slice(4), 'base64')
         return safeStorage.decryptString(buf)
+      } else {
+        console.warn('[ConfigStore] [FAIL-CLOSED] safeStorage is not available yet to decrypt secret.')
+        return ''
       }
     } catch (err) {
-      console.warn('[ConfigStore] safeStorage decryption failed:', err)
+      console.warn('[ConfigStore] [FAIL-CLOSED] safeStorage decryption failed:', err)
       return ''
     }
   }
+  // If not prefixed with enc:, it is a legacy plaintext secret
   return val
 }
 
@@ -85,7 +92,7 @@ class ConfigStore {
     hassUrl: process.env.HASS_URL || 'http://homeassistant.local:8123',
     hassToken: process.env.HASS_TOKEN || '',
     gitRepoPath: process.cwd(),
-    webhookDefaultUrl: 'http://localhost:5678/webhook/jasper',
+    webhookDefaultUrl: '',
     emailUser: '',
     emailImapHost: 'imap.gmail.com',
     emailImapPort: 993,
@@ -93,8 +100,27 @@ class ConfigStore {
     folderDefaultTarget: 'downloads'
   }
 
+  private isInitialized: boolean = false
+
   constructor() {
+    this.loadEnvDefaults()
+  }
+
+  private loadEnvDefaults(): void {
+    this.config.apiKey = process.env.GOOGLE_API_KEY || ''
+    this.config.voiceName = process.env.GEMINI_VOICE || 'Charon'
+    this.config.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-latest'
+    this.config.agentName = process.env.AGENT_NAME || 'Jasper'
+    this.config.hassUrl = process.env.HASS_URL || 'http://homeassistant.local:8123'
+    this.config.hassToken = process.env.HASS_TOKEN || ''
+  }
+
+  public initialize(): JasperConfig {
+    if (this.isInitialized) return this.config
+    console.log('[ConfigStore] Initializing ConfigStore and decrypting credentials after app.ready...')
     this.loadPersistedConfig()
+    this.isInitialized = true
+    return this.config
   }
 
   private getConfigFilePath(): string {
@@ -103,12 +129,7 @@ class ConfigStore {
 
   public loadPersistedConfig(): JasperConfig {
     // 1. .env defaults
-    this.config.apiKey = process.env.GOOGLE_API_KEY || ''
-    this.config.voiceName = process.env.GEMINI_VOICE || 'Charon'
-    this.config.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-latest'
-    this.config.agentName = process.env.AGENT_NAME || 'Jasper'
-    this.config.hassUrl = process.env.HASS_URL || 'http://homeassistant.local:8123'
-    this.config.hassToken = process.env.HASS_TOKEN || ''
+    this.loadEnvDefaults()
 
     // 2. Overlay persisted settings from userData
     try {

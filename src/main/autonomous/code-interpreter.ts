@@ -3,6 +3,7 @@ import { join } from 'path'
 import fs from 'fs'
 import { execFile } from 'child_process'
 import type { CodeExecutionResult } from '@shared'
+import { toolPolicyEngine } from './policy-engine'
 
 export class CodeInterpreter {
   private enabled: boolean = true
@@ -66,7 +67,8 @@ export class CodeInterpreter {
   public async execute(
     language: 'python' | 'javascript' | 'bash',
     code: string,
-    timeoutMs: number = 30000
+    timeoutMs: number = 30000,
+    signal?: AbortSignal
   ): Promise<CodeExecutionResult> {
     if (!this.enabled) {
       return {
@@ -77,6 +79,20 @@ export class CodeInterpreter {
         executionTimeMs: 0,
         generatedFiles: [],
         error: 'Serviço desativado'
+      }
+    }
+
+    // 1. Zero-Trust Policy Engine pre-flight static code scan
+    const policy = toolPolicyEngine.validateCode(language, code)
+    if (!policy.allowed) {
+      return {
+        success: false,
+        language,
+        stdout: '',
+        stderr: `[SANDBOX ZERO-TRUST BLOQUEIO]: ${policy.reason}`,
+        executionTimeMs: 0,
+        generatedFiles: [],
+        error: policy.reason
       }
     }
 
@@ -103,9 +119,12 @@ export class CodeInterpreter {
     }
 
     const command = language === 'python' ? 'python' : 'node'
-    const args = language === 'python' ? ['-u', scriptFileName] : [scriptFileName]
+    // Isolated execution: Python -I -s -S strips PYTHONPATH, PYTHONHOME, and user packages
+    const args = language === 'python'
+      ? ['-I', '-s', '-S', '-u', scriptFileName]
+      : ['--no-addons', '--disallow-code-generation-from-strings', scriptFileName]
 
-    // Sanitized environment: strip API keys, tokens, and app secrets
+    // Sanitized environment: strictly minimal PATH, zero app secrets or API keys
     const sanitizedEnv: Record<string, string> = {
       PATH: process.env.PATH || '',
       PATHEXT: process.env.PATHEXT || '',
@@ -116,13 +135,14 @@ export class CodeInterpreter {
     }
 
     return new Promise<CodeExecutionResult>((resolve) => {
-      execFile(
+      const child = execFile(
         command,
         args,
         {
           cwd: this.sandboxDir,
           env: sanitizedEnv,
           timeout: timeoutMs,
+          signal: signal,
           maxBuffer: 5 * 1024 * 1024,
           windowsHide: true
         },
@@ -141,8 +161,11 @@ export class CodeInterpreter {
           const generatedFiles = currentFiles.filter((f) => !beforeFiles.has(f) && f !== scriptFileName)
 
           if (error) {
+            const wasAborted = signal?.aborted || error.name === 'AbortError'
             const timedOut = error.killed && error.signal === 'SIGTERM'
-            const errorMsg = timedOut
+            const errorMsg = wasAborted
+              ? 'Execução cancelada pelo usuário via AbortSignal.'
+              : timedOut
               ? `Execução interrompida por tempo limite (${timeoutMs / 1000}s excedidos).`
               : error.message
 

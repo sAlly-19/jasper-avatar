@@ -15,5 +15,6 @@ export * from './reflexion-engine'
 export * from './calendar-email'
 export * from './webhook-manager'
 export * from './smart-home'
+export * from './policy-engine'
 export * from './coordinator'
 

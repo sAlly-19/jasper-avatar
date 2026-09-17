@@ -3,6 +3,22 @@ import { join } from 'path'
 import fs from 'fs'
 import type { KnowledgeNode, KnowledgeEdge, KnowledgeGraphData } from '@shared'
 
+function atomicWriteFileSync(filePath: string, data: string): void {
+  const tmpPath = `${filePath}.tmp.${Date.now()}`
+  fs.writeFileSync(tmpPath, data, 'utf-8')
+  try {
+    fs.renameSync(tmpPath, filePath)
+  } catch (err) {
+    // Windows fallback if destination file is locked or cross-device
+    try {
+      fs.copyFileSync(tmpPath, filePath)
+      fs.unlinkSync(tmpPath)
+    } catch {
+      fs.writeFileSync(filePath, data, 'utf-8')
+    }
+  }
+}
+
 export class KnowledgeGraphService {
   private isEnabled: boolean = true
   private data: KnowledgeGraphData = { nodes: [], edges: [] }
@@ -55,7 +71,7 @@ export class KnowledgeGraphService {
   private saveGraph(): void {
     try {
       const p = this.getFilePath()
-      fs.writeFileSync(p, JSON.stringify(this.data, null, 2), 'utf-8')
+      atomicWriteFileSync(p, JSON.stringify(this.data, null, 2))
     } catch (err) {
       console.warn('[KnowledgeGraph] Error saving graph:', err)
     }

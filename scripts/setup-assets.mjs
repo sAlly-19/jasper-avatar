@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 
-const FACECAP_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/facecap.glb'
+const FACECAP_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/r170/examples/models/gltf/facecap.glb'
 
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -61,17 +61,25 @@ async function main() {
   ensureDir(publicModelDir)
   ensureDir(publicBasisDir)
 
-  // 1. Download facecap.glb to assets/models/facecap.glb
+  // 1. Setup facecap.glb with offline fallback and immutable pinned URL
   const facecapAssetPath = path.join(assetsModelDir, 'facecap.glb')
   const facecapPublicPath = path.join(publicModelDir, 'facecap.glb')
 
   try {
-    await downloadFile(FACECAP_URL, facecapAssetPath)
-    // Copy to public/models/facecap.glb for web serving
-    fs.copyFileSync(facecapAssetPath, facecapPublicPath)
-    console.log(`[setup-assets] Copied facecap.glb to ${facecapPublicPath}`)
+    if (fs.existsSync(facecapAssetPath) && fs.statSync(facecapAssetPath).size > 10000) {
+      console.log(`[setup-assets] Usando asset local já existente em ${facecapAssetPath}`)
+      fs.copyFileSync(facecapAssetPath, facecapPublicPath)
+      console.log(`[setup-assets] Copiado facecap.glb para ${facecapPublicPath}`)
+    } else if (fs.existsSync(facecapPublicPath) && fs.statSync(facecapPublicPath).size > 10000) {
+      console.log(`[setup-assets] Usando asset de ${facecapPublicPath}`)
+      fs.copyFileSync(facecapPublicPath, facecapAssetPath)
+    } else {
+      await downloadFile(FACECAP_URL, facecapAssetPath)
+      fs.copyFileSync(facecapAssetPath, facecapPublicPath)
+      console.log(`[setup-assets] Copiado facecap.glb baixado para ${facecapPublicPath}`)
+    }
   } catch (err) {
-    console.error('[setup-assets] Error downloading facecap.glb:', err.message)
+    console.error('[setup-assets] Erro configurando facecap.glb:', err.message)
   }
 
   // 2. Copy Basis Universal transcoders from three

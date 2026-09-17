@@ -2,6 +2,7 @@ import { execFile } from 'child_process'
 import { join } from 'path'
 import fs from 'fs'
 import type { GitStatusResult, AutonomyNotification } from '@shared'
+import { toolPolicyEngine } from './policy-engine'
 
 export class GitWatcher {
   private enabled: boolean = true
@@ -152,6 +153,12 @@ export class GitWatcher {
       return { success: false, output: 'Mensagem de commit não informada.' }
     }
 
+    // Zero-Trust policy validation: block destructive flags, enforce path safety and credential protection
+    const policy = toolPolicyEngine.validateGitCommit(message, specificFiles)
+    if (!policy.allowed) {
+      return { success: false, output: `[BLOQUEIO POLICY ENGINE]: ${policy.reason}` }
+    }
+
     // Safety: only add specific files or tracked updates to avoid accidentally staging .env or node_modules
     const addArgs = specificFiles && specificFiles.length > 0
       ? ['add', '--', ...specificFiles]
@@ -170,18 +177,18 @@ export class GitWatcher {
     return { success: true, output: commitRes.stdout }
   }
 
-  public async runTests(repoPath: string = this.defaultRepoPath, customCommand?: string): Promise<{ success: boolean; output: string }> {
+  public async runTests(repoPath: string = this.defaultRepoPath, customCommand?: string, signal?: AbortSignal): Promise<{ success: boolean; output: string }> {
     return new Promise((resolve) => {
       const packageJsonPath = join(repoPath, 'package.json')
       const isNodeProject = fs.existsSync(packageJsonPath)
       const command = customCommand || (isNodeProject ? 'npm' : 'pytest')
       const args = customCommand ? [] : isNodeProject ? ['test'] : []
 
-      execFile(command, args, { cwd: repoPath, timeout: 60000, windowsHide: true, shell: process.platform === 'win32' }, (err, stdout, stderr) => {
+      execFile(command, args, { cwd: repoPath, timeout: 60000, signal, windowsHide: true, shell: process.platform === 'win32' }, (err, stdout, stderr) => {
         const out = (stdout ? stdout.toString() : '') + (stderr ? '\n' + stderr.toString() : '')
         resolve({
           success: !err,
-          output: out.trim() || (err ? err.message : 'Testes executados com sucesso.')
+          output: out.trim() || (err ? (signal?.aborted ? 'Execução de testes cancelada pelo usuário.' : err.message) : 'Testes executados com sucesso.')
         })
       })
     })

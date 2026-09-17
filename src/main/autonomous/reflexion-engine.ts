@@ -100,13 +100,32 @@ export class ReflexionEngine {
     // 2. Git Commit Check
     if (toolName === 'git_commit_changes') {
       const msg = String(safeArgs.message || '')
-      if (msg.toLowerCase().includes('--force') || msg.toLowerCase().includes('--amend')) {
-        return {
-          allowed: false,
-          riskLevel: 'HIGH',
-          reason: 'Operações de commit forçado (--force / --amend) exigem confirmação explícita.',
-          requiresConfirmation: true
-        }
+      const specificFiles = Array.isArray(safeArgs.files) ? safeArgs.files : []
+      const fileNotice = specificFiles.length > 0
+        ? `Arquivos a serem comitados: ${specificFiles.join(', ')}`
+        : 'Todos os arquivos rastreados modificados'
+
+      const confirmationId = `conf-git-${Date.now()}`
+      this.pendingConfirmations.set(confirmationId, { toolName, args: safeArgs, timestamp: Date.now() })
+
+      const reason = `Operação de commit Git solicitada ("${msg}"). Alvo: ${fileNotice}.`
+
+      if (this.onNotification) {
+        this.onNotification({
+          id: confirmationId,
+          type: 'info',
+          title: 'Git Watcher: Confirmação de Commit',
+          message: `${reason} Confirme a gravação das alterações.`,
+          timestamp: Date.now(),
+          data: { confirmationId, toolName, args: safeArgs }
+        })
+      }
+
+      return {
+        allowed: false,
+        riskLevel: 'MODERATE',
+        reason,
+        requiresConfirmation: true
       }
     }
 
