@@ -62,7 +62,7 @@ async function executeToolInternal(toolName: string, args: Record<string, any>):
     }
 
     case 'read_clipboard': {
-      const text = clipboardWatcher.readClipboard()
+      const text = await clipboardWatcher.readClipboard()
       if (!text || !text.trim()) {
         return 'A área de transferência (Clipboard) está vazia no momento.'
       }

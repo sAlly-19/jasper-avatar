@@ -126,6 +126,16 @@ export class WakeWordManager {
       }
 
       this.fallbackRecognizer.onerror = (err: any) => {
+        if (err.error === 'not-allowed' || err.error === 'service-not-allowed') {
+          console.warn('[WakeWord] Fallback fonético em nuvem (Web Speech API) indisponível no Electron. Calibre a Wake Word nas configurações para ativação offline via TensorFlow.js local.')
+          this.isPhoneticFallbackActive = false
+          this.isRunning = false
+          try {
+            this.fallbackRecognizer?.abort()
+          } catch {}
+          this.options.onTrainerUIUpdate?.()
+          return
+        }
         // Ignore aborted errors when user is speaking or mic is toggled
         if (err.error !== 'aborted') {
           console.warn('[WakeWord] Erro no fallback fonético:', err.error)
@@ -133,7 +143,7 @@ export class WakeWordManager {
       }
 
       this.fallbackRecognizer.onend = () => {
-        // Auto restart if still supposed to be running
+        // Auto restart only if still supposed to be running and active
         if (this.isRunning && this.isPhoneticFallbackActive) {
           try {
             this.fallbackRecognizer?.start()

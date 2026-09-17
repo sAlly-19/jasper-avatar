@@ -33,8 +33,8 @@ export const safeStorage = {
 };
 
 export const clipboard = {
-  readText: () => '',
-  writeText: () => {}
+  readText: () => Promise.resolve(''),
+  writeText: () => Promise.resolve()
 };
 
 export const BrowserWindow = class {

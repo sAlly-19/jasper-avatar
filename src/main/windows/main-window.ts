@@ -66,15 +66,15 @@ export function createMainWindow(): BrowserWindow {
     }
   })
 
-  // Auto-grant media (microphone) permissions to the renderer window
+  // Auto-grant media (microphone/audio) permissions to the renderer window
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    if (permission === 'media') {
+    if (permission === 'media' || (permission as string) === 'microphone' || (permission as string) === 'speech') {
       return callback(true)
     }
     callback(false)
   })
   session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    return permission === 'media'
+    return permission === 'media' || (permission as string) === 'microphone' || (permission as string) === 'speech'
   })
 
   // Forward renderer console logs to terminal and disk log file

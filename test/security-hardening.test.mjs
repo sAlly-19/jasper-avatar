@@ -11,9 +11,8 @@ var app = {
   }
 };
 var clipboard = {
-  readText: () => "",
-  writeText: () => {
-  }
+  readText: () => Promise.resolve(""),
+  writeText: () => Promise.resolve()
 };
 
 // src/main/autonomous/webhook-manager.ts
@@ -427,9 +426,13 @@ var ClipboardWatcherService = class {
   setOnInterestingContent(cb) {
     this.onInterestingContent = cb;
   }
-  start() {
+  async start() {
     if (this.timer) return;
-    this.lastClipboardText = clipboard.readText().trim();
+    try {
+      this.lastClipboardText = (await clipboard.readText()).trim();
+    } catch {
+      this.lastClipboardText = "";
+    }
     this.timer = setInterval(() => this.check(), this.pollIntervalMs);
     console.log("[ClipboardWatcher] Service started");
   }
@@ -440,8 +443,13 @@ var ClipboardWatcherService = class {
       console.log("[ClipboardWatcher] Service stopped");
     }
   }
-  readClipboard() {
-    return redactSecrets(clipboard.readText());
+  async readClipboard() {
+    try {
+      const text = await clipboard.readText();
+      return redactSecrets(text);
+    } catch {
+      return "";
+    }
   }
   analyzeText(text) {
     const sanitized = redactSecrets(text.trim());
@@ -495,10 +503,11 @@ var ClipboardWatcherService = class {
       timestamp: Date.now()
     };
   }
-  check() {
+  async check() {
     if (!this.isEnabled) return;
     try {
-      const currentText = clipboard.readText().trim();
+      const raw = await clipboard.readText();
+      const currentText = raw.trim();
       if (!currentText || currentText === this.lastClipboardText) return;
       this.lastClipboardText = currentText;
       const analysis = this.analyzeText(currentText);

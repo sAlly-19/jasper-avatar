@@ -46,9 +46,13 @@ export class ClipboardWatcherService {
     this.onInterestingContent = cb
   }
 
-  public start(): void {
+  public async start(): Promise<void> {
     if (this.timer) return
-    this.lastClipboardText = clipboard.readText().trim()
+    try {
+      this.lastClipboardText = (await clipboard.readText()).trim()
+    } catch {
+      this.lastClipboardText = ''
+    }
     this.timer = setInterval(() => this.check(), this.pollIntervalMs)
     console.log('[ClipboardWatcher] Service started')
   }
@@ -61,8 +65,13 @@ export class ClipboardWatcherService {
     }
   }
 
-  public readClipboard(): string {
-    return redactSecrets(clipboard.readText())
+  public async readClipboard(): Promise<string> {
+    try {
+      const text = await clipboard.readText()
+      return redactSecrets(text)
+    } catch {
+      return ''
+    }
   }
 
   public analyzeText(text: string): ClipboardAnalysis {
@@ -125,11 +134,12 @@ export class ClipboardWatcherService {
     }
   }
 
-  private check(): void {
+  private async check(): Promise<void> {
     if (!this.isEnabled) return
 
     try {
-      const currentText = clipboard.readText().trim()
+      const raw = await clipboard.readText()
+      const currentText = raw.trim()
       if (!currentText || currentText === this.lastClipboardText) return
 
       this.lastClipboardText = currentText
