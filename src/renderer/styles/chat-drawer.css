@@ -1,0 +1,86 @@
+.btn-chat-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+}
+
+.btn-chat-toggle:hover {
+  border-color: var(--cyan-neon);
+  color: var(--cyan-neon);
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+.btn-chat-toggle.active {
+  background: rgba(0, 240, 255, 0.2);
+  border-color: var(--cyan-neon);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+/* Sliding Text Input Drawer (opens to the right) */
+.chat-drawer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, padding 0.25s ease;
+}
+
+.chat-drawer.open {
+  max-width: 260px;
+  opacity: 1;
+  padding-left: 4px;
+  pointer-events: auto;
+}
+
+.chat-drawer input {
+  width: 170px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 14px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 11px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chat-drawer input:focus {
+  border-color: var(--cyan-neon);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+.btn-send {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00d2ff 0%, #0077ff 100%);
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-send:hover {
+  box-shadow: 0 0 8px var(--cyan-neon);
+  transform: scale(1.08);
+}
+

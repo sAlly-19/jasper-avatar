@@ -1,0 +1,30 @@
+{
+  "name": "jasper-avatar",
+  "version": "1.0.0",
+  "description": "Jasper - Interactive 3D Voice Assistant with Three.js and Gemini Live",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "start": "electron .",
+    "setup:assets": "node scripts/setup-assets.mjs",
+    "postinstall": "node scripts/setup-assets.mjs"
+  },
+  "dependencies": {
+    "@tensorflow-models/speech-commands": "^0.5.4",
+    "@tensorflow/tfjs": "^3.21.0",
+    "dotenv": "^16.4.7",
+    "three": "^0.170.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/three": "^0.170.0",
+    "@types/ws": "^8.5.13",
+    "electron": "^33.2.1",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11"
+  }
+}

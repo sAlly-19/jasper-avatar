@@ -1,0 +1,93 @@
+import { DOM } from './dom'
+
+export function showHudToast(
+  title: string,
+  message: string,
+  type: string = 'info',
+  durationMs: number = 6000,
+  action?: { label: string; onClick: () => void }
+): HTMLElement | null {
+  const container = DOM.hudToastContainer || document.getElementById('hud-toast-container')
+  if (!container) return null
+
+  const toast = document.createElement('div')
+  toast.className = `hud-toast ${type}`
+
+  const header = document.createElement('div')
+  header.className = 'hud-toast-header'
+
+  const titleSpan = document.createElement('span')
+  titleSpan.className = 'hud-toast-title'
+  titleSpan.textContent = title
+
+  const closeBtn = document.createElement('button')
+  closeBtn.className = 'hud-toast-close'
+  closeBtn.innerHTML = '&times;'
+
+  header.appendChild(titleSpan)
+  header.appendChild(closeBtn)
+
+  const msgDiv = document.createElement('div')
+  msgDiv.className = 'hud-toast-message'
+  msgDiv.textContent = message
+
+  toast.appendChild(header)
+  toast.appendChild(msgDiv)
+
+  const removeToast = (): void => {
+    toast.classList.add('fading')
+    setTimeout(() => {
+      if (toast.parentElement) {
+        toast.parentElement.removeChild(toast)
+      }
+    }, 300)
+  }
+
+  if (action) {
+    const actionContainer = document.createElement('div')
+    actionContainer.style.marginTop = '8px'
+    actionContainer.style.display = 'flex'
+    actionContainer.style.justifyContent = 'flex-end'
+
+    const actionBtn = document.createElement('button')
+    actionBtn.className = 'hud-toast-btn-action'
+    actionBtn.textContent = action.label
+    actionBtn.style.padding = '5px 12px'
+    actionBtn.style.background = 'rgba(0, 240, 255, 0.25)'
+    actionBtn.style.border = '1px solid rgba(0, 240, 255, 0.6)'
+    actionBtn.style.borderRadius = '6px'
+    actionBtn.style.color = '#ffffff'
+    actionBtn.style.fontSize = '12px'
+    actionBtn.style.fontWeight = '500'
+    actionBtn.style.cursor = 'pointer'
+    actionBtn.style.transition = 'all 0.2s ease'
+
+    actionBtn.addEventListener('mouseenter', () => {
+      actionBtn.style.background = 'rgba(0, 240, 255, 0.45)'
+      actionBtn.style.borderColor = 'rgba(0, 240, 255, 0.9)'
+    })
+    actionBtn.addEventListener('mouseleave', () => {
+      actionBtn.style.background = 'rgba(0, 240, 255, 0.25)'
+      actionBtn.style.borderColor = 'rgba(0, 240, 255, 0.6)'
+    })
+
+    actionBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      action.onClick()
+      removeToast()
+    })
+
+    actionContainer.appendChild(actionBtn)
+    toast.appendChild(actionContainer)
+  }
+
+  closeBtn.addEventListener('click', () => removeToast())
+
+  container.appendChild(toast)
+
+  // Auto remove
+  setTimeout(removeToast, durationMs)
+
+  return toast
+}
+
