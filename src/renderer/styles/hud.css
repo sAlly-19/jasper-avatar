@@ -66,6 +66,17 @@
   box-shadow: 0 0 12px var(--green-neon);
 }
 
+.status-badge.call {
+  border-color: rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+}
+
+.status-badge.call .status-dot {
+  background: var(--cyan-neon);
+  box-shadow: 0 0 12px var(--cyan-neon);
+  animation: pulse-dot 0.7s infinite alternate;
+}
+
 .status-badge.error .status-dot {
   background: var(--red-neon);
   box-shadow: 0 0 8px var(--red-neon);

@@ -12,6 +12,7 @@ export class SpeechCommandsWakeWord {
   private recognizer: speechCommands.SpeechCommandRecognizer | null = null
   private transferRecognizer: speechCommands.TransferSpeechCommandRecognizer | null = null
   private isCustomModelTrained = false
+  private isLegacyTwoClassModel = false
   private isListening = false
   private options: Required<SpeechWakeWordOptions>
 
@@ -22,8 +23,8 @@ export class SpeechCommandsWakeWord {
   constructor(options: SpeechWakeWordOptions = {}) {
     const agent = (options.agentName && options.agentName.trim()) || 'Jasper'
     this.options = {
-      probabilityThreshold: options.probabilityThreshold ?? 0.65,
-      suppressionTimeMillis: options.suppressionTimeMillis ?? 2000,
+      probabilityThreshold: options.probabilityThreshold ?? 0.85,
+      suppressionTimeMillis: options.suppressionTimeMillis ?? 2500,
       agentName: agent,
       wakeWords: options.wakeWords ?? [agent.toLowerCase()]
     }
@@ -70,16 +71,36 @@ export class SpeechCommandsWakeWord {
 
     try {
       await transfer.load()
-      this.isCustomModelTrained = true
-      console.log(`[SpeechCommands] [OK] Modelo personalizado "${modelKey}" carregado do IndexedDB:`, transfer.wordLabels())
+      const labels = transfer.wordLabels()
+      // A safe transfer model must have negative speech samples (_other_) to avoid firing on any word
+      if (labels.includes('_other_') && labels.length >= 3) {
+        this.isCustomModelTrained = true
+        this.isLegacyTwoClassModel = false
+        console.log(`[SpeechCommands] [OK] Modelo personalizado 3-classes "${modelKey}" carregado do IndexedDB:`, labels)
+      } else {
+        this.isCustomModelTrained = false
+        this.isLegacyTwoClassModel = true
+        console.warn(`[SpeechCommands] [AVISO] Modelo salvo "${modelKey}" possui apenas 2 classes (sem '_other_'). Calibração necessária para evitar falsos positivos.`, labels)
+      }
     } catch {
       this.isCustomModelTrained = false
+      this.isLegacyTwoClassModel = false
       console.log(`[SpeechCommands] Nenhum modelo personalizado salvo ainda para "${this.options.agentName}".`)
     }
   }
 
   public isCustomModelActive(): boolean {
     return this.isCustomModelTrained
+  }
+
+  public isLegacyModel(): boolean {
+    return this.isLegacyTwoClassModel
+  }
+
+  public hasNegativeSpeechSamples(): boolean {
+    if (!this.transferRecognizer || !this.isCustomModelTrained) return false
+    const labels = this.transferRecognizer.wordLabels()
+    return labels.includes('_other_')
   }
 
   public getModelAgentName(): string {
@@ -114,36 +135,49 @@ export class SpeechCommandsWakeWord {
 
           if (maxIndex >= 0) {
             const detectedWord = words[maxIndex]
-            if (detectedWord !== '_background_noise_' && detectedWord !== '_unknown_') {
-              // 1. If using the custom transfer model, match the specific trained agent name
-              if (this.isCustomModelTrained && this.transferRecognizer) {
-                const target = this.options.agentName.toLowerCase()
-                if (detectedWord.toLowerCase() !== target) {
-                  return
-                }
-              } else {
-                // 2. If using the base model, filter strictly by wakeWords (never 'go' or 'yes')
-                const matches = this.options.wakeWords.some(
-                  (w) => w.toLowerCase() === detectedWord.toLowerCase()
-                )
-                if (!matches) {
-                  return
-                }
-              }
-
-              console.log(
-                `%c[SpeechCommands] Nome detectado: "${detectedWord}" (confiança: ${maxScore.toFixed(2)})`,
-                'color: #00f0ff; font-weight: bold;'
-              )
-              this.onDetect?.(detectedWord, maxScore)
+            // Ignore background noise, unknown, and negative speech samples (_other_)
+            if (
+              detectedWord === '_background_noise_' ||
+              detectedWord === '_unknown_' ||
+              detectedWord === '_other_' ||
+              detectedWord === '_other_speech_'
+            ) {
+              return
             }
+
+            // Verify minimum probability threshold
+            if (maxScore < this.options.probabilityThreshold) {
+              return
+            }
+
+            // 1. If using the custom transfer model, match the specific trained agent name
+            if (this.isCustomModelTrained && this.transferRecognizer) {
+              const target = this.options.agentName.toLowerCase()
+              if (detectedWord.toLowerCase() !== target) {
+                return
+              }
+            } else {
+              // 2. If using the base model, filter strictly by wakeWords (never 'go' or 'yes')
+              const matches = this.options.wakeWords.some(
+                (w) => w.toLowerCase() === detectedWord.toLowerCase()
+              )
+              if (!matches) {
+                return
+              }
+            }
+
+            console.log(
+              `%c[SpeechCommands] Nome detectado: "${detectedWord}" (confiança: ${(maxScore * 100).toFixed(1)}%)`,
+              'color: #00f0ff; font-weight: bold;'
+            )
+            this.onDetect?.(detectedWord, maxScore)
           }
         },
         {
           includeSpectrogram: false,
           probabilityThreshold: this.options.probabilityThreshold,
           suppressionTimeMillis: this.options.suppressionTimeMillis,
-          overlapFactor: 0.5
+          overlapFactor: 0.25
         }
       )
 
@@ -237,16 +271,37 @@ export class SpeechCommandsWakeWord {
   public async trainCustomModel(onProgress?: (epoch: number, loss: number) => void): Promise<void> {
     if (!this.transferRecognizer) throw new Error('Nenhum exemplo de áudio foi gravado ainda.')
     const counts = this.transferRecognizer.countExamples()
-    const keys = Object.keys(counts)
-    if (keys.length < 2) {
-      throw new Error('É necessário gravar ao menos amostras do nome do assistente e de ruído/silêncio ambiente.')
+    const nameKey = this.options.agentName.toLowerCase()
+    const nameCount = counts[nameKey] || 0
+    const noiseCount = counts['_background_noise_'] || 0
+    const otherCount = (counts['_other_'] || 0) + (counts['_other_speech_'] || 0)
+
+    if (nameCount < 3 || noiseCount < 2 || otherCount < 2) {
+      throw new Error(
+        `Para treinar sem falsos positivos, é necessário gravar ao menos 3 amostras do nome "${this.options.agentName}", 2 de silêncio e 2 de outras palavras comuns.`
+      )
     }
 
     const wasListening = this.isListening
     await this.stop()
     await new Promise((resolve) => setTimeout(resolve, 150))
 
-    console.log(`[SpeechCommands] Treinando modelo neural transfer learning para "${this.options.agentName}"...`)
+    console.log(`[SpeechCommands] Treinando modelo neural transfer learning para "${this.options.agentName}" (3 classes: ${nameKey}, _background_noise_, _other_)...`)
+
+    // Reset previous transfer model instances to avoid TypeError: Cannot set property 'trainable' of undefined
+    const tr = this.transferRecognizer as any
+    if (tr) {
+      if (tr.model) {
+        try {
+          tr.model.dispose()
+        } catch (e) {
+          console.warn('[SpeechCommands] Aviso ao descartar modelo anterior:', e)
+        }
+        tr.model = null
+      }
+      tr.secondLastBaseDenseLayer = null
+    }
+
     await this.transferRecognizer.train({
       epochs: 25,
       callback: {
@@ -258,7 +313,8 @@ export class SpeechCommandsWakeWord {
 
     await this.transferRecognizer.save()
     this.isCustomModelTrained = true
-    console.log(`[SpeechCommands] [OK] Modelo personalizado "${this.getModelName()}" salvo no IndexedDB!`)
+    this.isLegacyTwoClassModel = false
+    console.log(`[SpeechCommands] [OK] Modelo personalizado robusto "${this.getModelName()}" salvo no IndexedDB!`)
 
     await this.start()
   }
@@ -272,8 +328,17 @@ export class SpeechCommandsWakeWord {
       try {
         this.transferRecognizer.clearExamples()
       } catch {}
+      try {
+        const tr = this.transferRecognizer as any
+        if (tr.model) {
+          tr.model.dispose()
+          tr.model = null
+        }
+        tr.secondLastBaseDenseLayer = null
+      } catch {}
     }
     this.isCustomModelTrained = false
+    this.isLegacyTwoClassModel = false
 
     try {
       await speechCommands.deleteSavedTransferModel(modelKey)
@@ -281,7 +346,7 @@ export class SpeechCommandsWakeWord {
 
     console.log(`[SpeechCommands] Modelo personalizado "${modelKey}" resetado.`)
 
-    if (wasListening) {
+    if (wasListening && this.isCustomModelTrained) {
       await this.start()
     }
   }

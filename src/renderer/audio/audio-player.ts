@@ -5,6 +5,7 @@ export class AudioPlayer {
   private activeSources: AudioBufferSourceNode[] = []
   private isSpeaking: boolean = false
   public onSpeakingChange: ((speaking: boolean) => void) | null = null
+  public onPlaybackEnded: (() => void) | null = null
 
   constructor() {
     // AudioContext will be initialized on user interaction or first playback
@@ -79,8 +80,12 @@ export class AudioPlayer {
       source.connect(ctx.destination)
     }
 
-    // 5. Schedule gapless continuous playback
+    // 5. Schedule gapless continuous playback with drift compensation
     const now = ctx.currentTime
+    // If there was a silence gap or nextPlayTime is in the past, realign to now
+    if (now > this.nextPlayTime + 0.08) {
+      this.nextPlayTime = now
+    }
     const startTime = Math.max(now, this.nextPlayTime)
     source.start(startTime)
     this.nextPlayTime = startTime + audioBuffer.duration
@@ -89,12 +94,18 @@ export class AudioPlayer {
     this.setSpeaking(true)
 
     source.onended = (): void => {
+      try {
+        source.disconnect()
+      } catch {}
+      source.onended = null
+
       const index = this.activeSources.indexOf(source)
       if (index !== -1) {
         this.activeSources.splice(index, 1)
       }
-      if (this.activeSources.length === 0 && ctx.currentTime >= this.nextPlayTime - 0.05) {
+      if (this.activeSources.length === 0) {
         this.setSpeaking(false)
+        this.onPlaybackEnded?.()
       }
     }
   }
@@ -114,6 +125,7 @@ export class AudioPlayer {
       try {
         source.stop()
         source.disconnect()
+        source.onended = null
       } catch {
         // Source might already have stopped
       }
@@ -125,4 +137,3 @@ export class AudioPlayer {
     this.setSpeaking(false)
   }
 }
-

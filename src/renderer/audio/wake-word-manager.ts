@@ -11,9 +11,7 @@ export interface WakeWordManagerOptions {
 
 export class WakeWordManager {
   private engine: SpeechCommandsWakeWord | null = null
-  private fallbackRecognizer: any = null
   private isRunning = false
-  private isPhoneticFallbackActive = false
   private options: WakeWordManagerOptions
 
   constructor(options: WakeWordManagerOptions) {
@@ -34,14 +32,22 @@ export class WakeWordManager {
     return this.isRunning
   }
 
-  public getCalibrationStatus(): { isCalibrated: boolean; mode: 'custom-tf' | 'phonetic-fallback' | 'disabled' } {
+  public syncRunningState(): void {
+    if (this.engine) {
+      this.isRunning = this.engine.getIsListening()
+    }
+  }
+
+  public getCalibrationStatus(): { isCalibrated: boolean; isLegacy: boolean; mode: 'tensorflow' | 'disabled' } {
     if (!this.options.getIsWakeWordEnabled()) {
-      return { isCalibrated: false, mode: 'disabled' }
+      return { isCalibrated: false, isLegacy: false, mode: 'disabled' }
     }
     const isCalibrated = this.engine?.isCustomModelActive() || false
+    const isLegacy = this.engine?.isLegacyModel() || false
     return {
       isCalibrated,
-      mode: isCalibrated ? 'custom-tf' : 'phonetic-fallback'
+      isLegacy,
+      mode: isCalibrated ? 'tensorflow' : 'disabled'
     }
   }
 
@@ -49,7 +55,7 @@ export class WakeWordManager {
     await this.stopAll()
 
     if (!this.options.getIsWakeWordEnabled()) {
-      console.log('[WakeWord] Wake word detection disabled by user.')
+      console.log('[WakeWord] Detecção de ativação por voz desativada pelo usuário.')
       this.options.onTrainerUIUpdate?.()
       return
     }
@@ -59,106 +65,47 @@ export class WakeWordManager {
       console.log(`[WakeWord] Inicializando TensorFlow.js para o agente "${agentName}"...`)
 
       this.engine = new SpeechCommandsWakeWord({
-        probabilityThreshold: 0.70,
-        suppressionTimeMillis: 2000,
+        probabilityThreshold: 0.85,
+        suppressionTimeMillis: 2500,
         agentName
       })
 
       await this.engine.load(agentName)
 
-      if (this.engine.isCustomModelActive()) {
-        // Calibrated custom TensorFlow model is present
-        this.engine.onDetect = (word: string, score: number) => {
-          console.log(`[WakeWord] [TF Custom] Nome detectado: "${word}" (confiança: ${score.toFixed(2)})!`)
-          playWakeChime()
-          updateStatusBadge('listening', `${agentName} Ouvindo...`)
+      // Bind detection exclusively via TensorFlow
+      this.engine.onDetect = (word: string, score: number) => {
+        console.log(`[WakeWord] [TensorFlow] Nome detectado: "${word}" (confiança: ${(score * 100).toFixed(1)}%)! Chamando agente ${agentName}...`)
+        playWakeChime()
+        updateStatusBadge('listening', `${agentName} Ouvindo...`)
+        // Aguarda o término do sinal sonoro (260ms) antes de abrir o microfone,
+        // evitando que o chime seja captado e acione prematuramente o fim do turno
+        setTimeout(() => {
           this.options.onWakeTriggered()
-        }
+        }, 300)
+      }
 
-        this.engine.onError = (err: any) => {
-          console.warn('[WakeWord] Erro no Speech Commands:', err)
-        }
+      this.engine.onError = (err: any) => {
+        console.warn('[WakeWord] Erro no Speech Commands TensorFlow:', err)
+      }
 
+      if (this.engine.isCustomModelActive()) {
         await this.engine.start()
         this.isRunning = true
-        this.isPhoneticFallbackActive = false
-        console.log(`[WakeWord] TensorFlow.js Speech Commands ATIVO (Modelo Calibrado)!`)
+        console.log(`[WakeWord] TensorFlow.js Speech Commands ATIVO para "${agentName}" (3 classes)!`)
       } else {
-        // Clean installation / uncalibrated: start Web Speech API phonetic fallback
-        console.log(`[WakeWord] Modelo TF não calibrado ainda. Ativando fallback fonético para "${agentName}"...`)
-        this.startPhoneticFallback(agentName)
+        if (this.engine.isLegacyModel()) {
+          console.warn(`[WakeWord] Modelo legado de 2 classes detectado para "${agentName}". Escuta pausada até calibração com amostras de outras palavras.`)
+        } else {
+          console.log(`[WakeWord] TensorFlow pronto. Modelo de voz para "${agentName}" pendente de calibração nas configurações.`)
+        }
+        this.isRunning = false
       }
     } catch (err: any) {
-      console.warn('[WakeWord] Falha ao iniciar motor TF. Tentando fallback fonético:', err?.message || err)
-      this.startPhoneticFallback(agentName)
+      console.warn('[WakeWord] Falha ao inicializar TensorFlow:', err?.message || err)
+      this.isRunning = false
     }
 
     this.options.onTrainerUIUpdate?.()
-  }
-
-  private startPhoneticFallback(agentName: string): void {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      console.warn('[WakeWord] Web Speech API não suportada neste ambiente.')
-      this.isRunning = false
-      return
-    }
-
-    try {
-      this.fallbackRecognizer = new SpeechRecognition()
-      this.fallbackRecognizer.continuous = true
-      this.fallbackRecognizer.interimResults = true
-      this.fallbackRecognizer.lang = 'pt-BR'
-
-      const target = agentName.toLowerCase().trim()
-
-      this.fallbackRecognizer.onresult = (event: any) => {
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0]?.transcript?.toLowerCase() || ''
-          if (transcript.includes(target) || (target === 'jasper' && (transcript.includes('jaspe') || transcript.includes('iásper')))) {
-            console.log(`[WakeWord] [Fallback Fonético] Nome "${agentName}" detectado na fala: "${transcript}"`)
-            playWakeChime()
-            updateStatusBadge('listening', `${agentName} Ouvindo...`)
-            this.options.onWakeTriggered()
-            break
-          }
-        }
-      }
-
-      this.fallbackRecognizer.onerror = (err: any) => {
-        if (err.error === 'not-allowed' || err.error === 'service-not-allowed') {
-          console.warn('[WakeWord] Fallback fonético em nuvem (Web Speech API) indisponível no Electron. Calibre a Wake Word nas configurações para ativação offline via TensorFlow.js local.')
-          this.isPhoneticFallbackActive = false
-          this.isRunning = false
-          try {
-            this.fallbackRecognizer?.abort()
-          } catch {}
-          this.options.onTrainerUIUpdate?.()
-          return
-        }
-        // Ignore aborted errors when user is speaking or mic is toggled
-        if (err.error !== 'aborted') {
-          console.warn('[WakeWord] Erro no fallback fonético:', err.error)
-        }
-      }
-
-      this.fallbackRecognizer.onend = () => {
-        // Auto restart only if still supposed to be running and active
-        if (this.isRunning && this.isPhoneticFallbackActive) {
-          try {
-            this.fallbackRecognizer?.start()
-          } catch {}
-        }
-      }
-
-      this.fallbackRecognizer.start()
-      this.isRunning = true
-      this.isPhoneticFallbackActive = true
-      console.log(`[WakeWord] Fallback Fonético ATIVO para "${agentName}" (pronto para ativação inicial sem calibração)!`)
-    } catch (err) {
-      console.warn('[WakeWord] Não foi possível iniciar o fallback fonético:', err)
-      this.isRunning = false
-    }
   }
 
   private async stopAll(): Promise<void> {
@@ -168,30 +115,18 @@ export class WakeWordManager {
       } catch {}
       this.engine = null
     }
-
-    if (this.fallbackRecognizer) {
-      try {
-        this.fallbackRecognizer.onend = null
-        this.fallbackRecognizer.stop()
-      } catch {}
-      this.fallbackRecognizer = null
-    }
-
     this.isRunning = false
-    this.isPhoneticFallbackActive = false
   }
 
   public async pause(): Promise<void> {
-    if (this.engine && this.isRunning && !this.isPhoneticFallbackActive) {
+    if (this.engine && this.isRunning) {
       try {
         await this.engine.stop()
-      } catch {}
-    } else if (this.fallbackRecognizer && this.isRunning && this.isPhoneticFallbackActive) {
-      try {
-        this.fallbackRecognizer.stop()
-      } catch {}
+      } catch (e) {
+        console.warn('[WakeWord] Erro ao pausar motor TensorFlow:', e)
+      }
+      this.isRunning = false
     }
-    this.isRunning = false
   }
 
   public async resume(isMicRecording: boolean): Promise<void> {
@@ -201,15 +136,11 @@ export class WakeWordManager {
       try {
         await this.engine.start()
         this.isRunning = true
-      } catch {}
-    } else if (this.isPhoneticFallbackActive && this.fallbackRecognizer && !this.isRunning) {
-      try {
-        this.fallbackRecognizer.start()
-        this.isRunning = true
-      } catch {}
-    } else if (!this.engine && !this.fallbackRecognizer) {
+      } catch (e) {
+        console.warn('[WakeWord] Erro ao retomar motor TensorFlow:', e)
+      }
+    } else if (!this.engine) {
       await this.init()
     }
   }
 }
-

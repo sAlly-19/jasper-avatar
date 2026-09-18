@@ -72,7 +72,7 @@ esbuild.buildSync({
     'electron': mockPath,
     '@shared': path.join(rootDir, 'src', 'shared', 'index.ts')
   },
-  external: ['three']
+  external: ['three', '@tensorflow/tfjs', '@tensorflow-models/speech-commands']
 })
 
 console.log('[run-tests] Executando suíte de testes de integração real...')

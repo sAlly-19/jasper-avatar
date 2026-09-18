@@ -29,18 +29,71 @@ let transcriptFadeTimeout: any = null
 let isWakeWordEnabled = true
 let isBloomEnabled = true
 let isConnected = false
+let isCallMode = false
+let shouldEndCallAfterPlayback = false
 
 // Forward declarations for circular references
 let wakeTrainerUI: WakeTrainerUI
 let wakeWordManager: WakeWordManager
 
+async function enterCallMode(withGreeting = true): Promise<void> {
+  if (isCallMode) return
+
+  isCallMode = true
+  shouldEndCallAfterPlayback = false
+  console.log('[Jasper] Ativando Modo Chamada Full-Duplex...')
+
+  // 1. Pause wake word detector so it does not run during call
+  await wakeWordManager.pause()
+
+  // 2. Visual and state update
+  DOM.btnMic?.classList.add('active')
+  if (DOM.micStatusLabel) {
+    DOM.micStatusLabel.textContent = 'Modo Chamada (Full-Duplex)'
+  }
+
+  // 3. Start continuous full-duplex mic streaming immediately
+  try {
+    await micRecorder.start(true)
+  } catch (err) {
+    console.error('[Jasper] Erro ao iniciar gravação no Modo Chamada:', err)
+    await exitCallMode()
+    return
+  }
+
+  if (withGreeting) {
+    // Proactive greeting: agent greets user and asks what they desire
+    updateStatusBadge('speaking', `${getCurrentAgentName()} Chamando...`)
+    const greetingPrompt = `O usuário acabou de chamar você. Cumprimente-o com elegância e brevidade em português e pergunte o que deseja.`
+    window.electronAPI.sendTextMessage(greetingPrompt)
+  } else {
+    updateStatusBadge('call', `${getCurrentAgentName()} Ouvindo... (Chamada)`)
+  }
+}
+
+async function exitCallMode(): Promise<void> {
+  if (!isCallMode) return
+  isCallMode = false
+  shouldEndCallAfterPlayback = false
+
+  console.log('[Jasper] Encerrando Modo Chamada...')
+  micRecorder.stop()
+  DOM.btnMic?.classList.remove('active')
+  if (DOM.micStatusLabel) {
+    DOM.micStatusLabel.textContent = 'Pressione para falar'
+  }
+  updateStatusBadge('connected', `${getCurrentAgentName()} Online`)
+
+  if (isWakeWordEnabled) {
+    await wakeWordManager.resume(false)
+  }
+}
+
 wakeWordManager = new WakeWordManager({
   getAgentName: () => getCurrentAgentName(),
   getIsWakeWordEnabled: () => isWakeWordEnabled,
   onWakeTriggered: () => {
-    if (!micRecorder.isRecording()) {
-      DOM.btnMic.click()
-    }
+    enterCallMode(true)
   },
   onTrainerUIUpdate: () => wakeTrainerUI?.updateUI()
 })
@@ -103,6 +156,13 @@ async function init(): Promise<void> {
       micRecorder.isRecording(),
       currentMicLevel
     )
+
+    if (isCallMode && micRecorder.isRecording() && !audioPlayer.getIsSpeaking()) {
+      const remainingSec = micRecorder.getRemainingInactivitySeconds()
+      if (remainingSec < 30) {
+        updateStatusBadge('call', `${getCurrentAgentName()} Ouvindo (${remainingSec}s)`)
+      }
+    }
 
     render()
   }
@@ -195,23 +255,75 @@ async function init(): Promise<void> {
   }
 
   // 7. Setup Electron IPC Listeners
+  let responseTimeout: any = null
+
   window.electronAPI.onAudioChunk((base64Audio) => {
+    if (responseTimeout) {
+      clearTimeout(responseTimeout)
+      responseTimeout = null
+    }
+    micRecorder.notifyAssistantActivity()
     updateStatusBadge('speaking', `${getCurrentAgentName()} Falando...`)
     audioPlayer.enqueueAudioChunk(base64Audio)
   })
 
   window.electronAPI.onInterrupted(() => {
+    if (responseTimeout) {
+      clearTimeout(responseTimeout)
+      responseTimeout = null
+    }
+    console.log('[Jasper] Barge-in: Interrupção por voz detectada pelo Gemini. Interrompendo áudio imediatamente.')
     audioPlayer.stopAll()
     lipSync.reset()
     DOM.transcriptBox.classList.add('hidden')
+    if (isCallMode) {
+      updateStatusBadge('call', `${getCurrentAgentName()} Ouvindo... (Chamada)`)
+    }
   })
 
+  // 7. Setup AudioPlayer Lifecycle
+  audioPlayer.onPlaybackEnded = async () => {
+    if (shouldEndCallAfterPlayback) {
+      shouldEndCallAfterPlayback = false
+      await exitCallMode()
+      return
+    }
+
+    if (isCallMode) {
+      updateStatusBadge('call', `${getCurrentAgentName()} Ouvindo... (Chamada)`)
+      if (DOM.micStatusLabel) {
+        DOM.micStatusLabel.textContent = 'Modo Chamada (Ouvindo...)'
+      }
+    } else {
+      updateStatusBadge('connected', `${getCurrentAgentName()} Pronto`)
+      if (DOM.micStatusLabel) {
+        DOM.micStatusLabel.textContent = 'Pressione para falar'
+      }
+      DOM.btnMic?.classList.remove('active')
+      if (isWakeWordEnabled) {
+        await wakeWordManager.resume(micRecorder.isRecording())
+      }
+    }
+  }
+
   window.electronAPI.onTurnComplete(() => {
-    updateStatusBadge('connected', `${getCurrentAgentName()} Pronto`)
-    if (DOM.micStatusLabel) DOM.micStatusLabel.textContent = 'Pressione para falar'
-    DOM.btnMic.classList.remove('active')
-    if (isWakeWordEnabled) {
-      wakeWordManager.resume(micRecorder.isRecording())
+    if (responseTimeout) {
+      clearTimeout(responseTimeout)
+      responseTimeout = null
+    }
+    micRecorder.notifyAssistantActivity()
+
+    if (!audioPlayer.getIsSpeaking()) {
+      if (isCallMode) {
+        updateStatusBadge('call', `${getCurrentAgentName()} Ouvindo... (Chamada)`)
+      } else {
+        updateStatusBadge('connected', `${getCurrentAgentName()} Pronto`)
+        if (DOM.micStatusLabel) DOM.micStatusLabel.textContent = 'Pressione para falar'
+        DOM.btnMic?.classList.remove('active')
+        if (isWakeWordEnabled) {
+          wakeWordManager.resume(micRecorder.isRecording())
+        }
+      }
     }
   })
 
@@ -229,6 +341,14 @@ async function init(): Promise<void> {
     transcriptFadeTimeout = setTimeout(() => {
       DOM.transcriptBox.classList.add('hidden')
     }, 9000)
+
+    // Se estiver em Modo Chamada e o assistente despedir-se, encerra a chamada ao término da fala
+    if (isCallMode) {
+      const farewellRegex = /\b(tchau|até mais|até logo|chamada encerrada|tenha um bom dia|tenha uma boa tarde|tenha uma boa noite|se precisar de algo|até a próxima)\b/i
+      if (farewellRegex.test(cleanText)) {
+        shouldEndCallAfterPlayback = true
+      }
+    }
   })
 
   window.electronAPI.onStatusChange((status, message) => {
@@ -294,41 +414,24 @@ async function init(): Promise<void> {
     currentMicLevel = level
   }
 
-  micRecorder.onSpeechEnd = () => {
-    DOM.btnMic.classList.remove('active')
-    if (DOM.micStatusLabel) DOM.micStatusLabel.textContent = 'Aguardando resposta...'
-    updateStatusBadge('connecting', `${getCurrentAgentName()} Processando...`)
+  micRecorder.onCallInactivityTimeout = () => {
+    console.log('[Jasper] Modo Chamada finalizado por inatividade de 30 segundos.')
+    showHudToast(
+      'Chamada Encerrada',
+      'Modo Chamada finalizado após 30 segundos de inatividade.',
+      'info',
+      4000
+    )
+    exitCallMode()
   }
 
-  micRecorder.onSpeechTimeout = () => {
-    DOM.btnMic.classList.remove('active')
-    if (DOM.micStatusLabel) DOM.micStatusLabel.textContent = 'Pressione para falar'
-    updateStatusBadge('connected', `${getCurrentAgentName()} Online`)
-    if (isWakeWordEnabled) {
-      wakeWordManager.resume(micRecorder.isRecording())
-    }
-  }
-
-  DOM.btnMic.addEventListener('click', async () => {
-    if (micRecorder.isRecording()) {
-      micRecorder.stop()
-      DOM.btnMic.classList.remove('active')
-      if (DOM.micStatusLabel) DOM.micStatusLabel.textContent = 'Pressione para falar'
-      updateStatusBadge('connected', `${getCurrentAgentName()} Online`)
-      if (isWakeWordEnabled) {
-        await wakeWordManager.resume(micRecorder.isRecording())
-      }
+  DOM.btnMic?.addEventListener('click', async () => {
+    if (isCallMode) {
+      // Se já estiver em Modo Chamada, o clique encerra a chamada
+      await exitCallMode()
     } else {
-      try {
-        await wakeWordManager.pause()
-        await micRecorder.start()
-        DOM.btnMic.classList.add('active')
-        if (DOM.micStatusLabel) DOM.micStatusLabel.textContent = 'Gravando áudio...'
-        updateStatusBadge('listening', `${getCurrentAgentName()} Ouvindo...`)
-      } catch (err: any) {
-        alert('Não foi possível acessar o microfone: ' + err.message)
-        if (isWakeWordEnabled) await wakeWordManager.resume(micRecorder.isRecording())
-      }
+      // Inicia chamada Full-Duplex
+      await enterCallMode(false)
     }
   })
 

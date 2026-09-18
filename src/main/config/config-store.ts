@@ -62,7 +62,7 @@ class ConfigStore {
   private config: JasperConfig = {
     apiKey: process.env.GOOGLE_API_KEY || '',
     voiceName: process.env.GEMINI_VOICE || 'Charon',
-    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-latest',
+    model: process.env.GEMINI_MODEL || 'gemini-3.1-flash-live-preview',
     enableSystemTools: true,
     enableMediaTools: true,
     agentName: process.env.AGENT_NAME || 'Jasper',

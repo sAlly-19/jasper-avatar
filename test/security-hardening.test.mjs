@@ -1,9 +1,11 @@
 // test/security-hardening.test.ts
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+import path2 from "node:path";
+import fs3 from "node:fs";
 
 // test/_electron-mock.mjs
-var tempUserData = "C:\\Users\\ALISSO~1.SAN\\AppData\\Local\\Temp\\jasper-test-userdata";
+var tempUserData = "C:\\Users\\aliss\\AppData\\Local\\Temp\\jasper-test-userdata";
 var app = {
   getPath: (name) => tempUserData,
   whenReady: () => Promise.resolve(),
@@ -1210,6 +1212,101 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       assert.equal(check.allowed, false);
       assert.equal(check.requiresConfirmation, true);
       assert.ok(check.reason?.includes("Opera\xE7\xE3o de commit Git solicitada"));
+    });
+  });
+  describe("WakeWordManager & Chamada de Agente Exclusiva via TensorFlow", () => {
+    test("c\xF3digo fonte de wake-word-manager e speech-commands n\xE3o possui refer\xEAncias a Web Speech API", () => {
+      const wakeWordManagerSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/audio/wake-word-manager.ts"),
+        "utf-8"
+      );
+      assert.equal(wakeWordManagerSrc.includes("SpeechRecognition"), false);
+      assert.equal(wakeWordManagerSrc.includes("webkitSpeechRecognition"), false);
+      assert.equal(wakeWordManagerSrc.includes("startPhoneticFallback"), false);
+      assert.equal(wakeWordManagerSrc.includes("isPhoneticFallbackActive"), false);
+      assert.ok(wakeWordManagerSrc.includes("mode: isCalibrated ? 'tensorflow' : 'disabled'"));
+      assert.ok(wakeWordManagerSrc.includes("syncRunningState"));
+      assert.ok(wakeWordManagerSrc.includes("[TensorFlow]"));
+      const speechCommandsSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/audio/speech-commands.ts"),
+        "utf-8"
+      );
+      assert.ok(speechCommandsSrc.includes("tr.secondLastBaseDenseLayer = null"));
+      assert.ok(speechCommandsSrc.includes("tr.model = null"));
+      assert.ok(speechCommandsSrc.includes("tr.model.dispose()"));
+    });
+    test("speech-commands implementa modelo neural de 3 classes com amostras negativas e threshold de 0.85", () => {
+      const speechCommandsSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/audio/speech-commands.ts"),
+        "utf-8"
+      );
+      assert.ok(speechCommandsSrc.includes("detectedWord === '_other_'"));
+      assert.ok(speechCommandsSrc.includes("detectedWord === '_background_noise_'"));
+      assert.ok(speechCommandsSrc.includes("probabilityThreshold: options.probabilityThreshold ?? 0.85"));
+      assert.ok(speechCommandsSrc.includes("overlapFactor: 0.25"));
+      assert.ok(speechCommandsSrc.includes("hasNegativeSpeechSamples()"));
+      assert.ok(speechCommandsSrc.includes("isLegacyModel()"));
+      assert.ok(speechCommandsSrc.includes("labels.includes('_other_')"));
+    });
+    test("wake-trainer-ui e index.html exigem calibra\xE7\xE3o de 3 classes (nome, sil\xEAncio e outras palavras)", () => {
+      const trainerUiSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/ui/wake-trainer-ui.ts"),
+        "utf-8"
+      );
+      const indexHtmlSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/index.html"),
+        "utf-8"
+      );
+      assert.ok(trainerUiSrc.includes("nameCount >= 3 && noiseCount >= 2 && otherCount >= 2"));
+      assert.ok(trainerUiSrc.includes("engine.collectCustomSample('_other_')"));
+      assert.ok(trainerUiSrc.includes("btnSampleOther"));
+      assert.ok(trainerUiSrc.includes("countOtherSamples"));
+      assert.ok(indexHtmlSrc.includes('id="btn-sample-other"'));
+      assert.ok(indexHtmlSrc.includes('id="count-other-samples"'));
+      assert.ok(indexHtmlSrc.includes("Gravar Outras Palavras"));
+    });
+  });
+  describe("Modo Chamada Cont\xEDnuo & Zero-Latency Audio Pipeline", () => {
+    test("MicRecorder possui suporte nativo a Modo Chamada Full-Duplex e timeout de 30s", () => {
+      const micRecorderSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/audio/mic-recorder.ts"),
+        "utf-8"
+      );
+      assert.ok(micRecorderSrc.includes("CALL_INACTIVITY_TIMEOUT_MS = 30000"));
+      assert.ok(micRecorderSrc.includes("onCallInactivityTimeout: (() => void) | null = null"));
+      assert.ok(micRecorderSrc.includes("notifyAssistantActivity()"));
+      assert.ok(micRecorderSrc.includes("getRemainingInactivitySeconds()"));
+      assert.ok(micRecorderSrc.includes("SPEECH_RMS_THRESHOLD = 0.025"));
+      assert.ok(micRecorderSrc.includes("MIN_SPEECH_CHUNKS = 18"));
+      assert.ok(micRecorderSrc.includes("Full-Duplex"));
+    });
+    test("main.ts implementa Modo Chamada Full-Duplex, sauda\xE7\xE3o proativa e barge-in", () => {
+      const mainSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/main.ts"),
+        "utf-8"
+      );
+      assert.ok(mainSrc.includes("async function enterCallMode(withGreeting = true)"));
+      assert.ok(mainSrc.includes("async function exitCallMode()"));
+      assert.ok(mainSrc.includes("enterCallMode(true)"));
+      assert.ok(mainSrc.includes("O usu\xE1rio acabou de chamar voc\xEA. Cumprimente-o com eleg\xE2ncia e brevidade em portugu\xEAs e pergunte o que deseja."));
+      assert.ok(mainSrc.includes("Barge-in: Interrup\xE7\xE3o por voz detectada"));
+      assert.ok(mainSrc.includes("micRecorder.onCallInactivityTimeout = () => {"));
+    });
+    test("AudioPlayer gerencia fontes de \xE1udio com desconex\xE3o imediata e callback de t\xE9rmino", () => {
+      const audioPlayerSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/renderer/audio/audio-player.ts"),
+        "utf-8"
+      );
+      assert.ok(audioPlayerSrc.includes("public onPlaybackEnded: (() => void) | null = null"));
+      assert.ok(audioPlayerSrc.includes("source.disconnect()"));
+      assert.ok(audioPlayerSrc.includes("this.onPlaybackEnded?.()"));
+    });
+    test("Gemini Live client utiliza o modelo oficial gemini-3.1-flash-live-preview", () => {
+      const liveClientSrc = fs3.readFileSync(
+        path2.join(process.cwd(), "src/main/gemini-live.ts"),
+        "utf-8"
+      );
+      assert.ok(liveClientSrc.includes("gemini-3.1-flash-live-preview"));
     });
   });
 });

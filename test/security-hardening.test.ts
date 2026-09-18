@@ -219,4 +219,126 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.ok(check.reason?.includes('Operação de commit Git solicitada'))
     })
   })
+
+  // 8. WakeWordManager & Chamada de Agente Exclusiva via TensorFlow
+  describe('WakeWordManager & Chamada de Agente Exclusiva via TensorFlow', () => {
+    test('código fonte de wake-word-manager e speech-commands não possui referências a Web Speech API', () => {
+      const wakeWordManagerSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/audio/wake-word-manager.ts'),
+        'utf-8'
+      )
+      // Garante remoção completa do Web Speech API / fallback fonético
+      assert.equal(wakeWordManagerSrc.includes('SpeechRecognition'), false)
+      assert.equal(wakeWordManagerSrc.includes('webkitSpeechRecognition'), false)
+      assert.equal(wakeWordManagerSrc.includes('startPhoneticFallback'), false)
+      assert.equal(wakeWordManagerSrc.includes('isPhoneticFallbackActive'), false)
+
+      // Garante modo exclusivo TensorFlow
+      assert.ok(wakeWordManagerSrc.includes("mode: isCalibrated ? 'tensorflow' : 'disabled'"))
+      assert.ok(wakeWordManagerSrc.includes('syncRunningState'))
+      assert.ok(wakeWordManagerSrc.includes('[TensorFlow]'))
+
+      const speechCommandsSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/audio/speech-commands.ts'),
+        'utf-8'
+      )
+      // Confirma a correção essencial para o "Erro no treinamento"
+      assert.ok(speechCommandsSrc.includes('tr.secondLastBaseDenseLayer = null'))
+      assert.ok(speechCommandsSrc.includes('tr.model = null'))
+      assert.ok(speechCommandsSrc.includes('tr.model.dispose()'))
+    })
+
+    test('speech-commands implementa modelo neural de 3 classes com amostras negativas e threshold de 0.85', () => {
+      const speechCommandsSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/audio/speech-commands.ts'),
+        'utf-8'
+      )
+      // Confirma filtro explícito de fala comum / amostras negativas
+      assert.ok(speechCommandsSrc.includes("detectedWord === '_other_'"))
+      assert.ok(speechCommandsSrc.includes("detectedWord === '_background_noise_'"))
+
+      // Confirma hiperparâmetros anti-falso-positivo
+      assert.ok(speechCommandsSrc.includes('probabilityThreshold: options.probabilityThreshold ?? 0.85'))
+      assert.ok(speechCommandsSrc.includes('overlapFactor: 0.25'))
+      assert.ok(speechCommandsSrc.includes('hasNegativeSpeechSamples()'))
+      assert.ok(speechCommandsSrc.includes('isLegacyModel()'))
+      assert.ok(speechCommandsSrc.includes('labels.includes(\'_other_\')'))
+    })
+
+    test('wake-trainer-ui e index.html exigem calibração de 3 classes (nome, silêncio e outras palavras)', () => {
+      const trainerUiSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/ui/wake-trainer-ui.ts'),
+        'utf-8'
+      )
+      const indexHtmlSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/index.html'),
+        'utf-8'
+      )
+
+      // Confirma que a UI exige 3 classes para habilitar treinamento
+      assert.ok(trainerUiSrc.includes('nameCount >= 3 && noiseCount >= 2 && otherCount >= 2'))
+      assert.ok(trainerUiSrc.includes("engine.collectCustomSample('_other_')"))
+      assert.ok(trainerUiSrc.includes('btnSampleOther'))
+      assert.ok(trainerUiSrc.includes('countOtherSamples'))
+
+      // Confirma elementos correspondentes no HTML
+      assert.ok(indexHtmlSrc.includes('id="btn-sample-other"'))
+      assert.ok(indexHtmlSrc.includes('id="count-other-samples"'))
+      assert.ok(indexHtmlSrc.includes('Gravar Outras Palavras'))
+    })
+  })
+
+  // 9. Modo Chamada Contínuo & Zero-Latency Audio Pipeline
+  describe('Modo Chamada Contínuo & Zero-Latency Audio Pipeline', () => {
+    test('MicRecorder possui suporte nativo a Modo Chamada Full-Duplex e timeout de 30s', () => {
+      const micRecorderSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/audio/mic-recorder.ts'),
+        'utf-8'
+      )
+      assert.ok(micRecorderSrc.includes('CALL_INACTIVITY_TIMEOUT_MS = 30000'))
+      assert.ok(micRecorderSrc.includes('onCallInactivityTimeout: (() => void) | null = null'))
+      assert.ok(micRecorderSrc.includes('notifyAssistantActivity()'))
+      assert.ok(micRecorderSrc.includes('getRemainingInactivitySeconds()'))
+      assert.ok(micRecorderSrc.includes('SPEECH_RMS_THRESHOLD = 0.025'))
+      assert.ok(micRecorderSrc.includes('MIN_SPEECH_CHUNKS = 18'))
+      assert.ok(micRecorderSrc.includes('Full-Duplex'))
+    })
+
+    test('main.ts implementa Modo Chamada Full-Duplex, saudação proativa e barge-in', () => {
+      const mainSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/main.ts'),
+        'utf-8'
+      )
+      // Presença das funções de controle do Modo Chamada
+      assert.ok(mainSrc.includes('async function enterCallMode(withGreeting = true)'))
+      assert.ok(mainSrc.includes('async function exitCallMode()'))
+      assert.ok(mainSrc.includes('enterCallMode(true)'))
+
+      // Saudação proativa em português
+      assert.ok(mainSrc.includes('O usuário acabou de chamar você. Cumprimente-o com elegância e brevidade em português e pergunte o que deseja.'))
+
+      // Hook de interrupção (Barge-in) e inatividade
+      assert.ok(mainSrc.includes('Barge-in: Interrupção por voz detectada'))
+      assert.ok(mainSrc.includes('micRecorder.onCallInactivityTimeout = () => {'))
+    })
+
+    test('AudioPlayer gerencia fontes de áudio com desconexão imediata e callback de término', () => {
+      const audioPlayerSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/renderer/audio/audio-player.ts'),
+        'utf-8'
+      )
+      assert.ok(audioPlayerSrc.includes('public onPlaybackEnded: (() => void) | null = null'))
+      assert.ok(audioPlayerSrc.includes('source.disconnect()'))
+      assert.ok(audioPlayerSrc.includes('this.onPlaybackEnded?.()'))
+    })
+
+    test('Gemini Live client utiliza o modelo oficial gemini-3.1-flash-live-preview', () => {
+      const liveClientSrc = fs.readFileSync(
+        path.join(process.cwd(), 'src/main/gemini-live.ts'),
+        'utf-8'
+      )
+      assert.ok(liveClientSrc.includes('gemini-3.1-flash-live-preview'))
+    })
+  })
 })
+

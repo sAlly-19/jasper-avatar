@@ -28,6 +28,7 @@ export class WakeTrainerUI {
     })
 
     const isCustomActive = engine?.isCustomModelActive() || false
+    const isLegacy = engine?.isLegacyModel() || false
     const {
       badgeModelState,
       wakeStatusTitle,
@@ -35,6 +36,7 @@ export class WakeTrainerUI {
       wakeStatusIcon,
       countNameSamples,
       countNoiseSamples,
+      countOtherSamples,
       btnTrainCustomModel
     } = DOM
 
@@ -42,12 +44,14 @@ export class WakeTrainerUI {
     const nameKey = currentAgentName.toLowerCase()
     const nameCount = counts[nameKey] || 0
     const noiseCount = counts['_background_noise_'] || 0
+    const otherCount = (counts['_other_'] || 0) + (counts['_other_speech_'] || 0)
 
     if (countNameSamples) countNameSamples.textContent = String(nameCount)
     if (countNoiseSamples) countNoiseSamples.textContent = String(noiseCount)
+    if (countOtherSamples) countOtherSamples.textContent = String(otherCount)
 
     if (btnTrainCustomModel) {
-      const ready = nameCount >= 3 && noiseCount >= 2
+      const ready = nameCount >= 3 && noiseCount >= 2 && otherCount >= 2
       btnTrainCustomModel.disabled = !ready
       btnTrainCustomModel.style.opacity = ready ? '1' : '0.5'
       btnTrainCustomModel.style.cursor = ready ? 'pointer' : 'not-allowed'
@@ -55,7 +59,7 @@ export class WakeTrainerUI {
 
     if (isCustomActive) {
       if (badgeModelState) {
-        badgeModelState.textContent = 'Calibrado & Ativo'
+        badgeModelState.textContent = 'Calibrado & Ativo (3 Classes)'
         badgeModelState.style.background = 'rgba(0, 255, 136, 0.15)'
         badgeModelState.style.color = '#00ff88'
         badgeModelState.style.borderColor = 'rgba(0, 255, 136, 0.3)'
@@ -64,9 +68,23 @@ export class WakeTrainerUI {
         wakeStatusTitle.innerHTML = `Motor Neural Ativo para: <span class="lbl-agent-target-name">${currentAgentName}</span>`
       }
       if (wakeStatusDesc) {
-        wakeStatusDesc.textContent = `Pronto! Diga "${currentAgentName}" no microfone para ativar o assistente. (Executado 100% localmente)`
+        wakeStatusDesc.textContent = `Pronto! Diga "${currentAgentName}" no microfone para ativar o assistente via TensorFlow. Fala comum ou ruídos aleatórios serão ignorados.`
       }
       if (wakeStatusIcon) wakeStatusIcon.innerHTML = SVG_ICONS.check
+    } else if (isLegacy) {
+      if (badgeModelState) {
+        badgeModelState.textContent = 'Requer Amostras Negativas'
+        badgeModelState.style.background = 'rgba(255, 68, 68, 0.15)'
+        badgeModelState.style.color = '#ff6666'
+        badgeModelState.style.borderColor = 'rgba(255, 68, 68, 0.3)'
+      }
+      if (wakeStatusTitle) {
+        wakeStatusTitle.innerHTML = `Calibração Incompleta: <span class="lbl-agent-target-name">${currentAgentName}</span>`
+      }
+      if (wakeStatusDesc) {
+        wakeStatusDesc.textContent = `O modelo salvo possui apenas 2 classes (ativa com qualquer voz). Grave 3 amostras de "Outras Palavras" e clique em "Treinar" para corrigir.`
+      }
+      if (wakeStatusIcon) wakeStatusIcon.innerHTML = SVG_ICONS.bolt
     } else {
       if (badgeModelState) {
         badgeModelState.textContent = 'Pendente de Calibração'
@@ -75,10 +93,10 @@ export class WakeTrainerUI {
         badgeModelState.style.borderColor = 'rgba(255, 170, 0, 0.3)'
       }
       if (wakeStatusTitle) {
-        wakeStatusTitle.innerHTML = `Calibração de Voz para: <span class="lbl-agent-target-name">${currentAgentName}</span>`
+        wakeStatusTitle.innerHTML = `Calibração TensorFlow para: <span class="lbl-agent-target-name">${currentAgentName}</span>`
       }
       if (wakeStatusDesc) {
-        wakeStatusDesc.textContent = `Grave 3 amostras rápidas dizendo "${currentAgentName}" e 2 de silêncio para a IA aprender sua voz e responder ao seu chamado.`
+        wakeStatusDesc.textContent = `Grave 3 amostras dizendo "${currentAgentName}", 2 de silêncio e 3 de outras palavras comuns para treinar a rede neural sem falsos positivos.`
       }
       if (wakeStatusIcon) wakeStatusIcon.innerHTML = SVG_ICONS.bolt
     }
@@ -88,6 +106,7 @@ export class WakeTrainerUI {
     const {
       btnSampleName,
       btnSampleNoise,
+      btnSampleOther,
       btnTrainCustomModel,
       btnResetCustomModel,
       trainerFeedback,
@@ -101,6 +120,12 @@ export class WakeTrainerUI {
         btnMic.classList.remove('active')
         if (micStatusLabel) micStatusLabel.textContent = 'Pressione para falar'
       }
+    }
+
+    const setSampleButtonsDisabled = (disabled: boolean): void => {
+      if (btnSampleName) btnSampleName.disabled = disabled
+      if (btnSampleNoise) btnSampleNoise.disabled = disabled
+      if (btnSampleOther) btnSampleOther.disabled = disabled
     }
 
     btnSampleName?.addEventListener('click', async () => {
@@ -118,8 +143,7 @@ export class WakeTrainerUI {
       const targetName = currentAgentName.toLowerCase().trim()
 
       try {
-        btnSampleName.disabled = true
-        if (btnSampleNoise) btnSampleNoise.disabled = true
+        setSampleButtonsDisabled(true)
         playTone(880, 0.12)
         if (trainerFeedback) {
           trainerFeedback.innerHTML = `${SVG_ICONS.dotRecord} Gravando... Diga claramente "${currentAgentName}" agora!`
@@ -142,9 +166,8 @@ export class WakeTrainerUI {
           trainerFeedback.style.color = '#ff6666'
         }
       } finally {
-        btnSampleName.disabled = false
+        setSampleButtonsDisabled(false)
         btnSampleName.innerHTML = `${SVG_ICONS.mic} Gravar "<span class="lbl-agent-target-name">${currentAgentName}</span>"`
-        if (btnSampleNoise) btnSampleNoise.disabled = false
       }
     })
 
@@ -160,8 +183,7 @@ export class WakeTrainerUI {
       if (!engine) return
 
       try {
-        btnSampleNoise.disabled = true
-        if (btnSampleName) btnSampleName.disabled = true
+        setSampleButtonsDisabled(true)
         playTone(659.25, 0.12)
         if (trainerFeedback) {
           trainerFeedback.innerHTML = `${SVG_ICONS.micOff} Gravando ruído ambiente... Fique em silêncio por 1 segundo.`
@@ -184,9 +206,48 @@ export class WakeTrainerUI {
           trainerFeedback.style.color = '#ff6666'
         }
       } finally {
-        btnSampleNoise.disabled = false
+        setSampleButtonsDisabled(false)
         btnSampleNoise.innerHTML = `${SVG_ICONS.micOff} Gravar Silêncio`
-        if (btnSampleName) btnSampleName.disabled = false
+      }
+    })
+
+    btnSampleOther?.addEventListener('click', async () => {
+      stopMicIfRecording()
+      await this.options.wakeWordManager.pause()
+
+      let engine = this.options.wakeWordManager.getEngine()
+      if (!engine) {
+        await this.options.wakeWordManager.init()
+        engine = this.options.wakeWordManager.getEngine()
+      }
+      if (!engine) return
+
+      try {
+        setSampleButtonsDisabled(true)
+        playTone(740, 0.12)
+        if (trainerFeedback) {
+          trainerFeedback.innerHTML = `${SVG_ICONS.dotRecord} Gravando... Diga qualquer palavra comum (ex: "olá", "teste", "ok")!`
+          trainerFeedback.style.color = '#c084fc'
+        }
+        btnSampleOther.innerHTML = `${SVG_ICONS.dotRecord} Gravando...`
+
+        const result = await engine.collectCustomSample('_other_')
+
+        playTone(523.25, 0.15)
+        if (trainerFeedback) {
+          trainerFeedback.innerHTML = `${SVG_ICONS.check} Amostra de outras palavras gravada com sucesso! (${result.count}/3)`
+          trainerFeedback.style.color = '#00ff88'
+        }
+        this.updateUI()
+      } catch (err: any) {
+        console.error('[WakeTrainer] Erro ao gravar outras palavras:', err)
+        if (trainerFeedback) {
+          trainerFeedback.textContent = `Erro ao gravar: ${err?.message || err}`
+          trainerFeedback.style.color = '#ff6666'
+        }
+      } finally {
+        setSampleButtonsDisabled(false)
+        btnSampleOther.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Gravar Outras Palavras`
       }
     })
 
@@ -198,7 +259,7 @@ export class WakeTrainerUI {
       try {
         btnTrainCustomModel.disabled = true
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.bolt} Compilando e treinando modelo neural local para "${currentAgentName}"...`
+          trainerFeedback.innerHTML = `${SVG_ICONS.bolt} Compilando e treinando modelo neural local de 3 classes para "${currentAgentName}"...`
           trainerFeedback.style.color = 'var(--accent-cyan)'
         }
 
@@ -208,13 +269,15 @@ export class WakeTrainerUI {
           }
         })
 
+        this.options.wakeWordManager.syncRunningState()
         playWakeChime()
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.sparkle} Sucesso! O assistente agora responde exclusivamente ao nome "${currentAgentName}".`
+          trainerFeedback.innerHTML = `${SVG_ICONS.sparkle} Sucesso! O assistente agora responde com alta precisão ao nome "${currentAgentName}". Fala comum será ignorada.`
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()
       } catch (err: any) {
+        console.error('[WakeTrainer] Erro no treinamento:', err)
         if (trainerFeedback) {
           trainerFeedback.textContent = `Erro no treinamento: ${err?.message || err}`
           trainerFeedback.style.color = '#ff6666'
@@ -231,6 +294,7 @@ export class WakeTrainerUI {
 
       if (confirm(`Deseja resetar as amostras e a calibração de voz para "${currentAgentName}"?`)) {
         await engine.clearCustomModel()
+        this.options.wakeWordManager.syncRunningState()
         if (trainerFeedback) {
           trainerFeedback.textContent = 'Calibração resetada com sucesso.'
           trainerFeedback.style.color = 'var(--text-dim)'
