@@ -8,9 +8,11 @@ O assistente permite que você converse naturalmente por voz, compartilhe sua te
 
 ## 📑 Sumário
 
+- [Demonstração Visual (Screenshots)](#-demonstração-visual-screenshots)
 - [Visão Geral e Para Que Serve](#-visão-geral-e-para-que-serve)
 - [Como o Programa Funciona (Arquitetura)](#-como-o-programa-funciona-arquitetura)
 - [Aplicativos e Requisitos Externos Necessários](#-aplicativos-e-requisitos-externos-necessários)
+- [Suíte de Testes & Qualidade de Código](#-suíte-de-testes--qualidade-de-código)
 - [Matriz de Status Operacional dos Módulos](#-matriz-de-status-operacional-dos-módulos)
 - [Painéis de Configuração Avançada dos Módulos](#-painéis-de-configuração-avançada-dos-módulos)
 - [Guia Rápido de Instalação e Execução](#-guia-rápido-de-instalação-e-execução)
@@ -20,6 +22,30 @@ O assistente permite que você converse naturalmente por voz, compartilhe sua te
 - [Loop de Auto-Reflexão e Segurança (Reflexion Guard)](#-loop-de-auto-reflexão-e-segurança-reflexion-guard)
 - [Privacidade, Segurança e Criptografia Local (Zero-Trust)](#-privacidade-segurança-e-criptografia-local-zero-trust)
 - [Perguntas Frequentes (FAQ)](#-perguntas-frequentes-faq)
+
+---
+
+## 📸 Demonstração Visual (Screenshots)
+
+### 1. Interface Principal Holográfica & Avatar 3D
+HUD futurista frameless com Three.js a 60 FPS, iluminação dinâmica, malha neural animada de sinapses no fundo e sincronização labial (Lip Sync) síncrona.
+![Avatar 3D HUD](assets/screenshots/01_avatar_hud.png)
+
+### 2. Estação de Autonomia (17 Serviços em Segundo Plano)
+Painel de controle com ativação granular, toggles em tempo real e documentação interativa para cada serviço autônomo.
+![Módulos de Autonomia](assets/screenshots/02_autonomy_modules.png)
+
+### 3. Inteligência Artificial & Treinamento Neural Local (TensorFlow.js)
+Treinamento local em 3 classes (Nome, Ruído e Outras Palavras) com threshold de 0.85, sem envio de voz para servidores de terceiros.
+![Configuração de IA e Wake Word](assets/screenshots/03_ai_config.png)
+
+### 4. Personalização de Identidade Visual & Expressões Faciais
+Ajuste de humor do avatar, rastreamento ocular dinâmico seguindo o cursor do mouse e efeito holográfico UnrealBloomPass.
+![Identidade e Visual](assets/screenshots/04_identity_visual.png)
+
+### 5. Ferramentas de Sistema & Proteção Zero-Trust
+Políticas estritas de execução local com sandboxing, bloqueio de SSRF/DNS rebinding e redação automática de segredos.
+![Ferramentas e Políticas](assets/screenshots/04_tools_system.png)
 
 ---
 
@@ -83,6 +109,69 @@ Para que **todas** as ferramentas e módulos funcionem perfeitamente, veja abaix
 | **Spotify (Desktop)** | *Opcional* | Tocar faixas, artistas e playlists pelo comando de mídia `play_music`. | Caso não use Spotify, o assistente abre automaticamente a busca no YouTube. |
 | **n8n / Zapier / Make** | *Opcional* | Disparar fluxos de automação através do **Webhook Manager**. | O [n8n](https://n8n.io/) é 100% open source e pode ser executado localmente de graça com o comando `npx n8n`. |
 | **Home Assistant** | *Opcional* | Controlar lâmpadas inteligentes, ar-condicionado e tomadas via **Smart Home**. | Caso você não possua um servidor Home Assistant na sua rede, o assistente opera em modo de simulação contextual. |
+
+---
+
+## 🧪 Suíte de Testes & Qualidade de Código
+
+O projeto conta com uma suíte de testes de integração automatizada (**10 suítes, 25 testes reais**) executados diretamente contra as classes do sistema (sem mocks das regras de negócio), garantindo integridade de execução, blindagem contra vulnerabilidades de rede e estabilidade da interface gráfica.
+
+Para executar os testes a qualquer momento:
+
+```bash
+npm test
+```
+
+### Resultados da Verificação Automatizada (25/25 Passando)
+
+```
+▶ Suíte de Testes de Integração com Classes e Módulos Reais
+  ▶ WebhookManager & SSRF / DNS Rebinding (Módulo Real)
+    ✔ isPrivateOrLoopbackHost bloqueia loopback e metadados de nuvem
+    ✔ isPrivateOrLoopbackIP bloqueia faixas privadas RFC1918 e CGNAT
+    ✔ resolveAndCheckSSRF detecta hosts que resolvem para loopback
+    ✔ WebhookManager gerencia registro e bloqueia SSRF não cadastrado
+  ✔ WebhookManager & SSRF / DNS Rebinding (Módulo Real) (7.1ms)
+  ▶ ToolPolicyEngine (Políticas Zero-Trust Reais)
+    ✔ bloqueia código Python perigoso com subprocessos, ctypes e traversal
+    ✔ permite código matemático/científico legítimo em Python
+    ✔ bloqueia código Node.js com child_process, worker_threads e eval
+    ✔ bloqueia execução de shell / bash arbitrário
+    ✔ bloqueia acesso a diretórios de sistema do Windows
+    ✔ valida contenção de caminhos e bloqueia directory traversal
+  ✔ ToolPolicyEngine (Políticas Zero-Trust Reais) (3.3ms)
+  ▶ ClipboardWatcher (Redação de Segredos Real)
+    ✔ redige Google Gemini API keys reais
+    ✔ redige Bearer Tokens e senhas no clipboard
+  ✔ ClipboardWatcher (Redação de Segredos Real) (2.0ms)
+  ▶ SmartHomeService (Allowlist de Domínios Real)
+    ✔ permite eletrodomésticos seguros (light, climate, switch)
+    ✔ bloqueia expressamente domínios de segurança física (lock, alarm, garage)
+  ✔ SmartHomeService (Allowlist de Domínios Real) (0.7ms)
+  ▶ KnowledgeGraphService (Grafo e Gravação Atômica Real)
+    ✔ adiciona nós, relações e persiste atomicamente
+  ✔ KnowledgeGraphService (Grafo e Gravação Atômica Real) (5.4ms)
+  ▶ Avatar 3D Morph Target O(1) Cache Real
+    ✔ buildMorphCacheMap mapeia variações ARKit Left/Right e caixa alta/baixa
+  ✔ Avatar 3D Morph Target O(1) Cache Real (0.4ms)
+  ▶ GitWatcher & Reflexion Guard (Segurança de Commit Real)
+    ✔ Policy Engine valida commit com arquivos específicos e rejeita vazamentos
+    ✔ ReflexionEngine intercepta commit e exige confirmação prévia
+  ✔ GitWatcher & Reflexion Guard (Segurança de Commit Real) (0.9ms)
+  ▶ WakeWordManager & Chamada de Agente Exclusiva via TensorFlow
+    ✔ código fonte de wake-word-manager e speech-commands não possui referências a Web Speech API
+    ✔ speech-commands implementa modelo neural de 3 classes com amostras negativas e threshold de 0.85
+    ✔ wake-trainer-ui e index.html exigem calibração de 3 classes (nome, silêncio e outras palavras)
+  ✔ WakeWordManager & Chamada de Agente Exclusiva via TensorFlow (4.9ms)
+  ▶ Modo Chamada Contínuo & Zero-Latency Audio Pipeline
+    ✔ MicRecorder possui suporte nativo a Modo Chamada Full-Duplex e timeout de 30s
+    ✔ main.ts implementa Modo Chamada Full-Duplex, saudação proativa e barge-in
+    ✔ AudioPlayer gerencia fontes de áudio com desconexão imediata e callback de término
+    ✔ Gemini Live client utiliza o modelo oficial gemini-3.1-flash-live-preview
+  ✔ Modo Chamada Contínuo & Zero-Latency Audio Pipeline (4.1ms)
+✔ Suíte de Testes de Integração com Classes e Módulos Reais (30.2ms)
+ℹ tests 25 | suites 10 | pass 25 | fail 0
+```
 
 ---
 

@@ -115,22 +115,73 @@ export function createMainWindow(): BrowserWindow {
   }
 
   // Automatic screenshot capture for visual verification when requested via CLI
-  if (process.argv.includes('--capture-screenshot')) {
+  if (process.argv.includes('--capture-screenshot') || process.argv.includes('--capture-showcase')) {
     setTimeout(async () => {
       try {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          const image = await mainWindow.webContents.capturePage()
-          const outDir = process.env.SCREENSHOT_OUT_DIR || app.getPath('temp')
-          const outPath = join(outDir, 'app_screenshot.png')
-          fs.writeFileSync(outPath, image.toPNG())
-          console.log('[Capture] Screenshot saved successfully to', outPath)
-          app.quit()
+        if (!mainWindow || mainWindow.isDestroyed()) return
+
+        const outDir = process.env.SCREENSHOT_OUT_DIR || join(app.getAppPath(), 'assets', 'screenshots')
+        if (!fs.existsSync(outDir)) {
+          fs.mkdirSync(outDir, { recursive: true })
         }
+
+        if (process.argv.includes('--capture-showcase')) {
+          console.log('[Capture] Iniciando captura da suíte de showcase...')
+
+          // 1. Avatar HUD Principal
+          const img1 = await mainWindow.webContents.capturePage()
+          fs.writeFileSync(join(outDir, '01_avatar_hud.png'), img1.toPNG())
+          console.log('[Capture] 01_avatar_hud.png salvo')
+
+          // Abrir configurações
+          await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-settings')?.click();`)
+          await new Promise((r) => setTimeout(r, 600))
+
+          // 2. Aba Autonomia (17 módulos de autonomia)
+          await mainWindow.webContents.executeJavaScript(`{
+            const btnAutonomy = document.querySelector('button[data-tab="tab-autonomy"]');
+            if (btnAutonomy) btnAutonomy.click();
+          }`)
+          await new Promise((r) => setTimeout(r, 600))
+          const img2 = await mainWindow.webContents.capturePage()
+          fs.writeFileSync(join(outDir, '02_autonomy_modules.png'), img2.toPNG())
+          console.log('[Capture] 02_autonomy_modules.png salvo')
+
+          // 3. Aba IA & Voz (Gemini Live & VAD)
+          await mainWindow.webContents.executeJavaScript(`{
+            const btnAI = document.querySelector('button[data-tab="tab-ai"]');
+            if (btnAI) btnAI.click();
+          }`)
+          await new Promise((r) => setTimeout(r, 600))
+          const img3 = await mainWindow.webContents.capturePage()
+          fs.writeFileSync(join(outDir, '03_ai_config.png'), img3.toPNG())
+          console.log('[Capture] 03_ai_config.png salvo')
+
+          // 4. Aba Ferramentas & Políticas Zero-Trust
+          await mainWindow.webContents.executeJavaScript(`{
+            const btnTools = document.querySelector('button[data-tab="tab-tools"]');
+            if (btnTools) btnTools.click();
+          }`)
+          await new Promise((r) => setTimeout(r, 600))
+          const img4 = await mainWindow.webContents.capturePage()
+          fs.writeFileSync(join(outDir, '04_tools_system.png'), img4.toPNG())
+          console.log('[Capture] 04_tools_system.png salvo')
+
+          console.log('[Capture] Todas as capturas de showcase foram salvas com sucesso em', outDir)
+          app.quit()
+          return
+        }
+
+        const image = await mainWindow.webContents.capturePage()
+        const outPath = join(outDir, 'app_screenshot.png')
+        fs.writeFileSync(outPath, image.toPNG())
+        console.log('[Capture] Screenshot saved successfully to', outPath)
+        app.quit()
       } catch (err) {
         console.error('[Capture] Error capturing page screenshot:', err)
         app.quit()
       }
-    }, 4500)
+    }, 6500)
   }
 
   return mainWindow

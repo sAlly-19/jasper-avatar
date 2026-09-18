@@ -5,7 +5,7 @@ import path2 from "node:path";
 import fs3 from "node:fs";
 
 // test/_electron-mock.mjs
-var tempUserData = "C:\\Users\\aliss\\AppData\\Local\\Temp\\jasper-test-userdata";
+var tempUserData = "C:\\Users\\ALISSO~1.SAN\\AppData\\Local\\Temp\\jasper-test-userdata";
 var app = {
   getPath: (name) => tempUserData,
   whenReady: () => Promise.resolve(),

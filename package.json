@@ -10,6 +10,7 @@
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "test": "node scripts/run-tests.mjs",
+    "capture:showcase": "node scripts/capture-showcase.cjs",
     "setup:assets": "node scripts/setup-assets.mjs",
     "postinstall": "node scripts/setup-assets.mjs"
   },
