@@ -1,0 +1,32 @@
+appId: com.jasper.avatar
+productName: Jasper AI
+copyright: Copyright © 2026 Jasper Team
+
+directories:
+  output: release
+
+files:
+  - out/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Jasper AI
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-Portable.${ext}
+

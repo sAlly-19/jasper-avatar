@@ -1484,30 +1484,6 @@ var LicenseManager = class {
     }
     const hw = getHardwareInfo();
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    const isDevKey = cleanKey.startsWith("JASPER-LT-DEV") || cleanKey.startsWith("JASPER-LT-TEST");
-    if (isDevKey) {
-      console.log("[LicenseManager] Chave de teste detectada. Ativando em modo local offline.");
-      configStore.updateConfig({
-        licenseKey: cleanKey,
-        licenseStatus: "active",
-        licenseClientName: "Desenvolvedor (Modo Teste)",
-        licenseClientEmail: "dev@jasper.local",
-        licenseMachineId: hw.machineId,
-        licenseActivatedAt: now,
-        licenseLastCheckedAt: now
-      });
-      return {
-        valid: true,
-        status: "ACTIVATED",
-        message: "Chave de desenvolvimento ativada com sucesso nesta m\xE1quina!",
-        client: {
-          name: "Desenvolvedor (Modo Teste)",
-          email: "dev@jasper.local"
-        },
-        machineId: hw.machineId,
-        activatedAt: now
-      };
-    }
     const baseUrl = this.customBaseUrl || `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/licenses`;
     const docUrl = `${baseUrl}/${cleanKey}?key=${this.apiKey}`;
     try {
@@ -1517,6 +1493,7 @@ var LicenseManager = class {
         signal: AbortSignal.timeout(8e3)
       });
       if (getRes.status === 404) {
+        configStore.updateConfig({ licenseStatus: "unlicensed" });
         return {
           valid: false,
           error: "LICENSE_NOT_FOUND",
@@ -1524,6 +1501,7 @@ var LicenseManager = class {
         };
       }
       if (getRes.status === 403) {
+        configStore.updateConfig({ licenseStatus: "disabled" });
         return {
           valid: false,
           error: "PERMISSION_DENIED",
@@ -1553,11 +1531,11 @@ var LicenseManager = class {
         };
       }
       if (status === "revoked") {
-        configStore.updateConfig({ licenseStatus: "unlicensed" });
+        configStore.updateConfig({ licenseStatus: "revoked" });
         return {
           valid: false,
           error: "LICENSE_REVOKED",
-          message: "Esta licen\xE7a foi permanentemente revogada."
+          message: "Esta licen\xE7a foi permanentemente revogada pelo administrador."
         };
       }
       if (!boundHwid) {
@@ -1680,18 +1658,76 @@ var LicenseManager = class {
     if (!result.valid && (result.error === "NETWORK_ERROR" || result.error === "SERVER_ERROR")) {
       if (cfg.licenseStatus === "active" && cfg.licenseLastCheckedAt) {
         const diffMs = Date.now() - new Date(cfg.licenseLastCheckedAt).getTime();
-        const diffDays = diffMs / (1e3 * 60 * 60 * 24);
-        if (diffDays <= 7) {
-          console.log("[LicenseManager] Modo offline autorizado baseado no check-in recente.");
+        const diffHours = diffMs / (1e3 * 60 * 60);
+        if (diffHours <= 24) {
+          console.log("[LicenseManager] Modo offline tempor\xE1rio autorizado (dentro da janela de 24h).");
           return {
             valid: true,
             status: "ACTIVE",
-            message: "Licen\xE7a v\xE1lida em modo offline."
+            message: "Licen\xE7a v\xE1lida em modo offline tempor\xE1rio (janela de 24h)."
           };
+        } else {
+          console.warn("[LicenseManager] Limite de 24 horas sem conex\xE3o atingido. Acesso suspenso.");
+          configStore.updateConfig({ licenseStatus: "disabled" });
+          const expiredResult = {
+            valid: false,
+            error: "EXPIRED_24H",
+            message: "\xC9 necess\xE1ria a verifica\xE7\xE3o de acesso a cada 24 horas. Conecte-se \xE0 internet para continuar usando o Jasper."
+          };
+          this.notifyRevoked(expiredResult);
+          return expiredResult;
         }
       }
     }
+    if (!result.valid) {
+      this.notifyRevoked(result);
+    }
     return result;
+  }
+  revocationListeners = [];
+  onRevoked(listener) {
+    this.revocationListeners.push(listener);
+    return () => {
+      this.revocationListeners = this.revocationListeners.filter((l) => l !== listener);
+    };
+  }
+  notifyRevoked(result) {
+    for (const listener of this.revocationListeners) {
+      try {
+        listener(result);
+      } catch (err) {
+        console.error("[LicenseManager] Erro no listener de revoga\xE7\xE3o:", err);
+      }
+    }
+  }
+  /**
+   * Executa a checagem periódica de 24 horas com o Firestore.
+   * Se a chave foi revogada, desativada ou se a máquina não confere, bloqueia imediatamente.
+   */
+  async checkAccess24h(force = false) {
+    const cfg = configStore.getConfig();
+    if (!cfg.licenseKey) {
+      const res = {
+        valid: false,
+        error: "NO_LICENSE",
+        message: "Nenhuma chave de licen\xE7a ativa configurada nesta esta\xE7\xE3o."
+      };
+      this.notifyRevoked(res);
+      return res;
+    }
+    if (!force && cfg.licenseLastCheckedAt) {
+      const diffMs = Date.now() - new Date(cfg.licenseLastCheckedAt).getTime();
+      const diffHours = diffMs / (1e3 * 60 * 60);
+      if (diffHours < 24 && cfg.licenseStatus === "active") {
+        return {
+          valid: true,
+          status: "ACTIVE",
+          message: "Licen\xE7a verificada recentemente (menos de 24 horas)."
+        };
+      }
+    }
+    console.log("[LicenseManager] Executando verifica\xE7\xE3o de acesso das 24 horas com o Firestore...");
+    return this.verifyCurrentLicense();
   }
   /**
    * Retorna resumo público da licença para a UI
@@ -2065,18 +2101,31 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
         server.close();
       }
     });
-    test("LicenseManager ativa chaves de desenvolvimento (JASPER-LT-DEV*) em modo local offline", async () => {
+    test("LicenseManager n\xE3o aceita chaves de desenvolvimento em modo offline (modo dev removido)", async () => {
       const manager = new LicenseManager();
       manager.setCustomBaseUrl("http://127.0.0.1:59999/non-existent");
       const devResult = await manager.activateLicense("JASPER-LT-DEV0-0000-0001");
-      assert.equal(devResult.valid, true);
-      assert.equal(devResult.status, "ACTIVATED");
-      assert.equal(devResult.client?.name, "Desenvolvedor (Modo Teste)");
-      assert.equal(configStore.getConfig().licenseStatus, "active");
+      assert.equal(devResult.valid, false);
+      assert.equal(devResult.error, "NETWORK_ERROR");
     });
-    test("UI e arquivos fonte cont\xEAm elementos e prote\xE7\xF5es de licenciamento obrigat\xF3rias", () => {
+    test("LicenseManager checkAccess24h e onRevoked notificam quando licen\xE7a \xE9 suspensa ou revogada", async () => {
+      const manager = new LicenseManager();
+      let revocationNotified = false;
+      manager.onRevoked(() => {
+        revocationNotified = true;
+      });
+      configStore.updateConfig({ licenseKey: "", licenseStatus: "unlicensed" });
+      const res = await manager.checkAccess24h(true);
+      assert.equal(res.valid, false);
+      assert.equal(revocationNotified, true);
+    });
+    test("UI e arquivos fonte cont\xEAm elementos e prote\xE7\xF5es de licenciamento obrigat\xF3rias e onboarding Gemini", () => {
       const htmlSrc = fs4.readFileSync(path2.join(process.cwd(), "src/renderer/index.html"), "utf-8");
       assert.ok(htmlSrc.includes('id="modal-license-activation"'));
+      assert.ok(htmlSrc.includes('id="step-license-activation"'));
+      assert.ok(htmlSrc.includes('id="step-gemini-onboarding"'));
+      assert.ok(htmlSrc.includes('id="gemini-key-masked-display"'));
+      assert.ok(htmlSrc.includes('id="input-onboarding-gemini-key"'));
       assert.ok(htmlSrc.includes('id="tab-license"'));
       assert.ok(htmlSrc.includes('id="input-license-key"'));
       assert.ok(htmlSrc.includes('id="tab-btn-activate-key"'));
@@ -2088,6 +2137,7 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       const mainSrc = fs4.readFileSync(path2.join(process.cwd(), "src/renderer/main.ts"), "utf-8");
       assert.ok(mainSrc.includes("licenseModal.checkOnStartup()"));
       assert.ok(mainSrc.includes("!lic.isLicensed"));
+      assert.ok(mainSrc.includes("onLicenseRevoked"));
     });
   });
 });

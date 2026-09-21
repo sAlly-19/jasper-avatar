@@ -126,6 +126,19 @@ export const DOM = {
   tabLicenseBadgeStatus: document.getElementById('tab-license-badge-status') as HTMLElement | null,
   tabLicenseClientName: document.getElementById('tab-license-client-name') as HTMLElement | null,
   tabLicenseActivatedAt: document.getElementById('tab-license-activated-at') as HTMLElement | null,
-  tabLicenseFeedback: document.getElementById('tab-license-feedback') as HTMLElement | null
+  tabLicenseFeedback: document.getElementById('tab-license-feedback') as HTMLElement | null,
+
+  // Gemini Settings & Onboarding
+  geminiKeyMaskedDisplay: document.getElementById('gemini-key-masked-display') as HTMLElement | null,
+  modalLicenseActivation: document.getElementById('modal-license-activation') as HTMLElement | null,
+  licenseModalTitle: document.getElementById('license-modal-title') as HTMLElement | null,
+  licenseModalSubtitle: document.getElementById('license-modal-subtitle') as HTMLElement | null,
+  stepLicenseActivation: document.getElementById('step-license-activation') as HTMLElement | null,
+  stepGeminiOnboarding: document.getElementById('step-gemini-onboarding') as HTMLElement | null,
+  inputOnboardingGeminiKey: document.getElementById('input-onboarding-gemini-key') as HTMLInputElement | null,
+  btnToggleOnboardingKey: document.getElementById('btn-toggle-onboarding-key') as HTMLButtonElement | null,
+  btnOpenGoogleAiStudio: document.getElementById('btn-open-google-ai-studio') as HTMLButtonElement | null,
+  btnSaveOnboardingGemini: document.getElementById('btn-save-onboarding-gemini') as HTMLButtonElement | null,
+  geminiOnboardingFeedback: document.getElementById('gemini-onboarding-feedback') as HTMLElement | null
 }
 

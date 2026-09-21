@@ -88,6 +88,7 @@ export interface ElectronAPI {
   getLicenseStatus: () => Promise<LicenseInfo>
   activateLicense: (key: string) => Promise<LicenseValidationResult>
   getHwid: () => Promise<{ machineId: string; machineName: string; platform: string }>
+  onLicenseRevoked: (callback: (payload: { status: string; message: string }) => void) => () => void
 }
 
 declare global {

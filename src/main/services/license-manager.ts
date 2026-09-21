@@ -68,33 +68,6 @@ export class LicenseManager {
     const hw = getHardwareInfo()
     const now = new Date().toISOString()
 
-    // 1. Chave de desenvolvimento / teste local offline (DEV)
-    const isDevKey = cleanKey.startsWith('JASPER-LT-DEV') || cleanKey.startsWith('JASPER-LT-TEST')
-    if (isDevKey) {
-      console.log('[LicenseManager] Chave de teste detectada. Ativando em modo local offline.')
-      configStore.updateConfig({
-        licenseKey: cleanKey,
-        licenseStatus: 'active',
-        licenseClientName: 'Desenvolvedor (Modo Teste)',
-        licenseClientEmail: 'dev@jasper.local',
-        licenseMachineId: hw.machineId,
-        licenseActivatedAt: now,
-        licenseLastCheckedAt: now
-      })
-
-      return {
-        valid: true,
-        status: 'ACTIVATED',
-        message: 'Chave de desenvolvimento ativada com sucesso nesta máquina!',
-        client: {
-          name: 'Desenvolvedor (Modo Teste)',
-          email: 'dev@jasper.local'
-        },
-        machineId: hw.machineId,
-        activatedAt: now
-      }
-    }
-
     // URL do documento no Firestore
     const baseUrl =
       this.customBaseUrl ||
@@ -102,7 +75,7 @@ export class LicenseManager {
     const docUrl = `${baseUrl}/${cleanKey}?key=${this.apiKey}`
 
     try {
-      // 2. Consulta direta do documento da chave no Firestore
+      // 1. Consulta direta do documento da chave no Firestore
       const getRes = await fetch(docUrl, {
         method: 'GET',
         headers: { Accept: 'application/json' },
@@ -110,6 +83,7 @@ export class LicenseManager {
       })
 
       if (getRes.status === 404) {
+        configStore.updateConfig({ licenseStatus: 'unlicensed' })
         return {
           valid: false,
           error: 'LICENSE_NOT_FOUND',
@@ -118,6 +92,7 @@ export class LicenseManager {
       }
 
       if (getRes.status === 403) {
+        configStore.updateConfig({ licenseStatus: 'disabled' })
         return {
           valid: false,
           error: 'PERMISSION_DENIED',
@@ -142,7 +117,7 @@ export class LicenseManager {
       const boundHwid = fields.machineId || null
       const boundMachineName = fields.machineName || null
 
-      // 3. Verificação de suspensão / revogação
+      // 2. Verificação de suspensão / revogação
       if (status === 'disabled') {
         configStore.updateConfig({ licenseStatus: 'disabled' })
         return {
@@ -153,11 +128,11 @@ export class LicenseManager {
       }
 
       if (status === 'revoked') {
-        configStore.updateConfig({ licenseStatus: 'unlicensed' })
+        configStore.updateConfig({ licenseStatus: 'revoked' })
         return {
           valid: false,
           error: 'LICENSE_REVOKED',
-          message: 'Esta licença foi permanentemente revogada.'
+          message: 'Esta licença foi permanentemente revogada pelo administrador.'
         }
       }
 
@@ -297,24 +272,90 @@ export class LicenseManager {
 
     const result = await this.activateLicense(cfg.licenseKey)
 
-    // Tolerância offline graciosa: se o servidor estiver temporariamente fora e a estação
-    // foi ativada/verificada nos últimos 7 dias, mantém o acesso ativo
+    // Tolerância offline máxima de 24 horas: se o servidor estiver temporariamente inacessível
+    // e a estação foi ativada/verificada com sucesso dentro das últimas 24 horas, permite acesso
     if (!result.valid && (result.error === 'NETWORK_ERROR' || result.error === 'SERVER_ERROR')) {
       if (cfg.licenseStatus === 'active' && cfg.licenseLastCheckedAt) {
         const diffMs = Date.now() - new Date(cfg.licenseLastCheckedAt).getTime()
-        const diffDays = diffMs / (1000 * 60 * 60 * 24)
-        if (diffDays <= 7) {
-          console.log('[LicenseManager] Modo offline autorizado baseado no check-in recente.')
+        const diffHours = diffMs / (1000 * 60 * 60)
+        if (diffHours <= 24) {
+          console.log('[LicenseManager] Modo offline temporário autorizado (dentro da janela de 24h).')
           return {
             valid: true,
             status: 'ACTIVE',
-            message: 'Licença válida em modo offline.'
+            message: 'Licença válida em modo offline temporário (janela de 24h).'
           }
+        } else {
+          console.warn('[LicenseManager] Limite de 24 horas sem conexão atingido. Acesso suspenso.')
+          configStore.updateConfig({ licenseStatus: 'disabled' })
+          const expiredResult: LicenseValidationResult = {
+            valid: false,
+            error: 'EXPIRED_24H',
+            message: 'É necessária a verificação de acesso a cada 24 horas. Conecte-se à internet para continuar usando o Jasper.'
+          }
+          this.notifyRevoked(expiredResult)
+          return expiredResult
         }
       }
     }
 
+    // Se o resultado for inválido (revogada, suspensa ou mismatch), notifica os listeners
+    if (!result.valid) {
+      this.notifyRevoked(result)
+    }
+
     return result
+  }
+
+  private revocationListeners: Array<(result: LicenseValidationResult) => void> = []
+
+  public onRevoked(listener: (result: LicenseValidationResult) => void): () => void {
+    this.revocationListeners.push(listener)
+    return () => {
+      this.revocationListeners = this.revocationListeners.filter((l) => l !== listener)
+    }
+  }
+
+  public notifyRevoked(result: LicenseValidationResult): void {
+    for (const listener of this.revocationListeners) {
+      try {
+        listener(result)
+      } catch (err) {
+        console.error('[LicenseManager] Erro no listener de revogação:', err)
+      }
+    }
+  }
+
+  /**
+   * Executa a checagem periódica de 24 horas com o Firestore.
+   * Se a chave foi revogada, desativada ou se a máquina não confere, bloqueia imediatamente.
+   */
+  public async checkAccess24h(force = false): Promise<LicenseValidationResult> {
+    const cfg = configStore.getConfig()
+    if (!cfg.licenseKey) {
+      const res: LicenseValidationResult = {
+        valid: false,
+        error: 'NO_LICENSE',
+        message: 'Nenhuma chave de licença ativa configurada nesta estação.'
+      }
+      this.notifyRevoked(res)
+      return res
+    }
+
+    if (!force && cfg.licenseLastCheckedAt) {
+      const diffMs = Date.now() - new Date(cfg.licenseLastCheckedAt).getTime()
+      const diffHours = diffMs / (1000 * 60 * 60)
+      if (diffHours < 24 && cfg.licenseStatus === 'active') {
+        return {
+          valid: true,
+          status: 'ACTIVE',
+          message: 'Licença verificada recentemente (menos de 24 horas).'
+        }
+      }
+    }
+
+    console.log('[LicenseManager] Executando verificação de acesso das 24 horas com o Firestore...')
+    return this.verifyCurrentLicense()
   }
 
   /**

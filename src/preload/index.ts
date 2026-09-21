@@ -231,5 +231,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   getHwid: (): Promise<{ machineId: string; machineName: string; platform: string }> => {
     return ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GET_HWID)
+  },
+  onLicenseRevoked: (callback: (payload: { status: string; message: string }) => void): (() => void) => {
+    const handler = (_event: any, payload: { status: string; message: string }): void => {
+      callback(payload)
+    }
+    ipcRenderer.on(IPC_CHANNELS.LICENSE_REVOKED, handler)
+    return (): void => {
+      ipcRenderer.removeListener(IPC_CHANNELS.LICENSE_REVOKED, handler)
+    }
   }
 })

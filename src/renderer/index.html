@@ -290,8 +290,15 @@
                     <p>Necessária para comunicação bidirecional de áudio e inteligência artificial.</p>
                   </div>
                 </div>
+
+                <!-- Active Key Masked Display -->
+                <div class="active-key-info-badge" style="display: flex; align-items: center; justify-content: space-between; background: rgba(0, 240, 255, 0.06); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px;">
+                  <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">CHAVE EM USO ATUAL:</span>
+                  <code id="gemini-key-masked-display" style="font-family: monospace; font-size: 11px; color: #00f0ff; background: rgba(0,0,0,0.45); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0,240,255,0.2);">NENHUMA CHAVE CONFIGURADA</code>
+                </div>
+
                 <div class="input-password-wrap">
-                  <input type="password" id="input-api-key" placeholder="AIzaSy..." />
+                  <input type="password" id="input-api-key" placeholder="Digite uma nova chave para alterar..." />
                   <button id="btn-toggle-key" type="button" class="btn-toggle">Mostrar</button>
                 </div>
                 <div class="api-key-hint">
@@ -1025,7 +1032,7 @@
         </div>
       </div>
 
-      <!-- Mandatory License Activation Modal -->
+      <!-- Mandatory License & Gemini Activation Modal -->
       <div id="modal-license-activation" class="modal-backdrop hidden" style="z-index: 99999; display: none;">
         <div class="modal-card license-activation-dialog">
           <!-- Modal Header -->
@@ -1033,61 +1040,122 @@
             <div class="modal-title-wrap">
               <span class="modal-arc-dot"></span>
               <div>
-                <h3>AUTENTICAÇÃO DE SEGURANÇA // ATIVAÇÃO</h3>
-                <span class="modal-subtitle">Jasper AI Desktop - Licenciamento Vitalício & Node-Locking</span>
+                <h3 id="license-modal-title">AUTENTICAÇÃO DE SEGURANÇA // ATIVAÇÃO</h3>
+                <span id="license-modal-subtitle" class="modal-subtitle">Jasper AI Desktop - Licenciamento Vitalício & Node-Locking</span>
               </div>
             </div>
             <button id="btn-close-license-modal" class="modal-close" title="Fechar" style="display: none;">&times;</button>
           </div>
 
-          <!-- Modal Body -->
-          <div class="modal-body" style="padding: 20px 24px;">
-            <div style="margin-bottom: 16px;">
-              <p style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin: 0 0 12px 0;">
-                Bem-vindo ao <strong>Jasper AI</strong>. Para desbloquear a estação de trabalho, o assistente neural 3D e a autonomia do sistema, insira sua chave de licença vitalícia fornecida na aquisição.
-              </p>
+          <!-- STEP 1: Ativação da Licença Jasper -->
+          <div id="step-license-activation" class="wizard-step">
+            <!-- Modal Body -->
+            <div class="modal-body" style="padding: 20px 24px;">
+              <div style="margin-bottom: 16px;">
+                <p style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin: 0 0 12px 0;">
+                  Bem-vindo ao <strong>Jasper AI</strong>. Para desbloquear a estação de trabalho, o assistente neural 3D e a autonomia do sistema, insira sua chave de licença vitalícia fornecida na aquisição.
+                </p>
+              </div>
+
+              <!-- Hardware ID Box -->
+              <div class="license-hwid-box" style="margin-bottom: 18px;">
+                <span class="hwid-label">HARDWARE IDENTIFIER (HWID DESTE DISPOSITIVO)</span>
+                <div class="hwid-value-row">
+                  <code class="hwid-code" id="license-hwid-display">IDENTIFICANDO HARDWARE...</code>
+                  <button type="button" id="btn-copy-hwid" class="btn-secondary-sm" style="font-size: 10px; padding: 5px 12px;">
+                    Copiar HWID
+                  </button>
+                </div>
+              </div>
+
+              <!-- License Key Input -->
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label class="license-input-label" for="input-license-key">INFORME SUA CHAVE DE ATIVAÇÃO (JASPER-LT):</label>
+                <input
+                  type="text"
+                  id="input-license-key"
+                  class="license-input"
+                  placeholder="JASPER-LT-XXXX-XXXX-XXXX"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <small class="form-hint" style="margin-top: 6px;">
+                  A chave é exclusiva e vinculada a este computador com validação contínua a cada 24 horas.
+                </small>
+              </div>
+
+              <!-- Feedback Message -->
+              <div id="license-feedback-message" class="license-feedback" style="display: none; margin-bottom: 10px;"></div>
             </div>
 
-            <!-- Hardware ID Box -->
-            <div class="license-hwid-box" style="margin-bottom: 18px;">
-              <span class="hwid-label">HARDWARE IDENTIFIER (HWID DESTE DISPOSITIVO)</span>
-              <div class="hwid-value-row">
-                <code class="hwid-code" id="license-hwid-display">IDENTIFICANDO HARDWARE...</code>
-                <button type="button" id="btn-copy-hwid" class="btn-secondary-sm" style="font-size: 10px; padding: 5px 12px;">
-                  Copiar HWID
+            <!-- Modal Footer Step 1 -->
+            <div class="modal-footer">
+              <div style="font-size: 11px; color: var(--text-muted);">
+                Proteção Criptográfica Node-Locking 2026
+              </div>
+              <div class="modal-actions">
+                <button type="button" id="btn-activate-license" class="btn-primary" style="padding: 10px 24px;">
+                  ATIVAR LICENÇA
                 </button>
               </div>
             </div>
-
-            <!-- License Key Input -->
-            <div class="form-group" style="margin-bottom: 16px;">
-              <label class="license-input-label" for="input-license-key">INFORME SUA CHAVE DE ATIVAÇÃO:</label>
-              <input
-                type="text"
-                id="input-license-key"
-                class="license-input"
-                placeholder="JASPER-LT-XXXX-XXXX-XXXX"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <small class="form-hint" style="margin-top: 6px;">
-                A chave será vinculada exclusivamente a esta estação de trabalho via Node-Locking.
-              </small>
-            </div>
-
-            <!-- Feedback Message -->
-            <div id="license-feedback-message" class="license-feedback" style="display: none; margin-bottom: 10px;"></div>
           </div>
 
-          <!-- Modal Footer -->
-          <div class="modal-footer">
-            <div style="font-size: 11px; color: var(--text-muted);">
-              Proteção Criptográfica Node-Locking 2026
+          <!-- STEP 2: Onboarding Chave do Google Gemini AI -->
+          <div id="step-gemini-onboarding" class="wizard-step" style="display: none;">
+            <div class="modal-body" style="padding: 20px 24px;">
+              <div style="margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #00ff88; box-shadow: 0 0 8px #00ff88;"></span>
+                  <span style="font-size: 12px; font-weight: 700; color: #00ff88; letter-spacing: 0.05em;">LICENÇA VALIDADA COM SUCESSO</span>
+                </div>
+                <p style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin: 0 0 10px 0;">
+                  Para que o Jasper possa raciocinar, conversar em tempo real por voz e interagir com seu computador, informe sua <strong>chave pessoal da API do Google Gemini</strong>.
+                </p>
+                <div style="background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #93c5fd; line-height: 1.4;">
+                  💡 <strong>100% Gratuito:</strong> Você pode gerar sua chave gratuitamente no Google AI Studio em menos de 1 minuto sem cartão de crédito.
+                </div>
+              </div>
+
+              <div style="margin-bottom: 14px;">
+                <button type="button" id="btn-open-google-ai-studio" class="btn-secondary" style="width: 100%; justify-content: center; padding: 8px 12px; font-size: 11px;">
+                  Abrir Google AI Studio para Obter Chave Gratuita ↗
+                </button>
+              </div>
+
+              <!-- Gemini API Key Input -->
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label class="license-input-label" for="input-onboarding-gemini-key">SUA GOOGLE_API_KEY DO GEMINI:</label>
+                <div class="input-password-wrap">
+                  <input
+                    type="password"
+                    id="input-onboarding-gemini-key"
+                    class="license-input"
+                    placeholder="AIzaSy..."
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button id="btn-toggle-onboarding-key" type="button" class="btn-toggle">Mostrar</button>
+                </div>
+                <small class="form-hint" style="margin-top: 6px;">
+                  Sua chave é criptografada localmente via safeStorage do Windows e nunca é compartilhada.
+                </small>
+              </div>
+
+              <!-- Gemini Feedback Message -->
+              <div id="gemini-onboarding-feedback" class="license-feedback" style="display: none; margin-bottom: 10px;"></div>
             </div>
-            <div class="modal-actions">
-              <button type="button" id="btn-activate-license" class="btn-primary" style="padding: 10px 24px;">
-                ATIVAR LICENÇA
-              </button>
+
+            <!-- Modal Footer Step 2 -->
+            <div class="modal-footer">
+              <div style="font-size: 11px; color: var(--text-muted);">
+                Google Gemini Multimodal Live API
+              </div>
+              <div class="modal-actions">
+                <button type="button" id="btn-save-onboarding-gemini" class="btn-primary" style="padding: 10px 24px;">
+                  SALVAR E INICIAR JASPER
+                </button>
+              </div>
             </div>
           </div>
         </div>

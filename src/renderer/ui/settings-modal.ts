@@ -195,8 +195,16 @@ export class SettingsModal {
       if (agentNamePreview) {
         agentNamePreview.textContent = `ID: ${(inputAgentName?.value || currentName).toUpperCase()}`
       }
-      if (config.hasFullKey) {
-        inputApiKey.placeholder = 'Chave salva (digite para alterar)'
+      if (DOM.geminiKeyMaskedDisplay) {
+        if (config.apiKey && config.hasFullKey) {
+          DOM.geminiKeyMaskedDisplay.textContent = config.apiKey
+          DOM.geminiKeyMaskedDisplay.style.color = '#00f0ff'
+          inputApiKey.placeholder = `Chave ativa: ${config.apiKey} (digite para alterar)`
+        } else {
+          DOM.geminiKeyMaskedDisplay.textContent = 'NENHUMA CHAVE CONFIGURADA'
+          DOM.geminiKeyMaskedDisplay.style.color = '#f87171'
+          inputApiKey.placeholder = 'Digite sua chave do Gemini (AIzaSy...)'
+        }
       }
       selectVoice.value = config.voiceName || 'Charon'
       selectModel.value = config.model || 'gemini-2.5-flash-native-audio-latest'

@@ -421,6 +421,16 @@ async function init(): Promise<void> {
     console.log(`[HUD] Received autonomy notification: ${notif.title}`)
   })
 
+  // Listener para suspender áudio, microfone e estado quando a licença for revogada
+  window.electronAPI.onLicenseRevoked(() => {
+    console.warn('[HUD] Licença revogada ou suspensa. Interrompendo áudio e microfone.')
+    micRecorder.stop()
+    audioPlayer.stopAll()
+    avatar?.setMood('neutral')
+    isConnected = false
+    updateStatusBadge('error', 'Licença Bloqueada')
+  })
+
   // 8. Mic Recording Feedback & VAD Handlers
   micRecorder.onAudioLevel = (level) => {
     currentMicLevel = level

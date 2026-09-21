@@ -68,7 +68,9 @@ export const IPC_CHANNELS = {
   // License & Node-Locking
   LICENSE_GET_STATUS: 'license:get-status',
   LICENSE_ACTIVATE: 'license:activate',
-  LICENSE_GET_HWID: 'license:get-hwid'
+  LICENSE_GET_HWID: 'license:get-hwid',
+  LICENSE_REVOKED: 'license:revoked',
+  LICENSE_STATUS_CHANGED: 'license:status-changed'
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

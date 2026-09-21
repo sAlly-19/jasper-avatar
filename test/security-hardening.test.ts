@@ -458,20 +458,37 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       }
     })
 
-    test('LicenseManager ativa chaves de desenvolvimento (JASPER-LT-DEV*) em modo local offline', async () => {
+    test('LicenseManager não aceita chaves de desenvolvimento em modo offline (modo dev removido)', async () => {
       const manager = new LicenseManager()
       manager.setCustomBaseUrl('http://127.0.0.1:59999/non-existent')
 
+      // Como o modo DEV foi removido, a chave tenta consultar o Firestore e falha com NETWORK_ERROR (pois a URL não existe)
       const devResult = await manager.activateLicense('JASPER-LT-DEV0-0000-0001')
-      assert.equal(devResult.valid, true)
-      assert.equal(devResult.status, 'ACTIVATED')
-      assert.equal(devResult.client?.name, 'Desenvolvedor (Modo Teste)')
-      assert.equal(configStore.getConfig().licenseStatus, 'active')
+      assert.equal(devResult.valid, false)
+      assert.equal(devResult.error, 'NETWORK_ERROR')
     })
 
-    test('UI e arquivos fonte contêm elementos e proteções de licenciamento obrigatórias', () => {
+    test('LicenseManager checkAccess24h e onRevoked notificam quando licença é suspensa ou revogada', async () => {
+      const manager = new LicenseManager()
+      let revocationNotified = false
+      manager.onRevoked(() => {
+        revocationNotified = true
+      })
+
+      // Simula licença sem chave configurada
+      configStore.updateConfig({ licenseKey: '', licenseStatus: 'unlicensed' })
+      const res = await manager.checkAccess24h(true)
+      assert.equal(res.valid, false)
+      assert.equal(revocationNotified, true)
+    })
+
+    test('UI e arquivos fonte contêm elementos e proteções de licenciamento obrigatórias e onboarding Gemini', () => {
       const htmlSrc = fs.readFileSync(path.join(process.cwd(), 'src/renderer/index.html'), 'utf-8')
       assert.ok(htmlSrc.includes('id="modal-license-activation"'))
+      assert.ok(htmlSrc.includes('id="step-license-activation"'))
+      assert.ok(htmlSrc.includes('id="step-gemini-onboarding"'))
+      assert.ok(htmlSrc.includes('id="gemini-key-masked-display"'))
+      assert.ok(htmlSrc.includes('id="input-onboarding-gemini-key"'))
       assert.ok(htmlSrc.includes('id="tab-license"'))
       assert.ok(htmlSrc.includes('id="input-license-key"'))
       assert.ok(htmlSrc.includes('id="tab-btn-activate-key"'))
@@ -485,6 +502,7 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       const mainSrc = fs.readFileSync(path.join(process.cwd(), 'src/renderer/main.ts'), 'utf-8')
       assert.ok(mainSrc.includes('licenseModal.checkOnStartup()'))
       assert.ok(mainSrc.includes('!lic.isLicensed'))
+      assert.ok(mainSrc.includes('onLicenseRevoked'))
     })
   })
 })
