@@ -18,6 +18,10 @@ import { KnowledgeGraphService } from '../src/main/autonomous/knowledge-graph'
 import { buildMorphCacheMap } from '../src/renderer/scene/avatar'
 import { GitWatcher } from '../src/main/autonomous/git-watcher'
 import { ReflexionEngine } from '../src/main/autonomous/reflexion-engine'
+import http from 'node:http'
+import { getHardwareInfo } from '../src/main/services/hwid'
+import { licenseManager, LicenseManager } from '../src/main/services/license-manager'
+import { configStore } from '../src/main/config/config-store'
 
 describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => {
 
@@ -338,6 +342,149 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
         'utf-8'
       )
       assert.ok(liveClientSrc.includes('gemini-3.1-flash-live-preview'))
+    })
+  })
+
+  // 11. Sistema de Licenciamento Criptográfico & Node-Locking (Módulo Real)
+  describe('Sistema de Licenciamento Criptográfico & Node-Locking (Módulo Real)', () => {
+    test('getHardwareInfo gera identificador único estável no formato HWID-XXXX-XXXX-XXXX', () => {
+      const hw1 = getHardwareInfo()
+      assert.ok(hw1.machineId)
+      assert.match(hw1.machineId, /^HWID-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/)
+      assert.ok(hw1.machineName.length > 0)
+      assert.ok(hw1.platform.length > 0)
+
+      // Verificação de determinismo
+      const hw2 = getHardwareInfo()
+      assert.equal(hw1.machineId, hw2.machineId)
+    })
+
+    test('LicenseManager valida formato de chaves JASPER-LT e legado JSPR-V1', () => {
+      assert.equal(licenseManager.validateKeyFormat('JASPER-LT-ZJV8-DVLK-942B'), true)
+      assert.equal(licenseManager.validateKeyFormat('JSPR-V1-ABCD-1234-EF56'), true)
+      assert.equal(licenseManager.validateKeyFormat('jasper-lt-1234-5678-90ab'), true)
+      assert.equal(licenseManager.validateKeyFormat('JASPER-LT-INVALID-KEY'), false)
+      assert.equal(licenseManager.validateKeyFormat(''), false)
+      assert.equal(licenseManager.validateKeyFormat(null as any), false)
+    })
+
+    test('LicenseManager realiza handshake com Firestore REST e processa ativação, heartbeat e Node-Locking', async () => {
+      let mockGetResponse: any = {
+        name: 'projects/jasper-avatar/databases/(default)/documents/licenses/JASPER-LT-ABCD-1234-EF56',
+        fields: {
+          key: { stringValue: 'JASPER-LT-ABCD-1234-EF56' },
+          name: { stringValue: 'Empresa Teste Ltda' },
+          email: { stringValue: 'contato@empresa.com' },
+          status: { stringValue: 'active' },
+          machineId: { nullValue: null }
+        }
+      }
+      let mockGetStatus = 200
+      let mockPatchStatus = 200
+
+      const server = http.createServer((req, res) => {
+        if (req.method === 'GET') {
+          res.writeHead(mockGetStatus, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(mockGetResponse))
+          return
+        }
+        if (req.method === 'PATCH') {
+          let raw = ''
+          req.on('data', chunk => { raw += chunk })
+          req.on('end', () => {
+            res.writeHead(mockPatchStatus, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ name: 'updated-doc' }))
+          })
+          return
+        }
+      })
+
+      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => resolve()))
+      const address = server.address() as any
+      const testBaseUrl = `http://127.0.0.1:${address.port}/licenses`
+
+      const manager = new LicenseManager()
+      manager.setCustomBaseUrl(testBaseUrl)
+
+      try {
+        // Caso A: 200 OK no GET e PATCH (Primeira Ativação na Máquina)
+        const resA = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
+        assert.equal(resA.valid, true)
+        assert.equal(resA.status, 'ACTIVATED')
+        assert.equal(configStore.getConfig().licenseStatus, 'active')
+        assert.equal(configStore.getConfig().licenseClientName, 'Empresa Teste Ltda')
+
+        const info = manager.getLicenseInfo()
+        assert.equal(info.isLicensed, true)
+        assert.equal(info.clientName, 'Empresa Teste Ltda')
+        assert.ok(info.keyMasked?.startsWith('JASPER-LT-'))
+
+        // Caso B: Mesma Máquina -> Atualiza heartbeat (Status ACTIVE)
+        const hw = getHardwareInfo()
+        mockGetResponse.fields.machineId = { stringValue: hw.machineId }
+        mockGetResponse.fields.machineName = { stringValue: hw.machineName }
+        const resSame = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
+        assert.equal(resSame.valid, true)
+        assert.equal(resSame.status, 'ACTIVE')
+
+        // Caso C: Node-Locking Mismatch em máquina divergente
+        mockGetResponse.fields.machineId = { stringValue: 'HWID-OUTRO-COMPUTADOR-9999' }
+        mockGetResponse.fields.machineName = { stringValue: 'PC-DO-CLIENTE-ANTERIOR' }
+        const resMismatch = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
+        assert.equal(resMismatch.valid, false)
+        assert.equal(resMismatch.error, 'MACHINE_MISMATCH')
+        assert.equal(configStore.getConfig().licenseStatus, 'disabled')
+
+        // Caso D: Licença suspensa (disabled)
+        mockGetResponse.fields.status = { stringValue: 'disabled' }
+        const resDisabled = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
+        assert.equal(resDisabled.valid, false)
+        assert.equal(resDisabled.error, 'LICENSE_DISABLED')
+
+        // Caso E: Licença revogada (revoked)
+        mockGetResponse.fields.status = { stringValue: 'revoked' }
+        const resRevoked = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
+        assert.equal(resRevoked.valid, false)
+        assert.equal(resRevoked.error, 'LICENSE_REVOKED')
+
+        // Caso F: Licença inexistente (404 NOT_FOUND no Firestore)
+        mockGetStatus = 404
+        mockGetResponse = { error: { code: 404, status: 'NOT_FOUND' } }
+        const resNotFound = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
+        assert.equal(resNotFound.valid, false)
+        assert.equal(resNotFound.error, 'LICENSE_NOT_FOUND')
+      } finally {
+        server.close()
+      }
+    })
+
+    test('LicenseManager ativa chaves de desenvolvimento (JASPER-LT-DEV*) em modo local offline', async () => {
+      const manager = new LicenseManager()
+      manager.setCustomBaseUrl('http://127.0.0.1:59999/non-existent')
+
+      const devResult = await manager.activateLicense('JASPER-LT-DEV0-0000-0001')
+      assert.equal(devResult.valid, true)
+      assert.equal(devResult.status, 'ACTIVATED')
+      assert.equal(devResult.client?.name, 'Desenvolvedor (Modo Teste)')
+      assert.equal(configStore.getConfig().licenseStatus, 'active')
+    })
+
+    test('UI e arquivos fonte contêm elementos e proteções de licenciamento obrigatórias', () => {
+      const htmlSrc = fs.readFileSync(path.join(process.cwd(), 'src/renderer/index.html'), 'utf-8')
+      assert.ok(htmlSrc.includes('id="modal-license-activation"'))
+      assert.ok(htmlSrc.includes('id="tab-license"'))
+      assert.ok(htmlSrc.includes('id="input-license-key"'))
+      assert.ok(htmlSrc.includes('id="tab-btn-activate-key"'))
+
+      const ipcSrc = fs.readFileSync(path.join(process.cwd(), 'src/main/ipc/register-ipc.ts'), 'utf-8')
+      assert.ok(ipcSrc.includes('cfg.licenseStatus !== \'active\''))
+      assert.ok(ipcSrc.includes('LICENSE_GET_STATUS'))
+      assert.ok(ipcSrc.includes('LICENSE_ACTIVATE'))
+      assert.ok(ipcSrc.includes('LICENSE_GET_HWID'))
+
+      const mainSrc = fs.readFileSync(path.join(process.cwd(), 'src/renderer/main.ts'), 'utf-8')
+      assert.ok(mainSrc.includes('licenseModal.checkOnStartup()'))
+      assert.ok(mainSrc.includes('!lic.isLicensed'))
     })
   })
 })

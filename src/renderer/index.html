@@ -168,6 +168,13 @@
               </svg>
               <span>Autonomia</span>
             </button>
+            <button type="button" class="settings-tab-btn" data-tab="tab-license">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              <span>Licença</span>
+            </button>
           </nav>
 
           <!-- Modal Body with Scrollable Tab Panes -->
@@ -869,6 +876,64 @@
                 </div>
               </div>
             </div>
+
+            <!-- TAB 6: LICENÇA VITALÍCIA & NODE-LOCKING -->
+            <div id="tab-license" class="settings-tab-pane">
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                  </span>
+                  <div>
+                    <h4>Status da Licença Vitalícia</h4>
+                    <p>Autenticação criptográfica de máquina (Node-Locking) e registro de proprietário.</p>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 14px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label class="form-label" style="margin: 0;">STATUS DO SISTEMA:</label>
+                    <span id="tab-license-badge-status" class="license-status-badge unlicensed">VERIFICANDO</span>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <div>
+                      <small style="color: var(--text-muted); display: block; font-size: 10px;">PROPRIETÁRIO / CLIENTE:</small>
+                      <span id="tab-license-client-name" style="color: #fff; font-weight: 600; font-size: 12px;">Não Registrado</span>
+                    </div>
+                    <div>
+                      <small style="color: var(--text-muted); display: block; font-size: 10px;">DATA DE ATIVAÇÃO:</small>
+                      <span id="tab-license-activated-at" style="color: #fff; font-weight: 600; font-size: 12px;">-</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 14px;">
+                  <label class="form-label">HARDWARE IDENTIFIER (HWID VINCULADO):</label>
+                  <div class="license-hwid-box" style="margin-top: 4px;">
+                    <div class="hwid-value-row">
+                      <code class="hwid-code" id="tab-license-hwid">HWID-CALCULANDO...</code>
+                      <button type="button" id="tab-btn-copy-hwid" class="btn-secondary-sm" style="font-size: 10px; padding: 4px 10px;">
+                        Copiar ID
+                      </button>
+                    </div>
+                  </div>
+                  <small class="form-hint" style="margin-top: 6px;">
+                    A chave de licença é criptograficamente vinculada a esta placa-mãe e CPU.
+                  </small>
+                </div>
+
+                <div class="form-group" style="margin-top: 14px;">
+                  <label class="form-label" for="tab-license-key">CHAVE DE ATIVAÇÃO (JASPER-LT):</label>
+                  <div style="display: flex; gap: 8px; margin-top: 4px;">
+                    <input type="text" id="tab-license-key" class="license-input" placeholder="JASPER-LT-XXXX-XXXX-XXXX" style="flex: 1;" />
+                    <button type="button" id="tab-btn-activate-key" class="btn-primary" style="white-space: nowrap; padding: 0 16px;">
+                      Ativar Chave
+                    </button>
+                  </div>
+                  <div id="tab-license-feedback" class="license-feedback" style="display: none; margin-top: 10px;"></div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Fixed Modal Footer -->
@@ -956,6 +1021,74 @@
           <div class="modal-footer">
             <div></div>
             <button type="button" id="btn-ack-module-detail" class="btn-primary" style="padding: 8px 24px; font-size: 11px;">Entendido</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mandatory License Activation Modal -->
+      <div id="modal-license-activation" class="modal-backdrop hidden" style="z-index: 99999; display: none;">
+        <div class="modal-card license-activation-dialog">
+          <!-- Modal Header -->
+          <div class="modal-header">
+            <div class="modal-title-wrap">
+              <span class="modal-arc-dot"></span>
+              <div>
+                <h3>AUTENTICAÇÃO DE SEGURANÇA // ATIVAÇÃO</h3>
+                <span class="modal-subtitle">Jasper AI Desktop - Licenciamento Vitalício & Node-Locking</span>
+              </div>
+            </div>
+            <button id="btn-close-license-modal" class="modal-close" title="Fechar" style="display: none;">&times;</button>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="modal-body" style="padding: 20px 24px;">
+            <div style="margin-bottom: 16px;">
+              <p style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin: 0 0 12px 0;">
+                Bem-vindo ao <strong>Jasper AI</strong>. Para desbloquear a estação de trabalho, o assistente neural 3D e a autonomia do sistema, insira sua chave de licença vitalícia fornecida na aquisição.
+              </p>
+            </div>
+
+            <!-- Hardware ID Box -->
+            <div class="license-hwid-box" style="margin-bottom: 18px;">
+              <span class="hwid-label">HARDWARE IDENTIFIER (HWID DESTE DISPOSITIVO)</span>
+              <div class="hwid-value-row">
+                <code class="hwid-code" id="license-hwid-display">IDENTIFICANDO HARDWARE...</code>
+                <button type="button" id="btn-copy-hwid" class="btn-secondary-sm" style="font-size: 10px; padding: 5px 12px;">
+                  Copiar HWID
+                </button>
+              </div>
+            </div>
+
+            <!-- License Key Input -->
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="license-input-label" for="input-license-key">INFORME SUA CHAVE DE ATIVAÇÃO:</label>
+              <input
+                type="text"
+                id="input-license-key"
+                class="license-input"
+                placeholder="JASPER-LT-XXXX-XXXX-XXXX"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <small class="form-hint" style="margin-top: 6px;">
+                A chave será vinculada exclusivamente a esta estação de trabalho via Node-Locking.
+              </small>
+            </div>
+
+            <!-- Feedback Message -->
+            <div id="license-feedback-message" class="license-feedback" style="display: none; margin-bottom: 10px;"></div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="modal-footer">
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Proteção Criptográfica Node-Locking 2026
+            </div>
+            <div class="modal-actions">
+              <button type="button" id="btn-activate-license" class="btn-primary" style="padding: 10px 24px;">
+                ATIVAR LICENÇA
+              </button>
+            </div>
           </div>
         </div>
       </div>

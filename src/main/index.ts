@@ -40,8 +40,8 @@ function initGeminiClient(): GeminiLiveClient {
     safeSend(IPC_CHANNELS.GEMINI_STATUS, status, message)
   }
 
-  // Auto-connect if API key is present
-  if (cfg.apiKey && cfg.apiKey.trim().length > 0) {
+  // Auto-connect if API key is present and station is licensed
+  if (cfg.apiKey && cfg.apiKey.trim().length > 0 && cfg.licenseStatus === 'active') {
     setTimeout(() => {
       client.connect().catch((err) => {
         console.warn('[Main] Auto-connect to Gemini Live failed:', err.message)

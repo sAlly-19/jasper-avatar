@@ -20,7 +20,9 @@ import {
   type WebhookConfig,
   type WebhookTriggerResult,
   type SmartHomeEntity,
-  type SmartHomeActionResult
+  type SmartHomeActionResult,
+  type LicenseInfo,
+  type LicenseValidationResult
 } from '@shared'
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -218,5 +220,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return (): void => {
       ipcRenderer.removeListener(IPC_CHANNELS.AUTONOMY_NOTIFICATION, handler)
     }
+  },
+
+  // License & Node-Locking APIs
+  getLicenseStatus: (): Promise<LicenseInfo> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GET_STATUS)
+  },
+  activateLicense: (key: string): Promise<LicenseValidationResult> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.LICENSE_ACTIVATE, key)
+  },
+  getHwid: (): Promise<{ machineId: string; machineName: string; platform: string }> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.LICENSE_GET_HWID)
   }
 })

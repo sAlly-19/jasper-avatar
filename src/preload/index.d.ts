@@ -15,10 +15,12 @@ import {
   SubagentRole,
   CalendarEvent,
   EmailSummary,
-  WebhookConfig,
-  WebhookTriggerResult,
-  SmartHomeEntity,
-  SmartHomeActionResult
+  type WebhookConfig,
+  type WebhookTriggerResult,
+  type SmartHomeEntity,
+  type SmartHomeActionResult,
+  type LicenseInfo,
+  type LicenseValidationResult
 } from '@shared'
 
 export interface ElectronAPI {
@@ -81,6 +83,11 @@ export interface ElectronAPI {
   testWebhook: (url: string) => Promise<WebhookTriggerResult>
   selectDirectory: () => Promise<string | null>
   onAutonomyNotification: (callback: (notif: AutonomyNotification) => void) => () => void
+
+  // License & Node-Locking
+  getLicenseStatus: () => Promise<LicenseInfo>
+  activateLicense: (key: string) => Promise<LicenseValidationResult>
+  getHwid: () => Promise<{ machineId: string; machineName: string; platform: string }>
 }
 
 declare global {

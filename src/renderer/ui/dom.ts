@@ -116,6 +116,16 @@ export const DOM = {
   inputHassToken: document.getElementById('input-hass-token') as HTMLInputElement | null,
   btnToggleHassToken: document.getElementById('btn-toggle-hass-token') as HTMLButtonElement | null,
   btnTestHass: document.getElementById('btn-test-hass') as HTMLButtonElement | null,
-  hassTestFeedback: document.getElementById('hass-test-feedback') as HTMLElement | null
+  hassTestFeedback: document.getElementById('hass-test-feedback') as HTMLElement | null,
+
+  // License Tab Elements
+  tabLicenseHwid: document.getElementById('tab-license-hwid') as HTMLElement | null,
+  tabBtnCopyHwid: document.getElementById('tab-btn-copy-hwid') as HTMLButtonElement | null,
+  tabLicenseKey: document.getElementById('tab-license-key') as HTMLInputElement | null,
+  tabBtnActivateKey: document.getElementById('tab-btn-activate-key') as HTMLButtonElement | null,
+  tabLicenseBadgeStatus: document.getElementById('tab-license-badge-status') as HTMLElement | null,
+  tabLicenseClientName: document.getElementById('tab-license-client-name') as HTMLElement | null,
+  tabLicenseActivatedAt: document.getElementById('tab-license-activated-at') as HTMLElement | null,
+  tabLicenseFeedback: document.getElementById('tab-license-feedback') as HTMLElement | null
 }
 

@@ -63,7 +63,12 @@ export const IPC_CHANNELS = {
   AUTONOMY_SMART_HOME_TEST_CONNECTION: 'autonomy:smart-home-test-connection',
   AUTONOMY_REFLEXION_CONFIRMATION: 'autonomy:reflexion-confirmation',
   AUTONOMY_WEBHOOK_TEST: 'autonomy:webhook-test',
-  DIALOG_SELECT_DIRECTORY: 'dialog:select-directory'
+  DIALOG_SELECT_DIRECTORY: 'dialog:select-directory',
+
+  // License & Node-Locking
+  LICENSE_GET_STATUS: 'license:get-status',
+  LICENSE_ACTIVATE: 'license:activate',
+  LICENSE_GET_HWID: 'license:get-hwid'
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

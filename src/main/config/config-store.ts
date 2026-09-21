@@ -3,6 +3,7 @@ import { join } from 'path'
 import fs from 'fs'
 import dotenv from 'dotenv'
 import type { JasperConfig, UpdateConfigPayload, ConfigSummary } from '@shared'
+import { getHardwareInfo } from '../services/hwid'
 
 // Load environment variables from .env
 dotenv.config()
@@ -175,6 +176,15 @@ class ConfigStore {
         if (data.emailPassword !== undefined) this.config.emailPassword = decryptSecret(data.emailPassword)
         if (data.folderDefaultTarget !== undefined) this.config.folderDefaultTarget = data.folderDefaultTarget
 
+        // License fields
+        if (data.licenseKey !== undefined) this.config.licenseKey = decryptSecret(data.licenseKey)
+        if (data.licenseStatus !== undefined) this.config.licenseStatus = data.licenseStatus
+        if (data.licenseClientName !== undefined) this.config.licenseClientName = data.licenseClientName
+        if (data.licenseClientEmail !== undefined) this.config.licenseClientEmail = data.licenseClientEmail
+        if (data.licenseMachineId !== undefined) this.config.licenseMachineId = data.licenseMachineId
+        if (data.licenseActivatedAt !== undefined) this.config.licenseActivatedAt = data.licenseActivatedAt
+        if (data.licenseLastCheckedAt !== undefined) this.config.licenseLastCheckedAt = data.licenseLastCheckedAt
+
         console.log('[ConfigStore] Loaded settings from userData/jasper-config.json')
       }
     } catch (err) {
@@ -191,7 +201,8 @@ class ConfigStore {
         ...this.config,
         apiKey: encryptSecret(this.config.apiKey),
         hassToken: encryptSecret(this.config.hassToken || ''),
-        emailPassword: encryptSecret(this.config.emailPassword || '')
+        emailPassword: encryptSecret(this.config.emailPassword || ''),
+        licenseKey: encryptSecret(this.config.licenseKey || '')
       }
       const content = JSON.stringify(dataToPersist, null, 2)
       atomicWriteFileSync(cfgPath, content)
@@ -245,11 +256,21 @@ class ConfigStore {
     if (payload.emailPassword !== undefined) this.config.emailPassword = payload.emailPassword.trim()
     if (payload.folderDefaultTarget !== undefined) this.config.folderDefaultTarget = payload.folderDefaultTarget.trim()
 
+    // License fields
+    if (payload.licenseKey !== undefined) this.config.licenseKey = payload.licenseKey.trim()
+    if (payload.licenseStatus !== undefined) this.config.licenseStatus = payload.licenseStatus
+    if (payload.licenseClientName !== undefined) this.config.licenseClientName = payload.licenseClientName.trim()
+    if (payload.licenseClientEmail !== undefined) this.config.licenseClientEmail = payload.licenseClientEmail.trim()
+    if (payload.licenseMachineId !== undefined) this.config.licenseMachineId = payload.licenseMachineId.trim()
+    if (payload.licenseActivatedAt !== undefined) this.config.licenseActivatedAt = payload.licenseActivatedAt
+    if (payload.licenseLastCheckedAt !== undefined) this.config.licenseLastCheckedAt = payload.licenseLastCheckedAt
+
     this.savePersistedConfig()
     return this.getConfig()
   }
 
   public getConfigSummary(isConnected: boolean): ConfigSummary {
+    const hw = getHardwareInfo()
     return {
       apiKey: this.config.apiKey
         ? `${this.config.apiKey.slice(0, 6)}...${this.config.apiKey.slice(-4)}`
@@ -291,7 +312,16 @@ class ConfigStore {
       emailImapPort: this.config.emailImapPort || 993,
       hasEmailPassword: Boolean(this.config.emailPassword && this.config.emailPassword.length > 0),
       folderDefaultTarget: this.config.folderDefaultTarget || 'downloads',
-      isConnected
+      isConnected,
+      // License & Node-Locking
+      hasLicense: Boolean(this.config.licenseKey && this.config.licenseStatus === 'active'),
+      licenseKeyMasked: this.config.licenseKey
+        ? `${this.config.licenseKey.slice(0, 10)}...${this.config.licenseKey.slice(-4)}`
+        : undefined,
+      licenseStatus: this.config.licenseStatus || 'unlicensed',
+      licenseClientName: this.config.licenseClientName,
+      licenseMachineId: this.config.licenseMachineId,
+      hwid: hw.machineId
     }
   }
 }

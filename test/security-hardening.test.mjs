@@ -1,8 +1,15 @@
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+
 // test/security-hardening.test.ts
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import path2 from "node:path";
-import fs3 from "node:fs";
+import fs4 from "node:fs";
 
 // test/_electron-mock.mjs
 var tempUserData = "C:\\Users\\ALISSO~1.SAN\\AppData\\Local\\Temp\\jasper-test-userdata";
@@ -11,6 +18,11 @@ var app = {
   whenReady: () => Promise.resolve(),
   quit: () => {
   }
+};
+var safeStorage = {
+  isEncryptionAvailable: () => true,
+  encryptString: (str) => Buffer.from(str, "utf-8"),
+  decryptString: (buf) => buf.toString("utf-8")
 };
 var clipboard = {
   readText: () => Promise.resolve(""),
@@ -1054,6 +1066,657 @@ var ReflexionEngine = class {
 var reflexionEngine = new ReflexionEngine();
 
 // test/security-hardening.test.ts
+import http from "node:http";
+
+// src/main/services/hwid.ts
+import { execSync } from "child_process";
+import crypto from "crypto";
+import os from "os";
+var cachedHardwareInfo = null;
+function getHardwareInfo() {
+  if (cachedHardwareInfo) {
+    return cachedHardwareInfo;
+  }
+  const platform = process.platform;
+  const machineName = os.hostname() || "JASPER-PC";
+  const rawParts = [];
+  if (platform === "win32") {
+    try {
+      const psScript = `
+        $u = (Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue).UUID;
+        $c = (Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1).ProcessorId;
+        $d = (Get-CimInstance Win32_LogicalDisk -ErrorAction SilentlyContinue | Where-Object DeviceID -eq 'C:').VolumeSerialNumber;
+        $g = (Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography' -Name MachineGuid -ErrorAction SilentlyContinue).MachineGuid;
+        "$u|$c|$d|$g"
+      `.trim();
+      const encoded = Buffer.from(psScript, "utf16le").toString("base64");
+      const output = execSync(`powershell.exe -NoProfile -NonInteractive -EncodedCommand ${encoded}`, {
+        timeout: 4e3,
+        encoding: "utf-8",
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "ignore"]
+      }).trim();
+      if (output && output.includes("|")) {
+        rawParts.push(output);
+      }
+    } catch {
+      try {
+        const wmicUuid = execSync("wmic csproduct get uuid", { timeout: 2500, encoding: "utf-8", windowsHide: true }).replace("UUID", "").trim();
+        if (wmicUuid) rawParts.push(wmicUuid);
+      } catch {
+      }
+    }
+  } else if (platform === "darwin") {
+    try {
+      const macSerial = execSync("ioreg -rd1 -c IOPlatformExpertDevice | grep -E '(IOPlatformSerialNumber)'", {
+        timeout: 2e3,
+        encoding: "utf-8"
+      }).trim();
+      if (macSerial) rawParts.push(macSerial);
+    } catch {
+    }
+  } else {
+    try {
+      const fs5 = __require("fs");
+      if (fs5.existsSync("/etc/machine-id")) {
+        rawParts.push(fs5.readFileSync("/etc/machine-id", "utf-8").trim());
+      } else if (fs5.existsSync("/var/lib/dbus/machine-id")) {
+        rawParts.push(fs5.readFileSync("/var/lib/dbus/machine-id", "utf-8").trim());
+      }
+    } catch {
+    }
+  }
+  if (rawParts.length === 0) {
+    rawParts.push(`${os.hostname()}|${os.arch()}|${os.cpus().length}|${os.userInfo().username}`);
+  }
+  const sha = crypto.createHash("sha256").update(rawParts.join("::")).digest("hex").toUpperCase();
+  const chunk1 = sha.substring(0, 4);
+  const chunk2 = sha.substring(4, 8);
+  const chunk3 = sha.substring(8, 12);
+  const machineId = `HWID-${chunk1}-${chunk2}-${chunk3}`;
+  cachedHardwareInfo = {
+    machineId,
+    machineName,
+    platform
+  };
+  return cachedHardwareInfo;
+}
+
+// src/main/config/config-store.ts
+import { join as join3 } from "path";
+import fs3 from "fs";
+import dotenv from "dotenv";
+dotenv.config();
+function encryptSecret(val) {
+  if (!val) return "";
+  if (val.startsWith("enc:")) return val;
+  try {
+    if (safeStorage && safeStorage.isEncryptionAvailable()) {
+      return `enc:${safeStorage.encryptString(val).toString("base64")}`;
+    }
+  } catch (err) {
+    console.error("[ConfigStore] [FAIL-CLOSED] safeStorage encryption failed:", err);
+    return "";
+  }
+  console.warn("[ConfigStore] [FAIL-CLOSED] safeStorage is unavailable. Secret cannot be saved in plaintext.");
+  return "";
+}
+function decryptSecret(val) {
+  if (!val) return "";
+  if (val.startsWith("enc:")) {
+    try {
+      if (safeStorage && safeStorage.isEncryptionAvailable()) {
+        const buf = Buffer.from(val.slice(4), "base64");
+        return safeStorage.decryptString(buf);
+      } else {
+        console.warn("[ConfigStore] [FAIL-CLOSED] safeStorage is not available yet to decrypt secret.");
+        return "";
+      }
+    } catch (err) {
+      console.warn("[ConfigStore] [FAIL-CLOSED] safeStorage decryption failed:", err);
+      return "";
+    }
+  }
+  return val;
+}
+function atomicWriteFileSync2(filePath, data) {
+  const tmpPath = `${filePath}.tmp.${Date.now()}`;
+  fs3.writeFileSync(tmpPath, data, "utf-8");
+  try {
+    fs3.renameSync(tmpPath, filePath);
+  } catch (err) {
+    try {
+      fs3.copyFileSync(tmpPath, filePath);
+      fs3.unlinkSync(tmpPath);
+    } catch {
+      fs3.writeFileSync(filePath, data, "utf-8");
+    }
+  }
+}
+var ConfigStore = class {
+  config = {
+    apiKey: process.env.GOOGLE_API_KEY || "",
+    voiceName: process.env.GEMINI_VOICE || "Charon",
+    model: process.env.GEMINI_MODEL || "gemini-3.1-flash-live-preview",
+    enableSystemTools: true,
+    enableMediaTools: true,
+    agentName: process.env.AGENT_NAME || "Jasper",
+    enableWakeWord: true,
+    enableBloom: true,
+    enableNeuralBg: true,
+    enableEyeTracking: true,
+    // Autonomy services
+    enableScreenAwareness: true,
+    enableWindowTracker: true,
+    enableClipboardWatcher: true,
+    enableCronEngine: true,
+    enableDailyBriefing: true,
+    enableSystemHealth: true,
+    enableSemanticMemory: true,
+    enableKnowledgeGraph: true,
+    enableCodeInterpreter: false,
+    // Security: Disabled by default
+    enableHeadlessBrowser: true,
+    enableGitWatcher: true,
+    enableFolderOrganizer: true,
+    enableSubagents: true,
+    enableReflexionLoop: true,
+    enableCalendarEmail: true,
+    enableWebhooks: true,
+    enableSmartHome: true,
+    // Module specific configurations
+    hassUrl: process.env.HASS_URL || "http://homeassistant.local:8123",
+    hassToken: process.env.HASS_TOKEN || "",
+    gitRepoPath: process.cwd(),
+    webhookDefaultUrl: "",
+    emailUser: "",
+    emailImapHost: "imap.gmail.com",
+    emailImapPort: 993,
+    emailPassword: "",
+    folderDefaultTarget: "downloads"
+  };
+  isInitialized = false;
+  constructor() {
+    this.loadEnvDefaults();
+  }
+  loadEnvDefaults() {
+    this.config.apiKey = process.env.GOOGLE_API_KEY || "";
+    this.config.voiceName = process.env.GEMINI_VOICE || "Charon";
+    this.config.model = process.env.GEMINI_MODEL || "gemini-2.5-flash-native-audio-latest";
+    this.config.agentName = process.env.AGENT_NAME || "Jasper";
+    this.config.hassUrl = process.env.HASS_URL || "http://homeassistant.local:8123";
+    this.config.hassToken = process.env.HASS_TOKEN || "";
+  }
+  initialize() {
+    if (this.isInitialized) return this.config;
+    console.log("[ConfigStore] Initializing ConfigStore and decrypting credentials after app.ready...");
+    this.loadPersistedConfig();
+    this.isInitialized = true;
+    return this.config;
+  }
+  getConfigFilePath() {
+    return join3(app.getPath("userData"), "jasper-config.json");
+  }
+  loadPersistedConfig() {
+    this.loadEnvDefaults();
+    try {
+      const cfgPath = this.getConfigFilePath();
+      if (fs3.existsSync(cfgPath)) {
+        const data = JSON.parse(fs3.readFileSync(cfgPath, "utf-8"));
+        if (data.apiKey) this.config.apiKey = decryptSecret(data.apiKey);
+        if (data.voiceName) this.config.voiceName = data.voiceName;
+        if (data.model) this.config.model = data.model;
+        if (data.enableSystemTools !== void 0) this.config.enableSystemTools = data.enableSystemTools;
+        if (data.enableMediaTools !== void 0) this.config.enableMediaTools = data.enableMediaTools;
+        if (data.agentName) this.config.agentName = data.agentName;
+        if (data.enableWakeWord !== void 0) this.config.enableWakeWord = data.enableWakeWord;
+        if (data.enableBloom !== void 0) this.config.enableBloom = data.enableBloom;
+        if (data.enableNeuralBg !== void 0) this.config.enableNeuralBg = data.enableNeuralBg;
+        if (data.enableEyeTracking !== void 0) this.config.enableEyeTracking = data.enableEyeTracking;
+        if (data.enableScreenAwareness !== void 0) this.config.enableScreenAwareness = data.enableScreenAwareness;
+        if (data.enableWindowTracker !== void 0) this.config.enableWindowTracker = data.enableWindowTracker;
+        if (data.enableClipboardWatcher !== void 0) this.config.enableClipboardWatcher = data.enableClipboardWatcher;
+        if (data.enableCronEngine !== void 0) this.config.enableCronEngine = data.enableCronEngine;
+        if (data.enableDailyBriefing !== void 0) this.config.enableDailyBriefing = data.enableDailyBriefing;
+        if (data.enableSystemHealth !== void 0) this.config.enableSystemHealth = data.enableSystemHealth;
+        if (data.enableSemanticMemory !== void 0) this.config.enableSemanticMemory = data.enableSemanticMemory;
+        if (data.enableKnowledgeGraph !== void 0) this.config.enableKnowledgeGraph = data.enableKnowledgeGraph;
+        if (data.enableCodeInterpreter !== void 0) this.config.enableCodeInterpreter = data.enableCodeInterpreter;
+        if (data.enableHeadlessBrowser !== void 0) this.config.enableHeadlessBrowser = data.enableHeadlessBrowser;
+        if (data.enableGitWatcher !== void 0) this.config.enableGitWatcher = data.enableGitWatcher;
+        if (data.enableFolderOrganizer !== void 0) this.config.enableFolderOrganizer = data.enableFolderOrganizer;
+        if (data.enableSubagents !== void 0) this.config.enableSubagents = data.enableSubagents;
+        if (data.enableReflexionLoop !== void 0) this.config.enableReflexionLoop = data.enableReflexionLoop;
+        if (data.enableCalendarEmail !== void 0) this.config.enableCalendarEmail = data.enableCalendarEmail;
+        if (data.enableWebhooks !== void 0) this.config.enableWebhooks = data.enableWebhooks;
+        if (data.enableSmartHome !== void 0) this.config.enableSmartHome = data.enableSmartHome;
+        if (data.hassUrl !== void 0) this.config.hassUrl = data.hassUrl;
+        if (data.hassToken !== void 0) this.config.hassToken = decryptSecret(data.hassToken);
+        if (data.gitRepoPath !== void 0) this.config.gitRepoPath = data.gitRepoPath;
+        if (data.webhookDefaultUrl !== void 0) this.config.webhookDefaultUrl = data.webhookDefaultUrl;
+        if (data.emailUser !== void 0) this.config.emailUser = data.emailUser;
+        if (data.emailImapHost !== void 0) this.config.emailImapHost = data.emailImapHost;
+        if (data.emailImapPort !== void 0) this.config.emailImapPort = data.emailImapPort;
+        if (data.emailPassword !== void 0) this.config.emailPassword = decryptSecret(data.emailPassword);
+        if (data.folderDefaultTarget !== void 0) this.config.folderDefaultTarget = data.folderDefaultTarget;
+        if (data.licenseKey !== void 0) this.config.licenseKey = decryptSecret(data.licenseKey);
+        if (data.licenseStatus !== void 0) this.config.licenseStatus = data.licenseStatus;
+        if (data.licenseClientName !== void 0) this.config.licenseClientName = data.licenseClientName;
+        if (data.licenseClientEmail !== void 0) this.config.licenseClientEmail = data.licenseClientEmail;
+        if (data.licenseMachineId !== void 0) this.config.licenseMachineId = data.licenseMachineId;
+        if (data.licenseActivatedAt !== void 0) this.config.licenseActivatedAt = data.licenseActivatedAt;
+        if (data.licenseLastCheckedAt !== void 0) this.config.licenseLastCheckedAt = data.licenseLastCheckedAt;
+        console.log("[ConfigStore] Loaded settings from userData/jasper-config.json");
+      }
+    } catch (err) {
+      console.warn("[ConfigStore] Error reading config from userData:", err);
+    }
+    return this.config;
+  }
+  savePersistedConfig() {
+    try {
+      const cfgPath = this.getConfigFilePath();
+      const dataToPersist = {
+        ...this.config,
+        apiKey: encryptSecret(this.config.apiKey),
+        hassToken: encryptSecret(this.config.hassToken || ""),
+        emailPassword: encryptSecret(this.config.emailPassword || ""),
+        licenseKey: encryptSecret(this.config.licenseKey || "")
+      };
+      const content = JSON.stringify(dataToPersist, null, 2);
+      atomicWriteFileSync2(cfgPath, content);
+      console.log("[ConfigStore] Saved configuration successfully to", cfgPath);
+    } catch (err) {
+      console.warn("[ConfigStore] Error saving config to userData:", err);
+    }
+  }
+  getConfig() {
+    return { ...this.config };
+  }
+  updateConfig(payload) {
+    if (payload.apiKey !== void 0) this.config.apiKey = payload.apiKey.trim();
+    if (payload.voiceName !== void 0) this.config.voiceName = payload.voiceName.trim();
+    if (payload.model !== void 0) this.config.model = payload.model.trim();
+    if (payload.enableSystemTools !== void 0) this.config.enableSystemTools = payload.enableSystemTools;
+    if (payload.enableMediaTools !== void 0) this.config.enableMediaTools = payload.enableMediaTools;
+    if (payload.agentName !== void 0) this.config.agentName = payload.agentName.trim();
+    if (payload.enableWakeWord !== void 0) this.config.enableWakeWord = payload.enableWakeWord;
+    if (payload.enableBloom !== void 0) this.config.enableBloom = payload.enableBloom;
+    if (payload.enableNeuralBg !== void 0) this.config.enableNeuralBg = payload.enableNeuralBg;
+    if (payload.enableEyeTracking !== void 0) this.config.enableEyeTracking = payload.enableEyeTracking;
+    if (payload.enableScreenAwareness !== void 0) this.config.enableScreenAwareness = payload.enableScreenAwareness;
+    if (payload.enableWindowTracker !== void 0) this.config.enableWindowTracker = payload.enableWindowTracker;
+    if (payload.enableClipboardWatcher !== void 0) this.config.enableClipboardWatcher = payload.enableClipboardWatcher;
+    if (payload.enableCronEngine !== void 0) this.config.enableCronEngine = payload.enableCronEngine;
+    if (payload.enableDailyBriefing !== void 0) this.config.enableDailyBriefing = payload.enableDailyBriefing;
+    if (payload.enableSystemHealth !== void 0) this.config.enableSystemHealth = payload.enableSystemHealth;
+    if (payload.enableSemanticMemory !== void 0) this.config.enableSemanticMemory = payload.enableSemanticMemory;
+    if (payload.enableKnowledgeGraph !== void 0) this.config.enableKnowledgeGraph = payload.enableKnowledgeGraph;
+    if (payload.enableCodeInterpreter !== void 0) this.config.enableCodeInterpreter = payload.enableCodeInterpreter;
+    if (payload.enableHeadlessBrowser !== void 0) this.config.enableHeadlessBrowser = payload.enableHeadlessBrowser;
+    if (payload.enableGitWatcher !== void 0) this.config.enableGitWatcher = payload.enableGitWatcher;
+    if (payload.enableFolderOrganizer !== void 0) this.config.enableFolderOrganizer = payload.enableFolderOrganizer;
+    if (payload.enableSubagents !== void 0) this.config.enableSubagents = payload.enableSubagents;
+    if (payload.enableReflexionLoop !== void 0) this.config.enableReflexionLoop = payload.enableReflexionLoop;
+    if (payload.enableCalendarEmail !== void 0) this.config.enableCalendarEmail = payload.enableCalendarEmail;
+    if (payload.enableWebhooks !== void 0) this.config.enableWebhooks = payload.enableWebhooks;
+    if (payload.enableSmartHome !== void 0) this.config.enableSmartHome = payload.enableSmartHome;
+    if (payload.hassUrl !== void 0) this.config.hassUrl = payload.hassUrl.trim();
+    if (payload.hassToken !== void 0) this.config.hassToken = payload.hassToken.trim();
+    if (payload.gitRepoPath !== void 0) this.config.gitRepoPath = payload.gitRepoPath.trim();
+    if (payload.webhookDefaultUrl !== void 0) this.config.webhookDefaultUrl = payload.webhookDefaultUrl.trim();
+    if (payload.emailUser !== void 0) this.config.emailUser = payload.emailUser.trim();
+    if (payload.emailImapHost !== void 0) this.config.emailImapHost = payload.emailImapHost.trim();
+    if (payload.emailImapPort !== void 0) this.config.emailImapPort = payload.emailImapPort;
+    if (payload.emailPassword !== void 0) this.config.emailPassword = payload.emailPassword.trim();
+    if (payload.folderDefaultTarget !== void 0) this.config.folderDefaultTarget = payload.folderDefaultTarget.trim();
+    if (payload.licenseKey !== void 0) this.config.licenseKey = payload.licenseKey.trim();
+    if (payload.licenseStatus !== void 0) this.config.licenseStatus = payload.licenseStatus;
+    if (payload.licenseClientName !== void 0) this.config.licenseClientName = payload.licenseClientName.trim();
+    if (payload.licenseClientEmail !== void 0) this.config.licenseClientEmail = payload.licenseClientEmail.trim();
+    if (payload.licenseMachineId !== void 0) this.config.licenseMachineId = payload.licenseMachineId.trim();
+    if (payload.licenseActivatedAt !== void 0) this.config.licenseActivatedAt = payload.licenseActivatedAt;
+    if (payload.licenseLastCheckedAt !== void 0) this.config.licenseLastCheckedAt = payload.licenseLastCheckedAt;
+    this.savePersistedConfig();
+    return this.getConfig();
+  }
+  getConfigSummary(isConnected) {
+    const hw = getHardwareInfo();
+    return {
+      apiKey: this.config.apiKey ? `${this.config.apiKey.slice(0, 6)}...${this.config.apiKey.slice(-4)}` : "",
+      hasFullKey: Boolean(this.config.apiKey && this.config.apiKey.length > 10),
+      voiceName: this.config.voiceName,
+      model: this.config.model,
+      enableSystemTools: this.config.enableSystemTools,
+      enableMediaTools: this.config.enableMediaTools,
+      agentName: this.config.agentName,
+      enableWakeWord: this.config.enableWakeWord,
+      enableBloom: this.config.enableBloom,
+      enableNeuralBg: this.config.enableNeuralBg,
+      enableEyeTracking: this.config.enableEyeTracking,
+      enableScreenAwareness: this.config.enableScreenAwareness,
+      enableWindowTracker: this.config.enableWindowTracker,
+      enableClipboardWatcher: this.config.enableClipboardWatcher,
+      enableCronEngine: this.config.enableCronEngine,
+      enableDailyBriefing: this.config.enableDailyBriefing,
+      enableSystemHealth: this.config.enableSystemHealth,
+      enableSemanticMemory: this.config.enableSemanticMemory,
+      enableKnowledgeGraph: this.config.enableKnowledgeGraph,
+      enableCodeInterpreter: this.config.enableCodeInterpreter,
+      enableHeadlessBrowser: this.config.enableHeadlessBrowser,
+      enableGitWatcher: this.config.enableGitWatcher,
+      enableFolderOrganizer: this.config.enableFolderOrganizer,
+      enableSubagents: this.config.enableSubagents,
+      enableReflexionLoop: this.config.enableReflexionLoop,
+      enableCalendarEmail: this.config.enableCalendarEmail,
+      enableWebhooks: this.config.enableWebhooks,
+      enableSmartHome: this.config.enableSmartHome,
+      // Module-specific configs
+      hassUrl: this.config.hassUrl || "http://homeassistant.local:8123",
+      hasHassToken: Boolean(this.config.hassToken && this.config.hassToken.length > 5),
+      gitRepoPath: this.config.gitRepoPath || process.cwd(),
+      webhookDefaultUrl: this.config.webhookDefaultUrl || "http://localhost:5678/webhook/jasper",
+      emailUser: this.config.emailUser || "",
+      emailImapHost: this.config.emailImapHost || "imap.gmail.com",
+      emailImapPort: this.config.emailImapPort || 993,
+      hasEmailPassword: Boolean(this.config.emailPassword && this.config.emailPassword.length > 0),
+      folderDefaultTarget: this.config.folderDefaultTarget || "downloads",
+      isConnected,
+      // License & Node-Locking
+      hasLicense: Boolean(this.config.licenseKey && this.config.licenseStatus === "active"),
+      licenseKeyMasked: this.config.licenseKey ? `${this.config.licenseKey.slice(0, 10)}...${this.config.licenseKey.slice(-4)}` : void 0,
+      licenseStatus: this.config.licenseStatus || "unlicensed",
+      licenseClientName: this.config.licenseClientName,
+      licenseMachineId: this.config.licenseMachineId,
+      hwid: hw.machineId
+    };
+  }
+};
+var configStore = new ConfigStore();
+
+// src/main/services/license-manager.ts
+var DEFAULT_FIREBASE_PROJECT = process.env.FIREBASE_PROJECT_ID || "jasper-avatar";
+var DEFAULT_FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyBkvZHEAr0Vn32I6Qcr4TW958L5nhHSx_0";
+function parseFirestoreFields(fields = {}) {
+  const result = {};
+  for (const [key, val] of Object.entries(fields)) {
+    if (!val || typeof val !== "object") continue;
+    if (val.stringValue !== void 0) result[key] = val.stringValue;
+    else if (val.integerValue !== void 0) result[key] = Number(val.integerValue);
+    else if (val.doubleValue !== void 0) result[key] = Number(val.doubleValue);
+    else if (val.booleanValue !== void 0) result[key] = val.booleanValue;
+    else if (val.nullValue !== void 0) result[key] = null;
+    else if (val.timestampValue !== void 0) result[key] = val.timestampValue;
+    else result[key] = val;
+  }
+  return result;
+}
+var LicenseManager = class {
+  projectId = DEFAULT_FIREBASE_PROJECT;
+  apiKey = DEFAULT_FIREBASE_API_KEY;
+  customBaseUrl = null;
+  setCustomBaseUrl(url) {
+    this.customBaseUrl = url;
+  }
+  setProjectId(id) {
+    this.projectId = id;
+  }
+  setApiKey(key) {
+    this.apiKey = key;
+  }
+  validateKeyFormat(key) {
+    if (!key || typeof key !== "string") return false;
+    const pattern = /^(JASPER-LT|JSPR-V1)-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
+    return pattern.test(key.trim());
+  }
+  /**
+   * Valida a licença e aplica a restrição de máquina única (Node-Locking) diretamente no Google Firestore.
+   * Não depende de Cloud Functions ou servidores intermediários.
+   */
+  async activateLicense(key) {
+    const cleanKey = key.trim().toUpperCase();
+    if (!this.validateKeyFormat(cleanKey)) {
+      return {
+        valid: false,
+        error: "INVALID_FORMAT",
+        message: "Formato de chave inv\xE1lido. Padr\xE3o esperado: JASPER-LT-XXXX-XXXX-XXXX"
+      };
+    }
+    const hw = getHardwareInfo();
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const isDevKey = cleanKey.startsWith("JASPER-LT-DEV") || cleanKey.startsWith("JASPER-LT-TEST");
+    if (isDevKey) {
+      console.log("[LicenseManager] Chave de teste detectada. Ativando em modo local offline.");
+      configStore.updateConfig({
+        licenseKey: cleanKey,
+        licenseStatus: "active",
+        licenseClientName: "Desenvolvedor (Modo Teste)",
+        licenseClientEmail: "dev@jasper.local",
+        licenseMachineId: hw.machineId,
+        licenseActivatedAt: now,
+        licenseLastCheckedAt: now
+      });
+      return {
+        valid: true,
+        status: "ACTIVATED",
+        message: "Chave de desenvolvimento ativada com sucesso nesta m\xE1quina!",
+        client: {
+          name: "Desenvolvedor (Modo Teste)",
+          email: "dev@jasper.local"
+        },
+        machineId: hw.machineId,
+        activatedAt: now
+      };
+    }
+    const baseUrl = this.customBaseUrl || `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents/licenses`;
+    const docUrl = `${baseUrl}/${cleanKey}?key=${this.apiKey}`;
+    try {
+      const getRes = await fetch(docUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8e3)
+      });
+      if (getRes.status === 404) {
+        return {
+          valid: false,
+          error: "LICENSE_NOT_FOUND",
+          message: "Chave de licen\xE7a inexistente ou incorreta."
+        };
+      }
+      if (getRes.status === 403) {
+        return {
+          valid: false,
+          error: "PERMISSION_DENIED",
+          message: "Acesso negado pelas regras de seguran\xE7a da licen\xE7a."
+        };
+      }
+      if (!getRes.ok) {
+        return {
+          valid: false,
+          error: "SERVER_ERROR",
+          message: `Falha ao consultar banco de dados (HTTP ${getRes.status}).`
+        };
+      }
+      const docData = await getRes.json();
+      const fields = parseFirestoreFields(docData.fields);
+      const status = fields.status || "active";
+      const clientName = fields.name || "Cliente Autorizado";
+      const clientEmail = fields.email || "";
+      const boundHwid = fields.machineId || null;
+      const boundMachineName = fields.machineName || null;
+      if (status === "disabled") {
+        configStore.updateConfig({ licenseStatus: "disabled" });
+        return {
+          valid: false,
+          error: "LICENSE_DISABLED",
+          message: "Esta licen\xE7a foi temporariamente suspensa pelo administrador."
+        };
+      }
+      if (status === "revoked") {
+        configStore.updateConfig({ licenseStatus: "unlicensed" });
+        return {
+          valid: false,
+          error: "LICENSE_REVOKED",
+          message: "Esta licen\xE7a foi permanentemente revogada."
+        };
+      }
+      if (!boundHwid) {
+        const patchUrl = `${baseUrl}/${cleanKey}?updateMask.fieldPaths=machineId&updateMask.fieldPaths=machineName&updateMask.fieldPaths=activatedAt&updateMask.fieldPaths=lastSeenAt&updateMask.fieldPaths=lastClientVersion&key=${this.apiKey}`;
+        const patchBody = {
+          fields: {
+            machineId: { stringValue: hw.machineId },
+            machineName: { stringValue: hw.machineName || "Computador Pessoal" },
+            activatedAt: { stringValue: now },
+            lastSeenAt: { stringValue: now },
+            lastClientVersion: { stringValue: "1.0.0" }
+          }
+        };
+        const patchRes = await fetch(patchUrl, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchBody),
+          signal: AbortSignal.timeout(8e3)
+        });
+        if (!patchRes.ok) {
+          const errData = await patchRes.json().catch(() => ({}));
+          console.warn("[LicenseManager] Falha ao vincular HWID no Firestore:", patchRes.status, errData);
+          return {
+            valid: false,
+            error: "ACTIVATION_FAILED",
+            message: "N\xE3o foi poss\xEDvel vincular o hardware da m\xE1quina ao registro da licen\xE7a."
+          };
+        }
+        configStore.updateConfig({
+          licenseKey: cleanKey,
+          licenseStatus: "active",
+          licenseClientName: clientName,
+          licenseClientEmail: clientEmail,
+          licenseMachineId: hw.machineId,
+          licenseActivatedAt: now,
+          licenseLastCheckedAt: now
+        });
+        console.log(`[LicenseManager] Licen\xE7a vinculada e ativada com sucesso nesta m\xE1quina para ${clientName}!`);
+        return {
+          valid: true,
+          status: "ACTIVATED",
+          message: `Licen\xE7a vinculada e ativada com sucesso nesta m\xE1quina (${hw.machineName})!`,
+          client: { name: clientName, email: clientEmail },
+          machineId: hw.machineId,
+          activatedAt: now
+        };
+      }
+      if (boundHwid === hw.machineId) {
+        const heartbeatUrl = `${baseUrl}/${cleanKey}?updateMask.fieldPaths=lastSeenAt&updateMask.fieldPaths=machineName&updateMask.fieldPaths=lastClientVersion&key=${this.apiKey}`;
+        const heartbeatBody = {
+          fields: {
+            lastSeenAt: { stringValue: now },
+            machineName: { stringValue: hw.machineName || boundMachineName || "Computador Pessoal" },
+            lastClientVersion: { stringValue: "1.0.0" }
+          }
+        };
+        fetch(heartbeatUrl, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(heartbeatBody),
+          signal: AbortSignal.timeout(8e3)
+        }).catch((err) => console.warn("[LicenseManager] Falha ao registrar heartbeat:", err.message));
+        configStore.updateConfig({
+          licenseKey: cleanKey,
+          licenseStatus: "active",
+          licenseClientName: clientName,
+          licenseClientEmail: clientEmail,
+          licenseMachineId: hw.machineId,
+          licenseActivatedAt: fields.activatedAt || now,
+          licenseLastCheckedAt: now
+        });
+        console.log(`[LicenseManager] Licen\xE7a ativa e autorizada nesta m\xE1quina (${clientName}).`);
+        return {
+          valid: true,
+          status: "ACTIVE",
+          message: "Licen\xE7a ativa e autorizada nesta m\xE1quina.",
+          client: { name: clientName, email: clientEmail },
+          machineId: hw.machineId,
+          lastSeenAt: now
+        };
+      }
+      configStore.updateConfig({ licenseStatus: "disabled" });
+      console.warn(`[LicenseManager] [NODE-LOCKING] Tentativa de uso em m\xE1quina diferente. Vinculada a "${boundMachineName}".`);
+      return {
+        valid: false,
+        error: "MACHINE_MISMATCH",
+        message: `Esta licen\xE7a \xE9 exclusiva e j\xE1 est\xE1 vinculada a outro computador ("${boundMachineName || "Dispositivo Anterior"}"). Para transferir o acesso, solicite a libera\xE7\xE3o ao administrador.`
+      };
+    } catch (err) {
+      console.warn("[LicenseManager] Erro de comunica\xE7\xE3o com o Firestore:", err.message);
+      return {
+        valid: false,
+        error: "NETWORK_ERROR",
+        message: "N\xE3o foi poss\xEDvel comunicar com o banco de dados do Jasper. Verifique sua conex\xE3o com a internet."
+      };
+    }
+  }
+  /**
+   * Verifica a licença atualmente salva no computador (Boot ou Check Periódico)
+   */
+  async verifyCurrentLicense() {
+    const cfg = configStore.getConfig();
+    const hw = getHardwareInfo();
+    if (!cfg.licenseKey) {
+      return {
+        valid: false,
+        error: "NO_LICENSE",
+        message: "Nenhuma chave de licen\xE7a ativa configurada nesta esta\xE7\xE3o."
+      };
+    }
+    if (cfg.licenseMachineId && cfg.licenseMachineId !== hw.machineId) {
+      configStore.updateConfig({ licenseStatus: "disabled" });
+      return {
+        valid: false,
+        error: "MACHINE_MISMATCH",
+        message: "O hardware atual n\xE3o corresponde \xE0 m\xE1quina originalmente vinculada a esta licen\xE7a."
+      };
+    }
+    const result = await this.activateLicense(cfg.licenseKey);
+    if (!result.valid && (result.error === "NETWORK_ERROR" || result.error === "SERVER_ERROR")) {
+      if (cfg.licenseStatus === "active" && cfg.licenseLastCheckedAt) {
+        const diffMs = Date.now() - new Date(cfg.licenseLastCheckedAt).getTime();
+        const diffDays = diffMs / (1e3 * 60 * 60 * 24);
+        if (diffDays <= 7) {
+          console.log("[LicenseManager] Modo offline autorizado baseado no check-in recente.");
+          return {
+            valid: true,
+            status: "ACTIVE",
+            message: "Licen\xE7a v\xE1lida em modo offline."
+          };
+        }
+      }
+    }
+    return result;
+  }
+  /**
+   * Retorna resumo público da licença para a UI
+   */
+  getLicenseInfo() {
+    const cfg = configStore.getConfig();
+    const hw = getHardwareInfo();
+    const isLicensed = Boolean(cfg.licenseKey && cfg.licenseStatus === "active");
+    const keyMasked = cfg.licenseKey ? `${cfg.licenseKey.slice(0, 10)}...${cfg.licenseKey.slice(-4)}` : void 0;
+    return {
+      isLicensed,
+      status: cfg.licenseStatus || "unlicensed",
+      keyMasked,
+      clientName: cfg.licenseClientName,
+      clientEmail: cfg.licenseClientEmail,
+      machineId: cfg.licenseMachineId,
+      currentHwid: hw.machineId,
+      activatedAt: cfg.licenseActivatedAt,
+      lastSeenAt: cfg.licenseLastCheckedAt
+    };
+  }
+};
+var licenseManager = new LicenseManager();
+
+// test/security-hardening.test.ts
 describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais", () => {
   describe("WebhookManager & SSRF / DNS Rebinding (M\xF3dulo Real)", () => {
     test("isPrivateOrLoopbackHost bloqueia loopback e metadados de nuvem", () => {
@@ -1216,7 +1879,7 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
   });
   describe("WakeWordManager & Chamada de Agente Exclusiva via TensorFlow", () => {
     test("c\xF3digo fonte de wake-word-manager e speech-commands n\xE3o possui refer\xEAncias a Web Speech API", () => {
-      const wakeWordManagerSrc = fs3.readFileSync(
+      const wakeWordManagerSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/audio/wake-word-manager.ts"),
         "utf-8"
       );
@@ -1227,7 +1890,7 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       assert.ok(wakeWordManagerSrc.includes("mode: isCalibrated ? 'tensorflow' : 'disabled'"));
       assert.ok(wakeWordManagerSrc.includes("syncRunningState"));
       assert.ok(wakeWordManagerSrc.includes("[TensorFlow]"));
-      const speechCommandsSrc = fs3.readFileSync(
+      const speechCommandsSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/audio/speech-commands.ts"),
         "utf-8"
       );
@@ -1236,7 +1899,7 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       assert.ok(speechCommandsSrc.includes("tr.model.dispose()"));
     });
     test("speech-commands implementa modelo neural de 3 classes com amostras negativas e threshold de 0.85", () => {
-      const speechCommandsSrc = fs3.readFileSync(
+      const speechCommandsSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/audio/speech-commands.ts"),
         "utf-8"
       );
@@ -1249,11 +1912,11 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       assert.ok(speechCommandsSrc.includes("labels.includes('_other_')"));
     });
     test("wake-trainer-ui e index.html exigem calibra\xE7\xE3o de 3 classes (nome, sil\xEAncio e outras palavras)", () => {
-      const trainerUiSrc = fs3.readFileSync(
+      const trainerUiSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/ui/wake-trainer-ui.ts"),
         "utf-8"
       );
-      const indexHtmlSrc = fs3.readFileSync(
+      const indexHtmlSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/index.html"),
         "utf-8"
       );
@@ -1268,7 +1931,7 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
   });
   describe("Modo Chamada Cont\xEDnuo & Zero-Latency Audio Pipeline", () => {
     test("MicRecorder possui suporte nativo a Modo Chamada Full-Duplex e timeout de 30s", () => {
-      const micRecorderSrc = fs3.readFileSync(
+      const micRecorderSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/audio/mic-recorder.ts"),
         "utf-8"
       );
@@ -1281,7 +1944,7 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       assert.ok(micRecorderSrc.includes("Full-Duplex"));
     });
     test("main.ts implementa Modo Chamada Full-Duplex, sauda\xE7\xE3o proativa e barge-in", () => {
-      const mainSrc = fs3.readFileSync(
+      const mainSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/main.ts"),
         "utf-8"
       );
@@ -1293,7 +1956,7 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       assert.ok(mainSrc.includes("micRecorder.onCallInactivityTimeout = () => {"));
     });
     test("AudioPlayer gerencia fontes de \xE1udio com desconex\xE3o imediata e callback de t\xE9rmino", () => {
-      const audioPlayerSrc = fs3.readFileSync(
+      const audioPlayerSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/renderer/audio/audio-player.ts"),
         "utf-8"
       );
@@ -1302,11 +1965,129 @@ describe("Su\xEDte de Testes de Integra\xE7\xE3o com Classes e M\xF3dulos Reais"
       assert.ok(audioPlayerSrc.includes("this.onPlaybackEnded?.()"));
     });
     test("Gemini Live client utiliza o modelo oficial gemini-3.1-flash-live-preview", () => {
-      const liveClientSrc = fs3.readFileSync(
+      const liveClientSrc = fs4.readFileSync(
         path2.join(process.cwd(), "src/main/gemini-live.ts"),
         "utf-8"
       );
       assert.ok(liveClientSrc.includes("gemini-3.1-flash-live-preview"));
+    });
+  });
+  describe("Sistema de Licenciamento Criptogr\xE1fico & Node-Locking (M\xF3dulo Real)", () => {
+    test("getHardwareInfo gera identificador \xFAnico est\xE1vel no formato HWID-XXXX-XXXX-XXXX", () => {
+      const hw1 = getHardwareInfo();
+      assert.ok(hw1.machineId);
+      assert.match(hw1.machineId, /^HWID-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/);
+      assert.ok(hw1.machineName.length > 0);
+      assert.ok(hw1.platform.length > 0);
+      const hw2 = getHardwareInfo();
+      assert.equal(hw1.machineId, hw2.machineId);
+    });
+    test("LicenseManager valida formato de chaves JASPER-LT e legado JSPR-V1", () => {
+      assert.equal(licenseManager.validateKeyFormat("JASPER-LT-ZJV8-DVLK-942B"), true);
+      assert.equal(licenseManager.validateKeyFormat("JSPR-V1-ABCD-1234-EF56"), true);
+      assert.equal(licenseManager.validateKeyFormat("jasper-lt-1234-5678-90ab"), true);
+      assert.equal(licenseManager.validateKeyFormat("JASPER-LT-INVALID-KEY"), false);
+      assert.equal(licenseManager.validateKeyFormat(""), false);
+      assert.equal(licenseManager.validateKeyFormat(null), false);
+    });
+    test("LicenseManager realiza handshake com Firestore REST e processa ativa\xE7\xE3o, heartbeat e Node-Locking", async () => {
+      let mockGetResponse = {
+        name: "projects/jasper-avatar/databases/(default)/documents/licenses/JASPER-LT-ABCD-1234-EF56",
+        fields: {
+          key: { stringValue: "JASPER-LT-ABCD-1234-EF56" },
+          name: { stringValue: "Empresa Teste Ltda" },
+          email: { stringValue: "contato@empresa.com" },
+          status: { stringValue: "active" },
+          machineId: { nullValue: null }
+        }
+      };
+      let mockGetStatus = 200;
+      let mockPatchStatus = 200;
+      const server = http.createServer((req, res) => {
+        if (req.method === "GET") {
+          res.writeHead(mockGetStatus, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(mockGetResponse));
+          return;
+        }
+        if (req.method === "PATCH") {
+          let raw = "";
+          req.on("data", (chunk) => {
+            raw += chunk;
+          });
+          req.on("end", () => {
+            res.writeHead(mockPatchStatus, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ name: "updated-doc" }));
+          });
+          return;
+        }
+      });
+      await new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+      const address = server.address();
+      const testBaseUrl = `http://127.0.0.1:${address.port}/licenses`;
+      const manager = new LicenseManager();
+      manager.setCustomBaseUrl(testBaseUrl);
+      try {
+        const resA = await manager.activateLicense("JASPER-LT-ABCD-1234-EF56");
+        assert.equal(resA.valid, true);
+        assert.equal(resA.status, "ACTIVATED");
+        assert.equal(configStore.getConfig().licenseStatus, "active");
+        assert.equal(configStore.getConfig().licenseClientName, "Empresa Teste Ltda");
+        const info = manager.getLicenseInfo();
+        assert.equal(info.isLicensed, true);
+        assert.equal(info.clientName, "Empresa Teste Ltda");
+        assert.ok(info.keyMasked?.startsWith("JASPER-LT-"));
+        const hw = getHardwareInfo();
+        mockGetResponse.fields.machineId = { stringValue: hw.machineId };
+        mockGetResponse.fields.machineName = { stringValue: hw.machineName };
+        const resSame = await manager.activateLicense("JASPER-LT-ABCD-1234-EF56");
+        assert.equal(resSame.valid, true);
+        assert.equal(resSame.status, "ACTIVE");
+        mockGetResponse.fields.machineId = { stringValue: "HWID-OUTRO-COMPUTADOR-9999" };
+        mockGetResponse.fields.machineName = { stringValue: "PC-DO-CLIENTE-ANTERIOR" };
+        const resMismatch = await manager.activateLicense("JASPER-LT-ABCD-1234-EF56");
+        assert.equal(resMismatch.valid, false);
+        assert.equal(resMismatch.error, "MACHINE_MISMATCH");
+        assert.equal(configStore.getConfig().licenseStatus, "disabled");
+        mockGetResponse.fields.status = { stringValue: "disabled" };
+        const resDisabled = await manager.activateLicense("JASPER-LT-ABCD-1234-EF56");
+        assert.equal(resDisabled.valid, false);
+        assert.equal(resDisabled.error, "LICENSE_DISABLED");
+        mockGetResponse.fields.status = { stringValue: "revoked" };
+        const resRevoked = await manager.activateLicense("JASPER-LT-ABCD-1234-EF56");
+        assert.equal(resRevoked.valid, false);
+        assert.equal(resRevoked.error, "LICENSE_REVOKED");
+        mockGetStatus = 404;
+        mockGetResponse = { error: { code: 404, status: "NOT_FOUND" } };
+        const resNotFound = await manager.activateLicense("JASPER-LT-ABCD-1234-EF56");
+        assert.equal(resNotFound.valid, false);
+        assert.equal(resNotFound.error, "LICENSE_NOT_FOUND");
+      } finally {
+        server.close();
+      }
+    });
+    test("LicenseManager ativa chaves de desenvolvimento (JASPER-LT-DEV*) em modo local offline", async () => {
+      const manager = new LicenseManager();
+      manager.setCustomBaseUrl("http://127.0.0.1:59999/non-existent");
+      const devResult = await manager.activateLicense("JASPER-LT-DEV0-0000-0001");
+      assert.equal(devResult.valid, true);
+      assert.equal(devResult.status, "ACTIVATED");
+      assert.equal(devResult.client?.name, "Desenvolvedor (Modo Teste)");
+      assert.equal(configStore.getConfig().licenseStatus, "active");
+    });
+    test("UI e arquivos fonte cont\xEAm elementos e prote\xE7\xF5es de licenciamento obrigat\xF3rias", () => {
+      const htmlSrc = fs4.readFileSync(path2.join(process.cwd(), "src/renderer/index.html"), "utf-8");
+      assert.ok(htmlSrc.includes('id="modal-license-activation"'));
+      assert.ok(htmlSrc.includes('id="tab-license"'));
+      assert.ok(htmlSrc.includes('id="input-license-key"'));
+      assert.ok(htmlSrc.includes('id="tab-btn-activate-key"'));
+      const ipcSrc = fs4.readFileSync(path2.join(process.cwd(), "src/main/ipc/register-ipc.ts"), "utf-8");
+      assert.ok(ipcSrc.includes("cfg.licenseStatus !== 'active'"));
+      assert.ok(ipcSrc.includes("LICENSE_GET_STATUS"));
+      assert.ok(ipcSrc.includes("LICENSE_ACTIVATE"));
+      assert.ok(ipcSrc.includes("LICENSE_GET_HWID"));
+      const mainSrc = fs4.readFileSync(path2.join(process.cwd(), "src/renderer/main.ts"), "utf-8");
+      assert.ok(mainSrc.includes("licenseModal.checkOnStartup()"));
+      assert.ok(mainSrc.includes("!lic.isLicensed"));
     });
   });
 });

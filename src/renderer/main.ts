@@ -15,6 +15,7 @@ import { SettingsModal } from './ui/settings-modal'
 import { NeuralBackground } from './scene/neural-background'
 import { showHudToast } from './ui/toast'
 import { initModuleInfoModal } from './ui/module-info-modal'
+import { licenseModal } from './ui/license-modal'
 
 // Audio & 3D Core instances
 const audioPlayer = new AudioPlayer()
@@ -38,6 +39,13 @@ let wakeWordManager: WakeWordManager
 
 async function enterCallMode(withGreeting = true): Promise<void> {
   if (isCallMode) return
+
+  const lic = await window.electronAPI.getLicenseStatus()
+  if (!lic.isLicensed) {
+    showHudToast('Licença Obrigatória', 'Ative sua licença vitalícia para desbloquear os recursos de voz do Jasper.', 'error', 5000)
+    licenseModal.show(true)
+    return
+  }
 
   isCallMode = true
   shouldEndCallAfterPlayback = false
@@ -188,6 +196,8 @@ async function init(): Promise<void> {
   })
 
   initModuleInfoModal()
+  licenseModal.init()
+  const licenseInfo = await licenseModal.checkOnStartup()
 
   // Window Controls & Fullscreen
   const updateFullscreenUI = (isFs: boolean): void => {
@@ -250,7 +260,9 @@ async function init(): Promise<void> {
   avatar?.setEyeTrackingEnabled(initialConfig.enableEyeTracking !== false)
   isConnected = initialConfig.isConnected
 
-  if (!initialConfig.hasFullKey) {
+  if (!licenseInfo.isLicensed) {
+    updateStatusBadge('error', 'Licença Pendente')
+  } else if (!initialConfig.hasFullKey) {
     updateStatusBadge('disconnected', 'Configure a API Key')
   }
 

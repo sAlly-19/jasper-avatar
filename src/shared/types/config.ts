@@ -37,6 +37,14 @@ export interface JasperConfig {
   emailImapPort?: number
   emailPassword?: string
   folderDefaultTarget?: string
+  // License & Node-Locking
+  licenseKey?: string
+  licenseStatus?: 'active' | 'disabled' | 'revoked' | 'unlicensed'
+  licenseClientName?: string
+  licenseClientEmail?: string
+  licenseMachineId?: string
+  licenseActivatedAt?: string
+  licenseLastCheckedAt?: string
 }
 
 export interface UpdateConfigPayload {
@@ -78,6 +86,14 @@ export interface UpdateConfigPayload {
   emailImapPort?: number
   emailPassword?: string
   folderDefaultTarget?: string
+  // License & Node-Locking
+  licenseKey?: string
+  licenseStatus?: 'active' | 'disabled' | 'revoked' | 'unlicensed'
+  licenseClientName?: string
+  licenseClientEmail?: string
+  licenseMachineId?: string
+  licenseActivatedAt?: string
+  licenseLastCheckedAt?: string
 }
 
 export interface ConfigSummary {
@@ -121,5 +137,40 @@ export interface ConfigSummary {
   hasEmailPassword?: boolean
   folderDefaultTarget?: string
   isConnected: boolean
+  // License & Node-Locking
+  hasLicense: boolean
+  licenseKeyMasked?: string
+  licenseStatus: 'active' | 'disabled' | 'revoked' | 'unlicensed'
+  licenseClientName?: string
+  licenseMachineId?: string
+  hwid: string
 }
+
+export interface LicenseValidationResult {
+  valid: boolean
+  status?: 'ACTIVATED' | 'ACTIVE' | 'DISABLED' | 'REVOKED'
+  error?: string
+  message: string
+  client?: {
+    name: string
+    email: string
+  }
+  machineId?: string
+  activatedAt?: string
+  lastSeenAt?: string
+}
+
+export interface LicenseInfo {
+  isLicensed: boolean
+  status: 'active' | 'disabled' | 'revoked' | 'unlicensed'
+  keyMasked?: string
+  clientName?: string
+  clientEmail?: string
+  machineId?: string
+  currentHwid: string
+  activatedAt?: string
+  lastSeenAt?: string
+  error?: string
+}
+
 

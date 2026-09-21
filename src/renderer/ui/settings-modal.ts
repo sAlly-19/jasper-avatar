@@ -2,6 +2,8 @@ import { DOM } from './dom'
 import { AvatarController, MoodType } from '../scene/avatar'
 import { WakeTrainerUI } from './wake-trainer-ui'
 import { SVG_ICONS } from './icons'
+import { showHudToast } from './toast'
+import { updateStatusBadge } from './status-badge'
 
 export interface SettingsModalOptions {
   getAgentName: () => string
@@ -42,6 +44,52 @@ export class SettingsModal {
         .join('')
     } catch {
       memoryFactsList.innerHTML = '<span class="memory-empty">Erro ao carregar memórias.</span>'
+    }
+  }
+
+  public async refreshLicenseUI(): Promise<void> {
+    const {
+      tabLicenseHwid,
+      tabLicenseBadgeStatus,
+      tabLicenseClientName,
+      tabLicenseActivatedAt,
+      tabLicenseKey,
+      tabLicenseFeedback
+    } = DOM
+
+    try {
+      const info = await window.electronAPI.getLicenseStatus()
+      if (tabLicenseHwid) {
+        tabLicenseHwid.textContent = info.currentHwid || 'N/A'
+      }
+      if (tabLicenseClientName) {
+        tabLicenseClientName.textContent = info.clientName || 'Não Registrado'
+      }
+      if (tabLicenseActivatedAt) {
+        tabLicenseActivatedAt.textContent = info.activatedAt
+          ? new Date(info.activatedAt).toLocaleString()
+          : '-'
+      }
+      if (tabLicenseBadgeStatus) {
+        tabLicenseBadgeStatus.className = `license-status-badge ${info.status || 'unlicensed'}`
+        if (info.isLicensed) {
+          tabLicenseBadgeStatus.textContent = 'VITALÍCIA ATIVA'
+        } else if (info.status === 'disabled') {
+          tabLicenseBadgeStatus.textContent = 'NODE BLOQUEADO'
+        } else if (info.status === 'revoked') {
+          tabLicenseBadgeStatus.textContent = 'REVOGADA'
+        } else {
+          tabLicenseBadgeStatus.textContent = 'NÃO ATIVADO'
+        }
+      }
+      if (tabLicenseKey && info.keyMasked) {
+        tabLicenseKey.placeholder = `Chave atual: ${info.keyMasked}`
+      }
+      if (tabLicenseFeedback) {
+        tabLicenseFeedback.style.display = 'none'
+      }
+    } catch (err) {
+      console.warn('[SettingsModal] Erro ao carregar status da licença:', err)
     }
   }
 
@@ -268,6 +316,9 @@ export class SettingsModal {
       // Refresh memory items
       await this.refreshMemoryUI()
 
+      // Refresh license status
+      await this.refreshLicenseUI()
+
       // Reset to first tab on open
       document.querySelectorAll('.settings-tab-btn').forEach((b, idx) => b.classList.toggle('active', idx === 0))
       document.querySelectorAll('.settings-tab-pane').forEach((p, idx) => p.classList.toggle('active', idx === 0))
@@ -282,6 +333,63 @@ export class SettingsModal {
 
     btnCancelSettings?.addEventListener('click', () => {
       settingsModal.classList.add('hidden')
+    })
+
+    // License Tab event listeners
+    DOM.tabBtnCopyHwid?.addEventListener('click', () => {
+      const hwid = DOM.tabLicenseHwid?.textContent
+      if (hwid && hwid !== 'HWID-CALCULANDO...') {
+        navigator.clipboard.writeText(hwid)
+        showHudToast('Hardware ID', 'Hardware ID copiado com sucesso!', 'info', 3000)
+      }
+    })
+
+    DOM.tabLicenseKey?.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement
+      target.value = target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '')
+    })
+
+    DOM.tabBtnActivateKey?.addEventListener('click', async () => {
+      const key = DOM.tabLicenseKey?.value.trim().toUpperCase()
+      if (!key) {
+        if (DOM.tabLicenseFeedback) {
+          DOM.tabLicenseFeedback.textContent = 'Informe sua chave de licença vitalícia.'
+          DOM.tabLicenseFeedback.className = 'license-feedback error'
+          DOM.tabLicenseFeedback.style.display = 'block'
+        }
+        return
+      }
+
+      if (DOM.tabBtnActivateKey) {
+        DOM.tabBtnActivateKey.disabled = true
+        DOM.tabBtnActivateKey.textContent = 'VALIDANDO...'
+      }
+
+      try {
+        const res = await window.electronAPI.activateLicense(key)
+        if (DOM.tabLicenseFeedback) {
+          DOM.tabLicenseFeedback.textContent = res.message || (res.valid ? 'Licença ativada com sucesso!' : 'Erro na ativação.')
+          DOM.tabLicenseFeedback.className = `license-feedback ${res.valid ? 'success' : 'error'}`
+          DOM.tabLicenseFeedback.style.display = 'block'
+        }
+
+        if (res.valid) {
+          showHudToast('Licença Ativada', 'Estação Jasper Desbloqueada com Sucesso!', 'info', 5000)
+          updateStatusBadge('online', 'Jasper Pronto')
+          await this.refreshLicenseUI()
+        }
+      } catch (err: any) {
+        if (DOM.tabLicenseFeedback) {
+          DOM.tabLicenseFeedback.textContent = 'Erro ao conectar ao servidor de autenticação.'
+          DOM.tabLicenseFeedback.className = 'license-feedback error'
+          DOM.tabLicenseFeedback.style.display = 'block'
+        }
+      } finally {
+        if (DOM.tabBtnActivateKey) {
+          DOM.tabBtnActivateKey.disabled = false
+          DOM.tabBtnActivateKey.textContent = 'Ativar Chave'
+        }
+      }
     })
 
     btnToggleKey.addEventListener('click', () => {

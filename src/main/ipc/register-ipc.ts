@@ -12,6 +12,8 @@ import {
   closeWindow,
   safeSend
 } from '../windows/main-window'
+import { licenseManager } from '../services/license-manager'
+import { getHardwareInfo } from '../services/hwid'
 import {
   autonomyCoordinator,
   systemHealth,
@@ -55,6 +57,13 @@ export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | nu
         configStore.updateConfig(payload)
       }
       const cfg = configStore.getConfig()
+      if (cfg.licenseStatus !== 'active') {
+        return {
+          success: false,
+          error: 'Esta estação Jasper requer uma chave de licença vitalícia ativa.'
+        }
+      }
+
       const client = getGeminiClient()
 
       try {
@@ -251,5 +260,18 @@ export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | nu
       return result.filePaths[0]
     }
     return null
+  })
+
+  // License & Node-Locking Handlers
+  ipcMain.handle(IPC_CHANNELS.LICENSE_GET_STATUS, () => {
+    return licenseManager.getLicenseInfo()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.LICENSE_ACTIVATE, async (_event, key: string) => {
+    return licenseManager.activateLicense(key)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.LICENSE_GET_HWID, () => {
+    return getHardwareInfo()
   })
 }
