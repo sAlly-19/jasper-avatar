@@ -294,6 +294,141 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
     ],
     requirements: 'Navegador web padrão e Spotify Desktop (opcional; caso não tenha Spotify, abre no YouTube).',
     badgeText: 'Spotify & YouTube • Google Search'
+  },
+
+  'process-manager': {
+    icon: SVG_ICONS.terminal,
+    title: '18. Gerenciador de Processos & Programas',
+    category: 'Automação Operacional do Windows',
+    overview: 'Localiza instantaneamente programas instalados, abre qualquer aplicativo e encerra processos pesados ou travados via comandos de voz.',
+    howItWorks: 'Realiza buscas ultrarrápidas no registro do Windows (App Paths), Menu Iniciar e Everything CLI (Voidtools). Executa aplicativos de forma universal via shell:AppsFolder ou Win32 e encerra tarefas com taskkill /F, protegendo processos críticos do sistema contra encerramento acidental.',
+    examples: [
+      '"Jasper, pesquise se o Office ou Photoshop estão instalados."',
+      '"Abra a calculadora ou o Discord."',
+      '"Feche o Notepad e liste os processos consumindo mais memória."'
+    ],
+    requirements: 'PowerShell nativo do Windows e Everything CLI (opcional para indexação em milissegundos).',
+    badgeText: 'Busca Instantânea • Encerramento Seguro'
+  },
+
+  'ui-automation': {
+    icon: SVG_ICONS.window,
+    title: '19. Automação de Interface Windows (UIA)',
+    category: 'Automação de UI Nativa',
+    overview: 'Permite ao assistente interagir com botões, campos de texto e formulários de janelas abertas no Windows sem precisar de RPA pago ou cliques às cegas por coordenadas.',
+    howItWorks: 'Utiliza a biblioteca nativa System.Windows.Automation da Microsoft para inspecionar a árvore de acessibilidade da janela ativa, identificando botões (InvokePattern) e campos de texto (ValuePattern) por nome e ID.',
+    examples: [
+      '"Jasper, quais botões estão disponíveis na janela do Bloco de Notas?"',
+      '"Clique no botão Salvar da janela ativa."',
+      '"Digite \'Relatório Concluído\' no campo de texto."'
+    ],
+    requirements: 'Windows 10 ou 11 (System.Windows.Automation nativo do .NET Framework).',
+    badgeText: 'UI Automation Microsoft • Zero RPA Pago'
+  },
+
+  'media-controller': {
+    icon: SVG_ICONS.speaker,
+    title: '20. Controle de Mídia & Volume do Sistema',
+    category: 'Áudio & Multimídia Global',
+    overview: 'Ajuste fino do volume sonoro e reprodução global do computador com comandos de voz naturais.',
+    howItWorks: 'Acessa a interface de áudio do Windows e despacha eventos virtuais de teclas de mídia (Play/Pause, Próxima Faixa, Faixa Anterior, Volume Up, Volume Down e Mute) aceitos universalmente por players de música e navegadores.',
+    examples: [
+      '"Jasper, aumente o volume em 10%."',
+      '"Silencie o computador (mude para mudo)."',
+      '"Pausar a música agora."'
+    ],
+    requirements: 'Nenhum software externo. 100% nativo do Windows.',
+    badgeText: 'Controle de Volume • Teclas Globais de Mídia'
+  },
+
+  'report-generator': {
+    icon: SVG_ICONS.folder,
+    title: '21. Geração de Relatórios Executivos (PDF, Excel, Word)',
+    category: 'Produtividade & Documentos',
+    overview: 'Cria documentos oficiais e profissionais instantaneamente a partir de conversas ou análises de dados, prontos para impressão ou envio por e-mail.',
+    howItWorks: 'Renderiza PDFs vetoriais com design corporativo Jasper via webContents.printToPDF() do Chromium, gera planilhas .xlsx com cabeçalhos estilizados via exceljs e cria arquivos .docx do Word com docx, salvando na pasta de relatórios do usuário.',
+    examples: [
+      '"Jasper, gere um relatório em PDF com o resumo das tarefas de hoje."',
+      '"Crie uma planilha de despesas com as colunas Item, Categoria e Valor."',
+      '"Gere um documento Word com a proposta comercial."'
+    ],
+    requirements: 'Bibliotecas NPM gratuitas integradas (exceljs, docx e Chromium nativo).',
+    badgeText: 'PDF Vetorial • Excel .xlsx • Word .docx'
+  },
+
+  'file-summarizer': {
+    icon: SVG_ICONS.clipboard,
+    title: '22. Leitor & Resumidor de Arquivos Locais',
+    category: 'Processamento de Documentos',
+    overview: 'Permite ao Jasper ler arquivos armazenados no seu computador, extrair textos importantes e sintetizar o conteúdo em tópicos objetivos.',
+    howItWorks: 'Utiliza motores locais de extração para documentos PDF (pdf-parse), arquivos Word (mammoth) e texto puro (.txt, .md, .csv, .json, .log). Aplica filtro de higienização de segredos (redactSecrets) para garantir que chaves de API e senhas nunca vazem nas respostas.',
+    examples: [
+      '"Jasper, resuma o arquivo contrato.pdf na minha pasta de documentos."',
+      '"O que está escrito no relatório financeiro.docx?"',
+      '"Analise o log de erros app.log e me diga o que falhou."'
+    ],
+    requirements: 'Nenhum leitor externo. Suporta PDF, DOCX, TXT, MD, CSV, JSON e LOG.',
+    badgeText: 'PDF & DOCX • Mascaramento de Segredos'
+  },
+
+  'qr-service': {
+    icon: SVG_ICONS.tag,
+    title: '23. Gerador & Leitor de QR Code',
+    category: 'Conectividade Rápida',
+    overview: 'Gera códigos QR de alta resolução para compartilhar links rapidamente com o celular, conectar convidados ao Wi-Fi ou gerar cobranças PIX.',
+    howItWorks: 'Codifica textos, URLs e credenciais em matrizes bidimensionais com correção de erros avançada via qrcode, salvando arquivos de imagem PNG na pasta de relatórios e fornecendo DataURL para exibição instantânea no HUD.',
+    examples: [
+      '"Jasper, gere um QR Code para o link da nossa landing page."',
+      '"Crie um QR Code com a minha chave PIX para pagamento."',
+      '"Gere um QR Code com os dados da rede Wi-Fi do escritório."'
+    ],
+    requirements: 'Biblioteca NPM qrcode integrada.',
+    badgeText: 'PNG de Alta Resolução • PIX & Wi-Fi'
+  },
+
+  'ocr-service': {
+    icon: SVG_ICONS.eye,
+    title: '24. OCR Local de Prints & Imagens (Tesseract.js)',
+    category: 'Reconhecimento Óptico de Caracteres',
+    overview: 'Extrai textos de qualquer imagem ou print de tela diretamente no computador, sem enviar seus dados confidenciais para servidores em nuvem de terceiros.',
+    howItWorks: 'Executa a engine Tesseract.js local com redes neurais treinadas em português e inglês. Lê arquivos ou captura a tela ativa sob demanda, filtrando tokens de segurança para total privacidade.',
+    examples: [
+      '"Jasper, leia o texto que está nesta imagem na minha tela."',
+      '"Faça OCR do print da nota fiscal e me diga o valor total."',
+      '"Extraia os dados da tabela que está visível no monitor."'
+    ],
+    requirements: 'Motor Tesseract.js local com dicionários eng+por embutidos.',
+    badgeText: '100% Offline & Local • Privacidade Máxima'
+  },
+
+  'presentation-mode': {
+    icon: SVG_ICONS.display,
+    title: '25. Modo Apresentação / Silencioso Inteligente',
+    category: 'Modo Executivo & Reuniões',
+    overview: 'Garante que o Jasper não fale ou emita alertas sonoros durante webinars, reuniões no Teams/Meet ou apresentações de slides.',
+    howItWorks: 'Monitora as janelas ativas em segundo plano. Ao identificar reuniões no Google Meet, Microsoft Teams, Zoom, Webex ou slides do PowerPoint em tela cheia, silencia as respostas de voz e preserva suas apresentações sem interrupções embaraçosas.',
+    examples: [
+      '"Jasper, ative o Modo Apresentação agora."',
+      'Durante uma chamada no Zoom, o Jasper silencia automaticamente e responde apenas visualmente no HUD.',
+      '"Jasper, desative o Modo Silencioso."'
+    ],
+    requirements: 'Compatível com qualquer navegador ou aplicativo de conferência.',
+    badgeText: 'Detecção Automática • Silêncio em Reuniões'
+  },
+
+  'focus-mode': {
+    icon: SVG_ICONS.target,
+    title: '26. Modo Foco & Bloqueador de Distrações',
+    category: 'Alta Concentração & Pomodoro',
+    overview: 'Ajuda você a manter foco total em suas metas de trabalho ou estudo, monitorando o tempo e afastando distrações digitais.',
+    howItWorks: 'Inicia sessões de foco (Pomodoro de 25 a 120 minutos). Durante a sessão, se aplicativos de jogos (Steam, Epic, Riot, Battle.net) ou mensageiros de lazer forem abertos em primeiro plano, emite um lembrete gentil para você voltar ao objetivo principal.',
+    examples: [
+      '"Jasper, inicie uma sessão de foco de 45 minutos."',
+      '"Quanto tempo falta para terminar meu bloco de foco?"',
+      'Ao abrir um jogo durante o trabalho: "Atenção: Você está em modo foco. Mantenha a concentração na sua tarefa principal!"'
+    ],
+    requirements: 'Nenhum software externo. Monitoramento leve de processos locais.',
+    badgeText: 'Pomodoro Inteligente • Produtividade Extrema'
   }
 }
 

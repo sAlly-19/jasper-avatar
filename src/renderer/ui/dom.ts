@@ -49,6 +49,7 @@ export const DOM = {
   inputAgentName: document.getElementById('input-agent-name') as HTMLInputElement | null,
   inputApiKey: document.getElementById('input-api-key') as HTMLInputElement,
   btnToggleKey: document.getElementById('btn-toggle-key') as HTMLButtonElement,
+  btnRemoveKey: document.getElementById('btn-remove-key') as HTMLButtonElement | null,
   selectVoice: document.getElementById('select-voice') as HTMLSelectElement,
   selectModel: document.getElementById('select-model') as HTMLSelectElement,
   checkWakeWord: document.getElementById('check-wake-word') as HTMLInputElement | null,
@@ -76,6 +77,15 @@ export const DOM = {
   checkCalendarEmail: document.getElementById('check-calendar-email') as HTMLInputElement | null,
   checkWebhooks: document.getElementById('check-webhooks') as HTMLInputElement | null,
   checkSmartHome: document.getElementById('check-smart-home') as HTMLInputElement | null,
+  checkProcessManager: document.getElementById('check-process-manager') as HTMLInputElement | null,
+  checkUiAutomation: document.getElementById('check-ui-automation') as HTMLInputElement | null,
+  checkMediaController: document.getElementById('check-media-controller') as HTMLInputElement | null,
+  checkReportGenerator: document.getElementById('check-report-generator') as HTMLInputElement | null,
+  checkFileSummarizer: document.getElementById('check-file-summarizer') as HTMLInputElement | null,
+  checkQrService: document.getElementById('check-qr-service') as HTMLInputElement | null,
+  checkOcrService: document.getElementById('check-ocr-service') as HTMLInputElement | null,
+  checkPresentationMode: document.getElementById('check-presentation-mode') as HTMLInputElement | null,
+  checkFocusMode: document.getElementById('check-focus-mode') as HTMLInputElement | null,
 
   // Toast Container
   hudToastContainer: document.getElementById('hud-toast-container') as HTMLElement | null,

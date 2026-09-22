@@ -100,6 +100,10 @@ export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | nu
       safeSend(IPC_CHANNELS.CONFIG_AGENT_NAME_UPDATED, updated.agentName)
     }
 
+    if (payload.apiKey !== undefined && payload.apiKey.trim() === '') {
+      getGeminiClient()?.disconnect()
+    }
+
     getGeminiClient()?.updateConfig(
       updated.apiKey,
       updated.voiceName,

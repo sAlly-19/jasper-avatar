@@ -39,11 +39,15 @@ pids
 *.seed
 *.pid.lock
 
-# Test Coverage
+# Test Coverage & Bundles
 coverage/
 *.lcov
 .nyc_output/
 lib-cov/
+test/*.mjs
+test/_electron-mock.mjs
+jasper-test-userdata/
+test-userdata/
 
 # Environment Files & Secrets (NEVER commit credentials)
 .env
@@ -86,7 +90,11 @@ $RECYCLE.BIN/
 scratch/
 temp/
 tmp/
+downloads/
+Documents/Jasper_Relatorios/
+Documents/Jasper_Sessoes/
 *.tmp
+*.tmp.*
 *.temp
 *.bak
 *.orig

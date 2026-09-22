@@ -27,6 +27,15 @@ export interface JasperConfig {
   enableCalendarEmail: boolean
   enableWebhooks: boolean
   enableSmartHome: boolean
+  enableProcessManager: boolean
+  enableUiAutomation: boolean
+  enableMediaController: boolean
+  enableReportGenerator: boolean
+  enableFileSummarizer: boolean
+  enableQrService: boolean
+  enableOcrService: boolean
+  enablePresentationMode: boolean
+  enableFocusMode: boolean
   // Module specific configurations
   hassUrl?: string
   hassToken?: string
@@ -76,6 +85,15 @@ export interface UpdateConfigPayload {
   enableCalendarEmail?: boolean
   enableWebhooks?: boolean
   enableSmartHome?: boolean
+  enableProcessManager?: boolean
+  enableUiAutomation?: boolean
+  enableMediaController?: boolean
+  enableReportGenerator?: boolean
+  enableFileSummarizer?: boolean
+  enableQrService?: boolean
+  enableOcrService?: boolean
+  enablePresentationMode?: boolean
+  enableFocusMode?: boolean
   // Module specific configurations
   hassUrl?: string
   hassToken?: string
@@ -126,6 +144,15 @@ export interface ConfigSummary {
   enableCalendarEmail: boolean
   enableWebhooks: boolean
   enableSmartHome: boolean
+  enableProcessManager: boolean
+  enableUiAutomation: boolean
+  enableMediaController: boolean
+  enableReportGenerator: boolean
+  enableFileSummarizer: boolean
+  enableQrService: boolean
+  enableOcrService: boolean
+  enablePresentationMode: boolean
+  enableFocusMode: boolean
   // Module specific configurations
   hassUrl?: string
   hasHassToken?: boolean

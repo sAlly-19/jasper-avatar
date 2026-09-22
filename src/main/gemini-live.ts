@@ -3,6 +3,7 @@ import {
   SYSTEM_FUNCTION_DECLARATIONS,
   MEDIA_FUNCTION_DECLARATIONS,
   getActiveAutonomyDeclarations,
+  getActiveSystemDeclarations,
   executeSystemTool,
   executeMediaTool,
   executeAutonomyTool
@@ -54,7 +55,12 @@ export class GeminiLiveClient {
     enableMediaTools?: boolean,
     agentName?: string
   ): void {
-    if (apiKey) this.apiKey = apiKey
+    if (apiKey !== undefined) {
+      this.apiKey = apiKey
+      if (!apiKey || apiKey.trim() === '') {
+        this.disconnect()
+      }
+    }
     if (voiceName) this.voiceName = voiceName
     if (model) this.model = model
     if (enableSystemTools !== undefined) this.enableSystemTools = enableSystemTools
@@ -127,7 +133,7 @@ export class GeminiLiveClient {
         const cfg = configStore.getConfig()
         const decls: any[] = []
         if (this.enableSystemTools) {
-          decls.push(...SYSTEM_FUNCTION_DECLARATIONS)
+          decls.push(...getActiveSystemDeclarations(cfg))
         }
         if (this.enableMediaTools) {
           decls.push(...MEDIA_FUNCTION_DECLARATIONS)

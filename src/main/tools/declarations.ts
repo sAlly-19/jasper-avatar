@@ -4,13 +4,171 @@
 export const SYSTEM_FUNCTION_DECLARATIONS = [
   {
     name: 'open_app',
-    description: 'Abre um aplicativo ou programa local no computador (ex: calculadora, notepad, vscode, explorer).',
+    description: 'Abre qualquer aplicativo, programa local ou executável no computador (ex: calculadora, notepad, spotify, chrome, discord, vscode, etc).',
     parameters: {
       type: 'OBJECT',
       properties: {
-        appName: { type: 'STRING', description: 'Nome do aplicativo (ex: calc, notepad, explorer, code)' }
+        appName: { type: 'STRING', description: 'Nome do aplicativo ou programa a abrir (ex: calc, notepad, spotify, chrome, discord)' }
       },
       required: ['appName']
+    }
+  },
+  {
+    name: 'search_program',
+    description: 'Pesquisa programas instalados no computador via StartApps e Everything CLI por nome ou palavra-chave.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING', description: 'Termo ou nome do programa a buscar (ex: office, steam, player, calculadora)' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'close_program',
+    description: 'Encerra ou fecha um programa ou processo em execução no computador.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        programName: { type: 'STRING', description: 'Nome do programa ou processo a fechar (ex: notepad, chrome, spotify)' },
+        force: { type: 'BOOLEAN', description: 'Forçar o encerramento imediato (padrão: true)' }
+      },
+      required: ['programName']
+    }
+  },
+  {
+    name: 'list_processes',
+    description: 'Lista os programas e processos em execução com maior consumo de memória RAM e CPU.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        limit: { type: 'NUMBER', description: 'Quantidade máxima de processos a listar (padrão: 8)' }
+      }
+    }
+  },
+  {
+    name: 'control_media_volume',
+    description: 'Controla o volume do som e a reprodução de mídia global do computador (aumentar volume, diminuir volume, mutar som, pausar, avançar faixa).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        command: {
+          type: 'STRING',
+          description: 'Comando de áudio/mídia: "volume_up", "volume_down", "mute", "play_pause", "next", "prev", "stop"'
+        },
+        value: {
+          type: 'NUMBER',
+          description: 'Valor opcional do percentual para alterar o volume (ex: 10 para aumentar ou diminuir 10%)'
+        }
+      },
+      required: ['command']
+    }
+  },
+  {
+    name: 'automate_ui',
+    description: 'Executa ações de automação na interface de janelas do Windows via UI Automation (clicar em botões por nome, digitar textos ou listar janelas/elementos).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        action: {
+          type: 'STRING',
+          description: 'Ação: "list_windows" (listar janelas abertas), "inspect" (ver botões de uma janela), "click" (clicar em botão/elemento) ou "set_text" (digitar texto)'
+        },
+        windowTitle: {
+          type: 'STRING',
+          description: 'Título ou parte do nome da janela alvo'
+        },
+        elementName: {
+          type: 'STRING',
+          description: 'Nome, rótulo ou ID do botão ou campo na janela (obrigatório para click e set_text)'
+        },
+        text: {
+          type: 'STRING',
+          description: 'Texto a digitar (obrigatório para set_text)'
+        }
+      },
+      required: ['action']
+    }
+  },
+  {
+    name: 'get_detailed_hardware_stats',
+    description: 'Obtém diagnóstico completo e detalhado do hardware do computador: modelo de CPU, núcleos, clock, temperatura, GPU, saúde de bateria e discos.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {}
+    }
+  },
+  {
+    name: 'generate_report_pdf',
+    description: 'Gera um relatório executivo profissional em PDF formatado (com gráficos, tabelas e cabeçalho Jasper) e salva na pasta do usuário.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'Título principal do relatório' },
+        contentHtml: { type: 'STRING', description: 'Conteúdo em HTML formatado (parágrafos <p>, tabelas <table>, listas <ul>, subtítulos <h2>)' },
+        fileName: { type: 'STRING', description: 'Nome opcional do arquivo PDF (ex: relatorio_financeiro.pdf)' }
+      },
+      required: ['title', 'contentHtml']
+    }
+  },
+  {
+    name: 'generate_spreadsheet',
+    description: 'Cria uma planilha formatada do Excel (.xlsx) com colunas estilizadas e dados tabulados, salvando na pasta do usuário.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'Título ou assunto da planilha' },
+        columnsJson: { type: 'STRING', description: 'JSON contendo lista de colunas no formato: [{"header":"Nome","key":"name","width":20},{"header":"Valor","key":"val"}]' },
+        rowsJson: { type: 'STRING', description: 'JSON contendo array de objetos com os dados das linhas' },
+        fileName: { type: 'STRING', description: 'Nome opcional do arquivo (ex: planilha_gastos.xlsx)' }
+      },
+      required: ['title', 'columnsJson', 'rowsJson']
+    }
+  },
+  {
+    name: 'generate_word_document',
+    description: 'Cria um documento formatado do Microsoft Word (.docx) com título, seções e parágrafos estruturados, salvando na pasta do usuário.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'Título principal do documento' },
+        sectionsJson: { type: 'STRING', description: 'JSON contendo lista de seções no formato: [{"heading":"Subtítulo","paragraph":"Texto do parágrafo"}]' },
+        fileName: { type: 'STRING', description: 'Nome opcional do arquivo (ex: proposta_comercial.docx)' }
+      },
+      required: ['title', 'sectionsJson']
+    }
+  },
+  {
+    name: 'read_and_summarize_file',
+    description: 'Lê e resume o conteúdo de qualquer arquivo local (.pdf, .docx, .txt, .md, .csv, .json, .log), extraindo estatísticas e pontos-chave.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        filePath: { type: 'STRING', description: 'Caminho absoluto ou relativo do arquivo a ser lido e sintetizado' }
+      },
+      required: ['filePath']
+    }
+  },
+  {
+    name: 'summarize_clipboard',
+    description: 'Lê a área de transferência do usuário (texto, erro copiado, link ou código) e gera um resumo executivo, tradução ou explicação técnica.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        action: { type: 'STRING', description: 'Ação desejada: "summarize" (resumo executivo), "translate" (traduzir) ou "explain" (explicar)' }
+      }
+    }
+  },
+  {
+    name: 'generate_qr_code',
+    description: 'Gera uma imagem de QR Code de alta resolução para um link, texto, Wi-Fi ou chave PIX e salva na pasta do usuário.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        data: { type: 'STRING', description: 'Conteúdo, URL, texto ou chave para codificar no QR Code' },
+        fileName: { type: 'STRING', description: 'Nome opcional do arquivo de imagem (ex: qrcode_pix.png)' }
+      },
+      required: ['data']
     }
   },
   {
@@ -44,6 +202,81 @@ export const SYSTEM_FUNCTION_DECLARATIONS = [
         fact: { type: 'STRING', description: 'Informação ou detalhe a ser memorizado' }
       },
       required: ['fact']
+    }
+  },
+  {
+    name: 'ocr_screen',
+    description: 'Executa OCR local (reconhecimento óptico de caracteres) na tela atual ou em um arquivo de imagem, extraindo textos legíveis com proteção de dados sensíveis.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        imagePath: {
+          type: 'STRING',
+          description: 'Caminho opcional da imagem salva para OCR. Se omitido, captura e lê o monitor principal.'
+        },
+        languages: {
+          type: 'STRING',
+          description: 'Idiomas do motor de reconhecimento (padrão: "eng+por")'
+        }
+      }
+    }
+  },
+  {
+    name: 'web_automate',
+    description: 'Executa automação web headless avançada (clicar em botões por seletor CSS, preencher campos de formulários, extrair tabelas ou tirar screenshots da página).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        url: {
+          type: 'STRING',
+          description: 'URL do site ou sistema web a automatizar'
+        },
+        action: {
+          type: 'STRING',
+          description: 'Ação a executar: "click" (clicar elemento), "fill" (preencher campo), "extract_table" (extrair dados de tabela) ou "screenshot" (capturar imagem)'
+        },
+        selector: {
+          type: 'STRING',
+          description: 'Seletor CSS do elemento HTML alvo (ex: "#btn-submit", "input[name=email]", "table.relatorio")'
+        },
+        value: {
+          type: 'STRING',
+          description: 'Valor ou texto a ser digitado no campo (obrigatório para a ação "fill")'
+        }
+      },
+      required: ['url', 'action']
+    }
+  },
+  {
+    name: 'set_presentation_mode',
+    description: 'Ativa ou desativa o Modo Apresentação / Silencioso Inteligente para reuniões, webinars ou apresentações de slides.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        active: {
+          type: 'BOOLEAN',
+          description: 'True para ativar o modo apresentação/silencioso, False para desativar'
+        }
+      },
+      required: ['active']
+    }
+  },
+  {
+    name: 'set_focus_mode',
+    description: 'Gerencia o Modo Foco e Bloqueador de Distrações (Pomodoro inteligente), silenciando alertas e detectando processos de jogos/redes sociais.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        action: {
+          type: 'STRING',
+          description: 'Ação: "start" para iniciar sessão de concentração, "stop" para encerrar ou "status" para consultar'
+        },
+        durationMinutes: {
+          type: 'NUMBER',
+          description: 'Duração da sessão de foco em minutos (padrão: 25)'
+        }
+      },
+      required: ['action']
     }
   }
 ]
@@ -351,6 +584,28 @@ export function getActiveAutonomyDeclarations(cfg: Record<string, any>): any[] {
     if ((decl.name === 'manage_calendar' || decl.name === 'check_emails') && cfg.enableCalendarEmail === false) continue
     if (decl.name === 'trigger_webhook' && cfg.enableWebhooks === false) continue
     if (decl.name === 'control_smart_home' && cfg.enableSmartHome === false) continue
+
+    result.push(decl)
+  }
+  return result
+}
+
+export function getActiveSystemDeclarations(cfg: Record<string, any>): any[] {
+  const result: any[] = []
+  for (const decl of SYSTEM_FUNCTION_DECLARATIONS) {
+    if (['open_app', 'search_program', 'close_program', 'list_processes'].includes(decl.name) && cfg.enableProcessManager === false) continue
+    if (decl.name === 'automate_ui' && cfg.enableUiAutomation === false) continue
+    if (decl.name === 'control_media_volume' && cfg.enableMediaController === false) continue
+    if (decl.name === 'get_detailed_hardware_stats' && cfg.enableSystemHealth === false) continue
+    if (['generate_report_pdf', 'generate_spreadsheet', 'generate_word_document'].includes(decl.name) && cfg.enableReportGenerator === false) continue
+    if (decl.name === 'read_and_summarize_file' && cfg.enableFileSummarizer === false) continue
+    if (decl.name === 'summarize_clipboard' && cfg.enableClipboardWatcher === false) continue
+    if (decl.name === 'generate_qr_code' && cfg.enableQrService === false) continue
+    if (decl.name === 'ocr_screen' && cfg.enableOcrService === false) continue
+    if (decl.name === 'web_automate' && cfg.enableHeadlessBrowser === false) continue
+    if (decl.name === 'set_presentation_mode' && cfg.enablePresentationMode === false) continue
+    if (decl.name === 'set_focus_mode' && cfg.enableFocusMode === false) continue
+    if (decl.name === 'organize_folder' && cfg.enableFolderOrganizer === false) continue
 
     result.push(decl)
   }

@@ -161,6 +161,26 @@ export class ClipboardWatcherService {
       console.warn('[ClipboardWatcher] Check error:', err)
     }
   }
+
+  public async summarizeClipboard(action: 'summarize' | 'translate' | 'explain' = 'summarize'): Promise<string> {
+    const raw = await this.readClipboard()
+    if (!raw || !raw.trim()) {
+      return 'A área de transferência está vazia ou não contém texto copiável.'
+    }
+
+    const analysis = this.analyzeText(raw)
+    const preview = raw.length > 2500 ? raw.slice(0, 2500) + '... [truncado]' : raw
+
+    let actionLabel = 'Resumo Executivo do Conteúdo Copiado'
+    if (action === 'translate') actionLabel = 'Tradução do Conteúdo da Área de Transferência'
+    if (action === 'explain') actionLabel = 'Explicação Técnica do Conteúdo Copiado'
+
+    return `${actionLabel} (${analysis.type.toUpperCase()} - ${raw.length} caracteres):
+"""
+${preview}
+"""
+Diagnóstico inicial: ${analysis.summary}. Pronto para detalhar.`
+  }
 }
 
 export const clipboardWatcher = new ClipboardWatcherService()

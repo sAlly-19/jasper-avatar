@@ -297,9 +297,10 @@
                   <code id="gemini-key-masked-display" style="font-family: monospace; font-size: 11px; color: #00f0ff; background: rgba(0,0,0,0.45); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0,240,255,0.2);">NENHUMA CHAVE CONFIGURADA</code>
                 </div>
 
-                <div class="input-password-wrap">
-                  <input type="password" id="input-api-key" placeholder="Digite uma nova chave para alterar..." />
+                <div class="input-password-wrap" style="display: flex; gap: 6px;">
+                  <input type="password" id="input-api-key" placeholder="Digite uma nova chave para alterar..." style="flex: 1;" />
                   <button id="btn-toggle-key" type="button" class="btn-toggle">Mostrar</button>
+                  <button id="btn-remove-key" type="button" class="btn-toggle" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #f87171;" title="Remover chave configurada">Remover</button>
                 </div>
                 <div class="api-key-hint">
                   <small>Obtenha sua chave gratuita no <a href="https://aistudio.google.com/" target="_blank">Google AI Studio &nearr;</a></small>
@@ -880,6 +881,159 @@
                     </div>
                     <small class="config-field-hint">Deixe o token em branco para usar o modo de simulação local sem alterar dispositivos reais.</small>
                   </div>
+                </div>
+              </div>
+
+              <!-- 18. Process Manager -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-process-manager">18. Gerenciador de Processos & Programas</label>
+                      <button type="button" class="btn-module-info" data-module="process-manager" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-process-manager">Pesquisa programas no StartApps, Registro e Everything CLI, inicializa apps e encerra tarefas com taskkill seguro.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-process-manager">
+                    <input type="checkbox" id="check-process-manager" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 19. Windows UI Automation -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-ui-automation">19. Automação de Interface Windows (UIA)</label>
+                      <button type="button" class="btn-module-info" data-module="ui-automation" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-ui-automation">Controla janelas do Windows via UI Automation: inspeciona elementos interativos, clica em botões e digita textos.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-ui-automation">
+                    <input type="checkbox" id="check-ui-automation" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 20. Media Controller -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-media-controller">20. Controle de Mídia & Volume do Sistema</label>
+                      <button type="button" class="btn-module-info" data-module="media-controller" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-media-controller">Controla o volume global do Windows em percentual, silencia áudio (mute) e aciona teclas de reprodução (play, pause, faixas).</label>
+                  </div>
+                  <label class="hud-toggle" for="check-media-controller">
+                    <input type="checkbox" id="check-media-controller" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 21. Report Generator -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-report-generator">21. Geração de Relatórios Executivos (PDF, Excel, Word)</label>
+                      <button type="button" class="btn-module-info" data-module="report-generator" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-report-generator">Gera PDFs corporativos vetoriais com printToPDF(), planilhas Excel (.xlsx) e documentos Word (.docx) na pasta do usuário.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-report-generator">
+                    <input type="checkbox" id="check-report-generator" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 22. File Summarizer -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-file-summarizer">22. Leitor & Resumidor de Arquivos Locais</label>
+                      <button type="button" class="btn-module-info" data-module="file-summarizer" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-file-summarizer">Lê e sintetiza arquivos PDF, Word (.docx), planilhas e códigos locais com redação e mascaramento de segredos/tokens.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-file-summarizer">
+                    <input type="checkbox" id="check-file-summarizer" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 23. QR Code Generator -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-qr-service">23. Gerador & Leitor de QR Code</label>
+                      <button type="button" class="btn-module-info" data-module="qr-service" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-qr-service">Gera QR Codes em alta resolução em PNG e DataURL para links, senhas de Wi-Fi e cobranças instantâneas PIX.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-qr-service">
+                    <input type="checkbox" id="check-qr-service" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 24. Local OCR Service -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-ocr-service">24. OCR Local de Prints & Imagens (Tesseract.js)</label>
+                      <button type="button" class="btn-module-info" data-module="ocr-service" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-ocr-service">Reconhecimento óptico de caracteres 100% local e offline (eng+por) em prints de tela e imagens com higienização de senhas.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-ocr-service">
+                    <input type="checkbox" id="check-ocr-service" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 25. Presentation Mode -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-presentation-mode">25. Modo Apresentação / Silencioso Inteligente</label>
+                      <button type="button" class="btn-module-info" data-module="presentation-mode" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-presentation-mode">Identifica conferências (Meet, Teams, Zoom, Webex) e apresentações de slides, silenciando alertas sonoros automaticamente.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-presentation-mode">
+                    <input type="checkbox" id="check-presentation-mode" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 26. Focus Mode -->
+              <div class="settings-card">
+                <div class="hud-switch-item">
+                  <div class="hud-switch-text">
+                    <div class="hud-switch-title-row">
+                      <label class="hud-switch-title" for="check-focus-mode">26. Modo Foco & Bloqueador de Distrações</label>
+                      <button type="button" class="btn-module-info" data-module="focus-mode" title="Saiba como este módulo funciona">!</button>
+                    </div>
+                    <label class="hud-switch-desc" for="check-focus-mode">Sessões Pomodoro com cronômetro regressivo e alertas proativos contra jogos (Steam, Riot) e mensageiros distrativos.</label>
+                  </div>
+                  <label class="hud-toggle" for="check-focus-mode">
+                    <input type="checkbox" id="check-focus-mode" checked />
+                    <span class="hud-toggle-slider"></span>
+                  </label>
                 </div>
               </div>
             </div>

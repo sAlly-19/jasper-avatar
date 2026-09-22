@@ -130,6 +130,15 @@ export class SettingsModal {
       checkCalendarEmail,
       checkWebhooks,
       checkSmartHome,
+      checkProcessManager,
+      checkUiAutomation,
+      checkMediaController,
+      checkReportGenerator,
+      checkFileSummarizer,
+      checkQrService,
+      checkOcrService,
+      checkPresentationMode,
+      checkFocusMode,
       btnClearMemory,
       inputGitRepoPath,
       btnBrowseGitRepo,
@@ -278,6 +287,33 @@ export class SettingsModal {
       if (checkSmartHome) {
         checkSmartHome.checked = config.enableSmartHome !== false
       }
+      if (checkProcessManager) {
+        checkProcessManager.checked = config.enableProcessManager !== false
+      }
+      if (checkUiAutomation) {
+        checkUiAutomation.checked = config.enableUiAutomation !== false
+      }
+      if (checkMediaController) {
+        checkMediaController.checked = config.enableMediaController !== false
+      }
+      if (checkReportGenerator) {
+        checkReportGenerator.checked = config.enableReportGenerator !== false
+      }
+      if (checkFileSummarizer) {
+        checkFileSummarizer.checked = config.enableFileSummarizer !== false
+      }
+      if (checkQrService) {
+        checkQrService.checked = config.enableQrService !== false
+      }
+      if (checkOcrService) {
+        checkOcrService.checked = config.enableOcrService !== false
+      }
+      if (checkPresentationMode) {
+        checkPresentationMode.checked = config.enablePresentationMode !== false
+      }
+      if (checkFocusMode) {
+        checkFocusMode.checked = config.enableFocusMode !== false
+      }
 
       // Populate module specific settings
       if (inputGitRepoPath) {
@@ -410,6 +446,28 @@ export class SettingsModal {
       }
     })
 
+    DOM.btnRemoveKey?.addEventListener('click', async () => {
+      if (!confirm('Deseja realmente remover a sua chave de API do Google Gemini? O assistente ficará desconectado até que uma nova chave seja informada.')) {
+        return
+      }
+
+      inputApiKey.value = ''
+      if (DOM.geminiKeyMaskedDisplay) {
+        DOM.geminiKeyMaskedDisplay.textContent = 'NENHUMA CHAVE CONFIGURADA'
+        DOM.geminiKeyMaskedDisplay.style.color = '#f87171'
+      }
+      inputApiKey.placeholder = 'Digite sua chave do Gemini (AIzaSy...)'
+
+      try {
+        await window.electronAPI.saveConfig({ apiKey: '' })
+        await window.electronAPI.disconnectGemini()
+        updateStatusBadge('offline', 'Sem Chave Gemini')
+        showHudToast('Chave Removida', 'A chave do Google Gemini foi removida com sucesso.', 'info', 4000)
+      } catch (err: any) {
+        showHudToast('Erro', `Falha ao remover chave: ${err.message || err}`, 'error', 5000)
+      }
+    })
+
     checkBloom?.addEventListener('change', () => {
       this.options.setBloomEnabled(checkBloom.checked)
     })
@@ -532,7 +590,7 @@ export class SettingsModal {
 
       await window.electronAPI.saveConfig({
         agentName: newName,
-        apiKey: apiKey || undefined,
+        apiKey: apiKey !== '' ? apiKey : (DOM.geminiKeyMaskedDisplay?.textContent === 'NENHUMA CHAVE CONFIGURADA' ? '' : undefined),
         voiceName,
         model,
         enableWakeWord,
@@ -558,6 +616,15 @@ export class SettingsModal {
         enableCalendarEmail: checkCalendarEmail ? checkCalendarEmail.checked : true,
         enableWebhooks: checkWebhooks ? checkWebhooks.checked : true,
         enableSmartHome: checkSmartHome ? checkSmartHome.checked : true,
+        enableProcessManager: checkProcessManager ? checkProcessManager.checked : true,
+        enableUiAutomation: checkUiAutomation ? checkUiAutomation.checked : true,
+        enableMediaController: checkMediaController ? checkMediaController.checked : true,
+        enableReportGenerator: checkReportGenerator ? checkReportGenerator.checked : true,
+        enableFileSummarizer: checkFileSummarizer ? checkFileSummarizer.checked : true,
+        enableQrService: checkQrService ? checkQrService.checked : true,
+        enableOcrService: checkOcrService ? checkOcrService.checked : true,
+        enablePresentationMode: checkPresentationMode ? checkPresentationMode.checked : true,
+        enableFocusMode: checkFocusMode ? checkFocusMode.checked : true,
         // Module specific configurations
         gitRepoPath: inputGitRepoPath?.value.trim() || undefined,
         folderDefaultTarget: selectFolderTarget?.value || 'downloads',

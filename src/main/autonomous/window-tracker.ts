@@ -57,14 +57,19 @@ export class WindowTrackerService {
   }
 
   private getScriptPath(): string {
-    // Development vs built asset path
-    const devPath = join(__dirname, 'scripts', 'get-active-window.ps1')
-    if (fs.existsSync(devPath)) return devPath
+    try {
+      const srcPath = join(app.getAppPath(), 'src', 'main', 'autonomous', 'scripts', 'get-active-window.ps1')
+      if (fs.existsSync(srcPath)) return srcPath
+    } catch {}
 
-    const srcPath = join(app.getAppPath(), 'src', 'main', 'autonomous', 'scripts', 'get-active-window.ps1')
-    if (fs.existsSync(srcPath)) return srcPath
+    try {
+      if (typeof __dirname !== 'undefined') {
+        const devPath = join(__dirname, 'scripts', 'get-active-window.ps1')
+        if (fs.existsSync(devPath)) return devPath
+      }
+    } catch {}
 
-    return devPath
+    return join(process.cwd(), 'src', 'main', 'autonomous', 'scripts', 'get-active-window.ps1')
   }
 
   public async getActiveWindow(): Promise<ActiveWindowInfo> {

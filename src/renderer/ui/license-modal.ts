@@ -174,20 +174,10 @@ export class LicenseModal {
         showHudToast('Licença Ativada', 'Estação Jasper Desbloqueada com Sucesso!', 'info', 5000)
         updateStatusBadge('online', 'Licença Válida')
 
-        // Verifica se o usuário já configurou sua chave pessoal do Gemini
-        const currentCfg = await window.electronAPI.getConfig()
-        if (currentCfg.hasFullKey) {
-          // Já possui chave própria configurada
-          setTimeout(() => {
-            this.hide()
-            window.electronAPI.connectGemini().catch(() => {})
-          }, 1200)
-        } else {
-          // Avança imediatamente para o Passo 2 (solicitar a chave do Gemini do usuário)
-          setTimeout(() => {
-            this.goToStep2()
-          }, 800)
-        }
+        // Sempre avança para o Passo 2 para solicitar a chave de API pessoal do Google Gemini do usuário
+        setTimeout(() => {
+          this.goToStep2()
+        }, 800)
       } else {
         this.showFeedback(result.message || 'Falha ao ativar licença.', 'error')
       }

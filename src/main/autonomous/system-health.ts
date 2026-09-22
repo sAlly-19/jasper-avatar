@@ -1,6 +1,41 @@
 import os from 'os'
-import { exec } from 'child_process'
+import si from 'systeminformation'
 import type { SystemHealthData, AutonomyNotification } from '@shared'
+
+export interface DetailedHardwareStats {
+  cpu: {
+    brand: string
+    cores: number
+    speedGhz: number
+    loadPercent: number
+  }
+  memory: {
+    totalGb: number
+    usedGb: number
+    freeGb: number
+    usagePercent: number
+  }
+  disks: Array<{
+    mount: string
+    totalGb: number
+    freeGb: number
+    usePercent: number
+  }>
+  battery?: {
+    hasBattery: boolean
+    percent: number
+    isCharging: boolean
+  }
+  graphics: Array<{
+    model: string
+    vramMb?: number
+  }>
+  osInfo: {
+    platform: string
+    distro: string
+    uptimeHours: number
+  }
+}
 
 export class SystemHealthService {
   private isEnabled: boolean = true
@@ -10,12 +45,38 @@ export class SystemHealthService {
   private currentHealth: SystemHealthData
   private onHealthWarning?: (notification: AutonomyNotification) => void
   private highRamAlertSent: boolean = false
-  private cachedDisk: { freeGb?: number; totalGb?: number; timestamp: number } | null = null
+  private staticHardwareCache: {
+    cpuBrand?: string
+    cpuCores?: number
+    cpuSpeed?: number
+    graphics?: Array<{ model: string; vramMb?: number }>
+    osDistro?: string
+  } = {}
 
   constructor(enabled: boolean = true) {
     this.isEnabled = enabled
     this.currentHealth = this.getBasicMetrics(0)
     this.sampleCpu()
+    this.preloadStaticInfo()
+  }
+
+  private async preloadStaticInfo(): Promise<void> {
+    try {
+      const [cpu, gfx, osInfo] = await Promise.all([
+        si.cpu(),
+        si.graphics(),
+        si.osInfo()
+      ])
+      this.staticHardwareCache = {
+        cpuBrand: cpu.brand,
+        cpuCores: cpu.cores,
+        cpuSpeed: cpu.speed,
+        graphics: gfx.controllers.map((c) => ({ model: c.model, vramMb: c.vram || undefined })),
+        osDistro: `${osInfo.distro} ${osInfo.release}`
+      }
+    } catch {
+      // Non-critical background cache
+    }
   }
 
   public setEnabled(enabled: boolean): void {
@@ -98,45 +159,86 @@ export class SystemHealthService {
     }
   }
 
-  private async fetchDiskInfo(): Promise<{ freeGb?: number; totalGb?: number }> {
-    if (this.cachedDisk && Date.now() - this.cachedDisk.timestamp < 60000) {
-      return { freeGb: this.cachedDisk.freeGb, totalGb: this.cachedDisk.totalGb }
-    }
-
-    return new Promise((resolve) => {
-      exec(
-        'powershell -NoProfile -Command "(Get-PSDrive C).Free; (Get-PSDrive C).Used + (Get-PSDrive C).Free"',
-        { timeout: 3000, windowsHide: true },
-        (error, stdout) => {
-          if (error || !stdout) {
-            resolve(this.cachedDisk ? { freeGb: this.cachedDisk.freeGb, totalGb: this.cachedDisk.totalGb } : {})
-            return
-          }
-          const lines = stdout.trim().split(/\r?\n/).map((l) => Number(l.trim()))
-          if (lines.length >= 2 && !isNaN(lines[0]) && !isNaN(lines[1])) {
-            const freeGb = Math.round(lines[0] / (1024 ** 3))
-            const totalGb = Math.round(lines[1] / (1024 ** 3))
-            this.cachedDisk = { freeGb, totalGb, timestamp: Date.now() }
-            resolve({ freeGb, totalGb })
-            return
-          }
-          resolve(this.cachedDisk ? { freeGb: this.cachedDisk.freeGb, totalGb: this.cachedDisk.totalGb } : {})
-        }
-      )
-    })
-  }
-
   public async getHealth(): Promise<SystemHealthData> {
     const cpu = this.sampleCpu()
     const base = this.getBasicMetrics(cpu)
+
     try {
-      const disk = await this.fetchDiskInfo()
-      base.diskFreeGb = disk.freeGb
-      base.diskTotalGb = disk.totalGb
-    } catch {}
+      const [disks, battery] = await Promise.all([
+        si.fsSize().catch(() => []),
+        si.battery().catch(() => null)
+      ])
+
+      const primaryDisk = disks.find((d) => d.mount.toLowerCase().startsWith('c:')) || disks[0]
+      if (primaryDisk) {
+        base.diskFreeGb = Math.round(primaryDisk.available / (1024 ** 3))
+        base.diskTotalGb = Math.round(primaryDisk.size / (1024 ** 3))
+      }
+
+      if (battery && battery.hasBattery) {
+        base.batteryPercent = battery.percent
+        base.isCharging = battery.isCharging
+      }
+    } catch {
+      // Fallback already populated
+    }
 
     this.currentHealth = base
     return this.currentHealth
+  }
+
+  public async getDetailedHardwareStats(): Promise<DetailedHardwareStats> {
+    const [load, mem, disks, battery, gfx, cpuInfo] = await Promise.all([
+      si.currentLoad().catch(() => ({ currentLoad: this.sampleCpu() })),
+      si.mem().catch(() => ({
+        total: os.totalmem(),
+        used: os.totalmem() - os.freemem(),
+        free: os.freemem()
+      })),
+      si.fsSize().catch(() => []),
+      si.battery().catch(() => null),
+      si.graphics().catch(() => ({ controllers: [] })),
+      si.cpu().catch(() => ({ brand: 'Processador Windows', cores: os.cpus().length, speed: 0 }))
+    ])
+
+    const totalRamGb = Number((mem.total / (1024 ** 3)).toFixed(1))
+    const usedRamGb = Number((mem.used / (1024 ** 3)).toFixed(1))
+    const freeRamGb = Number((mem.free / (1024 ** 3)).toFixed(1))
+    const ramPercent = Math.round((mem.used / mem.total) * 100)
+
+    const diskList = disks.map((d) => ({
+      mount: d.mount,
+      totalGb: Math.round(d.size / (1024 ** 3)),
+      freeGb: Math.round(d.available / (1024 ** 3)),
+      usePercent: Math.round(d.use)
+    }))
+
+    return {
+      cpu: {
+        brand: cpuInfo.brand || this.staticHardwareCache.cpuBrand || 'Processador Windows',
+        cores: cpuInfo.cores || this.staticHardwareCache.cpuCores || os.cpus().length,
+        speedGhz: cpuInfo.speed || this.staticHardwareCache.cpuSpeed || 0,
+        loadPercent: Math.round(load.currentLoad)
+      },
+      memory: {
+        totalGb: totalRamGb,
+        usedGb: usedRamGb,
+        freeGb: freeRamGb,
+        usagePercent: ramPercent
+      },
+      disks: diskList,
+      battery: battery && battery.hasBattery ? {
+        hasBattery: true,
+        percent: battery.percent,
+        isCharging: battery.isCharging
+      } : undefined,
+      graphics: gfx.controllers.map((c) => ({ model: c.model, vramMb: c.vram || undefined })),
+      osInfo: {
+        platform: 'Windows',
+        distro: this.staticHardwareCache.osDistro || os.version() || 'Windows',
+        uptimeHours: Number((os.uptime() / 3600).toFixed(1))
+      }
+    }
   }
 
   private async poll(): Promise<void> {
@@ -163,4 +265,3 @@ export class SystemHealthService {
 }
 
 export const systemHealth = new SystemHealthService()
-

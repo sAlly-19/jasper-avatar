@@ -89,6 +89,15 @@ class ConfigStore {
     enableCalendarEmail: true,
     enableWebhooks: true,
     enableSmartHome: true,
+    enableProcessManager: true,
+    enableUiAutomation: true,
+    enableMediaController: true,
+    enableReportGenerator: true,
+    enableFileSummarizer: true,
+    enableQrService: true,
+    enableOcrService: true,
+    enablePresentationMode: true,
+    enableFocusMode: true,
     // Module specific configurations
     hassUrl: process.env.HASS_URL || 'http://homeassistant.local:8123',
     hassToken: process.env.HASS_TOKEN || '',
@@ -137,7 +146,7 @@ class ConfigStore {
       const cfgPath = this.getConfigFilePath()
       if (fs.existsSync(cfgPath)) {
         const data = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'))
-        if (data.apiKey) this.config.apiKey = decryptSecret(data.apiKey)
+        if (data.apiKey !== undefined) this.config.apiKey = decryptSecret(data.apiKey)
         if (data.voiceName) this.config.voiceName = data.voiceName
         if (data.model) this.config.model = data.model
         if (data.enableSystemTools !== undefined) this.config.enableSystemTools = data.enableSystemTools
@@ -164,6 +173,15 @@ class ConfigStore {
         if (data.enableCalendarEmail !== undefined) this.config.enableCalendarEmail = data.enableCalendarEmail
         if (data.enableWebhooks !== undefined) this.config.enableWebhooks = data.enableWebhooks
         if (data.enableSmartHome !== undefined) this.config.enableSmartHome = data.enableSmartHome
+        if (data.enableProcessManager !== undefined) this.config.enableProcessManager = data.enableProcessManager
+        if (data.enableUiAutomation !== undefined) this.config.enableUiAutomation = data.enableUiAutomation
+        if (data.enableMediaController !== undefined) this.config.enableMediaController = data.enableMediaController
+        if (data.enableReportGenerator !== undefined) this.config.enableReportGenerator = data.enableReportGenerator
+        if (data.enableFileSummarizer !== undefined) this.config.enableFileSummarizer = data.enableFileSummarizer
+        if (data.enableQrService !== undefined) this.config.enableQrService = data.enableQrService
+        if (data.enableOcrService !== undefined) this.config.enableOcrService = data.enableOcrService
+        if (data.enablePresentationMode !== undefined) this.config.enablePresentationMode = data.enablePresentationMode
+        if (data.enableFocusMode !== undefined) this.config.enableFocusMode = data.enableFocusMode
 
         // Module-specific configs
         if (data.hassUrl !== undefined) this.config.hassUrl = data.hassUrl
@@ -244,6 +262,15 @@ class ConfigStore {
     if (payload.enableCalendarEmail !== undefined) this.config.enableCalendarEmail = payload.enableCalendarEmail
     if (payload.enableWebhooks !== undefined) this.config.enableWebhooks = payload.enableWebhooks
     if (payload.enableSmartHome !== undefined) this.config.enableSmartHome = payload.enableSmartHome
+    if (payload.enableProcessManager !== undefined) this.config.enableProcessManager = payload.enableProcessManager
+    if (payload.enableUiAutomation !== undefined) this.config.enableUiAutomation = payload.enableUiAutomation
+    if (payload.enableMediaController !== undefined) this.config.enableMediaController = payload.enableMediaController
+    if (payload.enableReportGenerator !== undefined) this.config.enableReportGenerator = payload.enableReportGenerator
+    if (payload.enableFileSummarizer !== undefined) this.config.enableFileSummarizer = payload.enableFileSummarizer
+    if (payload.enableQrService !== undefined) this.config.enableQrService = payload.enableQrService
+    if (payload.enableOcrService !== undefined) this.config.enableOcrService = payload.enableOcrService
+    if (payload.enablePresentationMode !== undefined) this.config.enablePresentationMode = payload.enablePresentationMode
+    if (payload.enableFocusMode !== undefined) this.config.enableFocusMode = payload.enableFocusMode
 
     // Module-specific configs
     if (payload.hassUrl !== undefined) this.config.hassUrl = payload.hassUrl.trim()
@@ -302,6 +329,15 @@ class ConfigStore {
       enableCalendarEmail: this.config.enableCalendarEmail,
       enableWebhooks: this.config.enableWebhooks,
       enableSmartHome: this.config.enableSmartHome,
+      enableProcessManager: this.config.enableProcessManager,
+      enableUiAutomation: this.config.enableUiAutomation,
+      enableMediaController: this.config.enableMediaController,
+      enableReportGenerator: this.config.enableReportGenerator,
+      enableFileSummarizer: this.config.enableFileSummarizer,
+      enableQrService: this.config.enableQrService,
+      enableOcrService: this.config.enableOcrService,
+      enablePresentationMode: this.config.enablePresentationMode,
+      enableFocusMode: this.config.enableFocusMode,
       // Module-specific configs
       hassUrl: this.config.hassUrl || 'http://homeassistant.local:8123',
       hasHassToken: Boolean(this.config.hassToken && this.config.hassToken.length > 5),

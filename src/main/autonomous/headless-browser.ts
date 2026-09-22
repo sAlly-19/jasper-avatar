@@ -198,6 +198,169 @@ export class HeadlessBrowser {
       }
     }
   }
+
+  /**
+   * Performs advanced headless web actions (clicking elements, filling forms, extracting tables)
+   */
+  public async executeAction(
+    targetUrl: string,
+    action: 'click' | 'fill' | 'extract_table' | 'screenshot',
+    selector?: string,
+    value?: string
+  ): Promise<{ success: boolean; url: string; title: string; result?: any; message: string }> {
+    if (!this.enabled) {
+      return {
+        success: false,
+        url: targetUrl,
+        title: '',
+        message: 'Navegador Headless desativado nas configurações.'
+      }
+    }
+
+    let formattedUrl = targetUrl.trim()
+    if (!/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = `https://${formattedUrl}`
+    }
+
+    const urlPolicy = toolPolicyEngine.validateBrowserUrl(formattedUrl)
+    if (!urlPolicy.allowed) {
+      return {
+        success: false,
+        url: formattedUrl,
+        title: '',
+        message: `[BLOQUEIO DE SEGURANÇA ZERO-TRUST]: ${urlPolicy.reason}`
+      }
+    }
+
+    let win: BrowserWindow | null = null
+    try {
+      win = new BrowserWindow({
+        show: false,
+        width: 1280,
+        height: 800,
+        webPreferences: {
+          sandbox: true,
+          javascript: true,
+          contextIsolation: true
+        }
+      })
+
+      win.webContents.setAudioMuted(true)
+      await win.loadURL(formattedUrl, { timeout: 20000 })
+      await new Promise((r) => setTimeout(r, 1500))
+
+      const title = win.webContents.getTitle() || ''
+
+      switch (action) {
+        case 'click': {
+          if (!selector) return { success: false, url: formattedUrl, title, message: 'Seletor CSS obrigatório para ação click.' }
+          const clickScript = `
+            (() => {
+              const el = document.querySelector(${JSON.stringify(selector)});
+              if (!el) return { found: false };
+              el.click();
+              return { found: true };
+            })()
+          `
+          const res = await win.webContents.executeJavaScript(clickScript)
+          if (!res.found) {
+            return { success: false, url: formattedUrl, title, message: `Elemento "${selector}" não encontrado na página.` }
+          }
+          await new Promise((r) => setTimeout(r, 1200))
+          return {
+            success: true,
+            url: formattedUrl,
+            title: win.webContents.getTitle() || title,
+            message: `Elemento "${selector}" clicado com sucesso.`
+          }
+        }
+
+        case 'fill': {
+          if (!selector || value === undefined) {
+            return { success: false, url: formattedUrl, title, message: 'Seletor e valor são obrigatórios para ação fill.' }
+          }
+          const fillScript = `
+            (() => {
+              const el = document.querySelector(${JSON.stringify(selector)});
+              if (!el) return { found: false };
+              el.value = ${JSON.stringify(value)};
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              return { found: true };
+            })()
+          `
+          const res = await win.webContents.executeJavaScript(fillScript)
+          if (!res.found) {
+            return { success: false, url: formattedUrl, title, message: `Campo "${selector}" não encontrado na página.` }
+          }
+          return {
+            success: true,
+            url: formattedUrl,
+            title,
+            message: `Campo "${selector}" preenchido com "${value}".`
+          }
+        }
+
+        case 'extract_table': {
+          const tableSelector = selector || 'table'
+          const extractScript = `
+            (() => {
+              const table = document.querySelector(${JSON.stringify(tableSelector)});
+              if (!table) return { found: false, headers: [], rows: [] };
+              const headers = Array.from(table.querySelectorAll('th')).map(th => th.innerText.trim());
+              const rows = Array.from(table.querySelectorAll('tr')).slice(headers.length ? 1 : 0).map(tr => {
+                return Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());
+              });
+              return { found: true, headers, rows };
+            })()
+          `
+          const tableData = await win.webContents.executeJavaScript(extractScript)
+          if (!tableData.found) {
+            return { success: false, url: formattedUrl, title, message: `Tabela "${tableSelector}" não encontrada.` }
+          }
+          return {
+            success: true,
+            url: formattedUrl,
+            title,
+            result: tableData,
+            message: `Tabela extraída com sucesso (${tableData.rows.length} linhas encontradas).`
+          }
+        }
+
+        case 'screenshot': {
+          const image = await win.webContents.capturePage()
+          return {
+            success: true,
+            url: formattedUrl,
+            title,
+            result: image.toDataURL(),
+            message: 'Captura de tela da página web realizada com sucesso.'
+          }
+        }
+
+        default:
+          return {
+            success: false,
+            url: formattedUrl,
+            title,
+            message: `Ação desconhecida: ${action}. Use click, fill, extract_table ou screenshot.`
+          }
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        url: formattedUrl,
+        title: '',
+        message: `Erro ao executar ação web: ${err.message}`
+      }
+    } finally {
+      if (win && !win.isDestroyed()) {
+        try {
+          win.destroy()
+        } catch {}
+      }
+    }
+  }
 }
 
 export const headlessBrowser = new HeadlessBrowser()

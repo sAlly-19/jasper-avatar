@@ -19,6 +19,9 @@ import { reflexionEngine } from './reflexion-engine'
 import { calendarEmail } from './calendar-email'
 import { webhookManager } from './webhook-manager'
 import { smartHome } from './smart-home'
+import { processManager } from './process-manager'
+import { mediaController } from './media-controller'
+import { uiAutomation } from './ui-automation'
 
 export class AutonomyCoordinator {
   private isInitialized: boolean = false
@@ -108,6 +111,11 @@ export class AutonomyCoordinator {
     // 17. Smart Home Integration (Home Assistant REST/WebSocket)
     smartHome.setEnabled(cfg.enableSmartHome !== false)
     smartHome.setConfig(cfg.hassUrl || '', cfg.hassToken || '')
+
+    // 18. Process Manager, Media Controller & UI Automation
+    processManager.setEnabled(true)
+    mediaController.setEnabled(true)
+    uiAutomation.setEnabled(true)
 
     console.log('[AutonomyCoordinator] All autonomous services initialized successfully.')
   }

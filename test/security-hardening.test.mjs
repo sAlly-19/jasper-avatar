@@ -12,9 +12,10 @@ import path2 from "node:path";
 import fs4 from "node:fs";
 
 // test/_electron-mock.mjs
-var tempUserData = "C:\\Users\\ALISSO~1.SAN\\AppData\\Local\\Temp\\jasper-test-userdata";
+var tempUserData = "C:\\Users\\aliss\\AppData\\Local\\Temp\\jasper-test-userdata";
 var app = {
   getPath: (name) => tempUserData,
+  getAppPath: () => "C:\\Users\\aliss\\Desktop\\Antigravity\\jasper-avatar",
   whenReady: () => Promise.resolve(),
   quit: () => {
   }
@@ -539,6 +540,22 @@ var ClipboardWatcherService = class {
     } catch (err) {
       console.warn("[ClipboardWatcher] Check error:", err);
     }
+  }
+  async summarizeClipboard(action = "summarize") {
+    const raw = await this.readClipboard();
+    if (!raw || !raw.trim()) {
+      return "A \xE1rea de transfer\xEAncia est\xE1 vazia ou n\xE3o cont\xE9m texto copi\xE1vel.";
+    }
+    const analysis = this.analyzeText(raw);
+    const preview = raw.length > 2500 ? raw.slice(0, 2500) + "... [truncado]" : raw;
+    let actionLabel = "Resumo Executivo do Conte\xFAdo Copiado";
+    if (action === "translate") actionLabel = "Tradu\xE7\xE3o do Conte\xFAdo da \xC1rea de Transfer\xEAncia";
+    if (action === "explain") actionLabel = "Explica\xE7\xE3o T\xE9cnica do Conte\xFAdo Copiado";
+    return `${actionLabel} (${analysis.type.toUpperCase()} - ${raw.length} caracteres):
+"""
+${preview}
+"""
+Diagn\xF3stico inicial: ${analysis.summary}. Pronto para detalhar.`;
   }
 };
 var clipboardWatcher = new ClipboardWatcherService();
@@ -1224,6 +1241,15 @@ var ConfigStore = class {
     enableCalendarEmail: true,
     enableWebhooks: true,
     enableSmartHome: true,
+    enableProcessManager: true,
+    enableUiAutomation: true,
+    enableMediaController: true,
+    enableReportGenerator: true,
+    enableFileSummarizer: true,
+    enableQrService: true,
+    enableOcrService: true,
+    enablePresentationMode: true,
+    enableFocusMode: true,
     // Module specific configurations
     hassUrl: process.env.HASS_URL || "http://homeassistant.local:8123",
     hassToken: process.env.HASS_TOKEN || "",
@@ -1263,7 +1289,7 @@ var ConfigStore = class {
       const cfgPath = this.getConfigFilePath();
       if (fs3.existsSync(cfgPath)) {
         const data = JSON.parse(fs3.readFileSync(cfgPath, "utf-8"));
-        if (data.apiKey) this.config.apiKey = decryptSecret(data.apiKey);
+        if (data.apiKey !== void 0) this.config.apiKey = decryptSecret(data.apiKey);
         if (data.voiceName) this.config.voiceName = data.voiceName;
         if (data.model) this.config.model = data.model;
         if (data.enableSystemTools !== void 0) this.config.enableSystemTools = data.enableSystemTools;
@@ -1290,6 +1316,15 @@ var ConfigStore = class {
         if (data.enableCalendarEmail !== void 0) this.config.enableCalendarEmail = data.enableCalendarEmail;
         if (data.enableWebhooks !== void 0) this.config.enableWebhooks = data.enableWebhooks;
         if (data.enableSmartHome !== void 0) this.config.enableSmartHome = data.enableSmartHome;
+        if (data.enableProcessManager !== void 0) this.config.enableProcessManager = data.enableProcessManager;
+        if (data.enableUiAutomation !== void 0) this.config.enableUiAutomation = data.enableUiAutomation;
+        if (data.enableMediaController !== void 0) this.config.enableMediaController = data.enableMediaController;
+        if (data.enableReportGenerator !== void 0) this.config.enableReportGenerator = data.enableReportGenerator;
+        if (data.enableFileSummarizer !== void 0) this.config.enableFileSummarizer = data.enableFileSummarizer;
+        if (data.enableQrService !== void 0) this.config.enableQrService = data.enableQrService;
+        if (data.enableOcrService !== void 0) this.config.enableOcrService = data.enableOcrService;
+        if (data.enablePresentationMode !== void 0) this.config.enablePresentationMode = data.enablePresentationMode;
+        if (data.enableFocusMode !== void 0) this.config.enableFocusMode = data.enableFocusMode;
         if (data.hassUrl !== void 0) this.config.hassUrl = data.hassUrl;
         if (data.hassToken !== void 0) this.config.hassToken = decryptSecret(data.hassToken);
         if (data.gitRepoPath !== void 0) this.config.gitRepoPath = data.gitRepoPath;
@@ -1361,6 +1396,15 @@ var ConfigStore = class {
     if (payload.enableCalendarEmail !== void 0) this.config.enableCalendarEmail = payload.enableCalendarEmail;
     if (payload.enableWebhooks !== void 0) this.config.enableWebhooks = payload.enableWebhooks;
     if (payload.enableSmartHome !== void 0) this.config.enableSmartHome = payload.enableSmartHome;
+    if (payload.enableProcessManager !== void 0) this.config.enableProcessManager = payload.enableProcessManager;
+    if (payload.enableUiAutomation !== void 0) this.config.enableUiAutomation = payload.enableUiAutomation;
+    if (payload.enableMediaController !== void 0) this.config.enableMediaController = payload.enableMediaController;
+    if (payload.enableReportGenerator !== void 0) this.config.enableReportGenerator = payload.enableReportGenerator;
+    if (payload.enableFileSummarizer !== void 0) this.config.enableFileSummarizer = payload.enableFileSummarizer;
+    if (payload.enableQrService !== void 0) this.config.enableQrService = payload.enableQrService;
+    if (payload.enableOcrService !== void 0) this.config.enableOcrService = payload.enableOcrService;
+    if (payload.enablePresentationMode !== void 0) this.config.enablePresentationMode = payload.enablePresentationMode;
+    if (payload.enableFocusMode !== void 0) this.config.enableFocusMode = payload.enableFocusMode;
     if (payload.hassUrl !== void 0) this.config.hassUrl = payload.hassUrl.trim();
     if (payload.hassToken !== void 0) this.config.hassToken = payload.hassToken.trim();
     if (payload.gitRepoPath !== void 0) this.config.gitRepoPath = payload.gitRepoPath.trim();
@@ -1411,6 +1455,15 @@ var ConfigStore = class {
       enableCalendarEmail: this.config.enableCalendarEmail,
       enableWebhooks: this.config.enableWebhooks,
       enableSmartHome: this.config.enableSmartHome,
+      enableProcessManager: this.config.enableProcessManager,
+      enableUiAutomation: this.config.enableUiAutomation,
+      enableMediaController: this.config.enableMediaController,
+      enableReportGenerator: this.config.enableReportGenerator,
+      enableFileSummarizer: this.config.enableFileSummarizer,
+      enableQrService: this.config.enableQrService,
+      enableOcrService: this.config.enableOcrService,
+      enablePresentationMode: this.config.enablePresentationMode,
+      enableFocusMode: this.config.enableFocusMode,
       // Module-specific configs
       hassUrl: this.config.hassUrl || "http://homeassistant.local:8123",
       hasHassToken: Boolean(this.config.hassToken && this.config.hassToken.length > 5),

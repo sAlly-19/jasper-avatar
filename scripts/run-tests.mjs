@@ -22,6 +22,7 @@ const tempUserData = ${JSON.stringify(tempUserData)};
 
 export const app = {
   getPath: (name) => tempUserData,
+  getAppPath: () => ${JSON.stringify(rootDir)},
   whenReady: () => Promise.resolve(),
   quit: () => {}
 };
@@ -42,9 +43,17 @@ export const BrowserWindow = class {
   loadURL() { return Promise.resolve(); }
   webContents = {
     setAudioMuted() {},
-    getTitle() { return 'Test Page'; },
-    capturePage() { return Promise.resolve({ toDataURL: () => 'data:image/png;base64,...' }); },
-    executeJavaScript() { return Promise.resolve('Mocked page content'); }
+    getTitle() { return 'Página Corporativa Jasper'; },
+    capturePage() { return Promise.resolve({ toDataURL: () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' }); },
+    executeJavaScript(script) {
+      if (typeof script === 'string' && script.includes('.click()')) return Promise.resolve({ found: true });
+      if (typeof script === 'string' && script.includes('el.value =')) return Promise.resolve({ found: true });
+      if (typeof script === 'string' && (script.includes('extract_table') || script.includes('table'))) {
+        return Promise.resolve({ found: true, headers: ['Plano', 'Valor'], rows: [['Jasper Pro', 'R$ 197']] });
+      }
+      return Promise.resolve('Mocked page content');
+    },
+    printToPDF: () => Promise.resolve(Buffer.from('%PDF-1.4 Mock PDF Stream Generated\\n%%EOF'))
   };
   destroy() {}
   isDestroyed() { return false; }
@@ -54,7 +63,20 @@ export const shell = {
   openExternal: () => Promise.resolve()
 };
 
-export default { app, safeStorage, clipboard, BrowserWindow, shell };
+export const desktopCapturer = {
+  getSources: () => Promise.resolve([
+    {
+      name: 'Entire Screen',
+      id: 'screen:0:0',
+      thumbnail: {
+        toJPEG: () => Buffer.from('fake-jpeg-data'),
+        getSize: () => ({ width: 1280, height: 720 })
+      }
+    }
+  ])
+};
+
+export default { app, safeStorage, clipboard, BrowserWindow, shell, desktopCapturer };
 `
 
 const mockPath = path.join(rootDir, 'test', '_electron-mock.mjs')
@@ -62,21 +84,46 @@ fs.writeFileSync(mockPath, electronMockShim, 'utf-8')
 
 // Bundle tests with esbuild resolving real TypeScript classes and @shared aliases
 console.log('[run-tests] Empacotando testes com as implementações REAIS do sistema...')
-esbuild.buildSync({
-  entryPoints: [path.join(rootDir, 'test', 'security-hardening.test.ts')],
-  outfile: path.join(rootDir, 'test', 'security-hardening.test.mjs'),
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  alias: {
-    'electron': mockPath,
-    '@shared': path.join(rootDir, 'src', 'shared', 'index.ts')
-  },
-  external: ['three', '@tensorflow/tfjs', '@tensorflow-models/speech-commands', 'dotenv']
-})
+
+const testFiles = [
+  { in: 'zero-config-real-modules.test.ts', out: 'zero-config-real-modules.test.mjs' },
+  { in: 'security-hardening.test.ts', out: 'security-hardening.test.mjs' },
+  { in: 'os-automation.test.ts', out: 'os-automation.test.mjs' },
+  { in: 'productivity-reports.test.ts', out: 'productivity-reports.test.mjs' },
+  { in: 'environment-intelligence.test.ts', out: 'environment-intelligence.test.mjs' }
+]
+
+for (const tf of testFiles) {
+  esbuild.buildSync({
+    entryPoints: [path.join(rootDir, 'test', tf.in)],
+    outfile: path.join(rootDir, 'test', tf.out),
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    alias: {
+      'electron': mockPath,
+      '@shared': path.join(rootDir, 'src', 'shared', 'index.ts')
+    },
+    external: [
+      'three',
+      '@tensorflow/tfjs',
+      '@tensorflow-models/speech-commands',
+      'dotenv',
+      'systeminformation',
+      'exceljs',
+      'docx',
+      'qrcode',
+      'pdf-parse',
+      'mammoth',
+      'jsqr',
+      'tesseract.js'
+    ]
+  })
+}
 
 console.log('[run-tests] Executando suíte de testes de integração real...')
-const res = spawnSync(process.execPath, ['--test', 'test/security-hardening.test.mjs'], {
+const outFiles = testFiles.map((tf) => path.join('test', tf.out))
+const res = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...outFiles], {
   cwd: rootDir,
   stdio: 'inherit'
 })
@@ -89,4 +136,3 @@ try {
 } catch {}
 
 process.exit(res.status ?? 0)
-
