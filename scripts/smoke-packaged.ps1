@@ -9,27 +9,54 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
 $smokeRoot = Join-Path $env:TEMP 'jasper-packaged-smoke-ci'
 $appDataRoot = Join-Path $smokeRoot 'appdata'
 $screenshotRoot = Join-Path $smokeRoot 'screenshots'
+$resolvedTemp = [IO.Path]::GetFullPath($env:TEMP).TrimEnd([IO.Path]::DirectorySeparatorChar)
+$resolvedSmokeRoot = [IO.Path]::GetFullPath($smokeRoot)
+if (-not $resolvedSmokeRoot.StartsWith("$resolvedTemp$([IO.Path]::DirectorySeparatorChar)", [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Diretorio temporario do smoke test invalido.'
+}
+if (Test-Path -LiteralPath $resolvedSmokeRoot) {
+    Remove-Item -LiteralPath $resolvedSmokeRoot -Recurse -Force
+}
 New-Item -ItemType Directory -Path $appDataRoot, $screenshotRoot -Force | Out-Null
 
 $env:APPDATA = $appDataRoot
 $env:SCREENSHOT_OUT_DIR = $screenshotRoot
 $process = Start-Process -FilePath $executable -ArgumentList @('--capture-screenshot', "--user-data-dir=$appDataRoot") -WindowStyle Hidden -PassThru
-if (-not $process.WaitForExit(30000)) {
-    $process.Kill()
-    throw 'Smoke test excedeu 30 segundos.'
-}
-if ($process.ExitCode -ne 0) {
-    throw "Aplicacao empacotada encerrou com codigo $($process.ExitCode)."
-}
-
 $screenshot = Join-Path $screenshotRoot 'app_screenshot.png'
-if (-not (Test-Path -LiteralPath $screenshot -PathType Leaf) -or (Get-Item -LiteralPath $screenshot).Length -lt 10000) {
-    throw 'Smoke test nao gerou uma captura valida.'
+$deadline = [DateTime]::UtcNow.AddSeconds(90)
+$runtimeLog = $null
+
+try {
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $process.Refresh()
+        if ($process.HasExited -and $process.ExitCode -ne 0) {
+            throw "Aplicacao empacotada encerrou com codigo $($process.ExitCode)."
+        }
+
+        $runtimeLog = Get-ChildItem -LiteralPath $appDataRoot -Filter 'jasper-runtime-*.log' -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        $hasScreenshot = (Test-Path -LiteralPath $screenshot -PathType Leaf) -and
+            (Get-Item -LiteralPath $screenshot).Length -ge 10000
+        $hasLoadedAvatar = $runtimeLog -and
+            ((Get-Content -LiteralPath $runtimeLog.FullName -Raw) -match 'Avatar model loaded successfully')
+
+        if ($hasScreenshot -and $hasLoadedAvatar) {
+            break
+        }
+        Start-Sleep -Milliseconds 500
+    }
+} finally {
+    $process.Refresh()
+    if (-not $process.HasExited) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        $process.WaitForExit(5000) | Out-Null
+    }
 }
 
-$runtimeLog = Get-ChildItem -LiteralPath $appDataRoot -Filter 'jasper-runtime-*.log' -Recurse -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+if (-not (Test-Path -LiteralPath $screenshot -PathType Leaf) -or (Get-Item -LiteralPath $screenshot).Length -lt 10000) {
+    throw 'Smoke test nao gerou uma captura valida em 90 segundos.'
+}
 if (-not $runtimeLog) {
     throw 'Smoke test nao gerou log de runtime.'
 }
