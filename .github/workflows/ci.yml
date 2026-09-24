@@ -28,6 +28,8 @@ jobs:
       - run: npm run audit:runtime
       - run: npm run package:dir
       - run: npm run smoke:packaged
+        env:
+          JASPER_SMOKE_ROOT: ${{ runner.temp }}
       - name: Generate security metadata
         shell: pwsh
         run: |

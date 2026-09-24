@@ -6,10 +6,11 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
     throw 'Executavel empacotado nao encontrado. Execute npm run package:dir primeiro.'
 }
 
-$smokeRoot = Join-Path $env:TEMP 'jasper-packaged-smoke-ci'
+$tempRoot = if ($env:JASPER_SMOKE_ROOT) { $env:JASPER_SMOKE_ROOT } else { $env:TEMP }
+$smokeRoot = Join-Path $tempRoot 'jasper-packaged-smoke-ci'
 $appDataRoot = Join-Path $smokeRoot 'appdata'
 $screenshotRoot = Join-Path $smokeRoot 'screenshots'
-$resolvedTemp = [IO.Path]::GetFullPath($env:TEMP).TrimEnd([IO.Path]::DirectorySeparatorChar)
+$resolvedTemp = [IO.Path]::GetFullPath($tempRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
 $resolvedSmokeRoot = [IO.Path]::GetFullPath($smokeRoot)
 if (-not $resolvedSmokeRoot.StartsWith("$resolvedTemp$([IO.Path]::DirectorySeparatorChar)", [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Diretorio temporario do smoke test invalido.'
