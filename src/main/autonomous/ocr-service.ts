@@ -3,6 +3,7 @@ import path from 'path'
 import { createRequire } from 'module'
 import { screenAwareness } from './screen-awareness'
 import { redactSecrets } from './clipboard-watcher'
+import { securityBroker } from '../services/security-broker'
 
 export interface OcrResult {
   success: boolean
@@ -57,8 +58,11 @@ export class OcrService {
       let bufferToProcess: Buffer
 
       if (typeof imageInput === 'string') {
-        const cleanPath = path.resolve(imageInput.trim())
-        bufferToProcess = await fs.readFile(cleanPath)
+        const pathDecision = securityBroker.resolveUserPath(imageInput)
+        if (!pathDecision.allowed || !pathDecision.resolvedPath) {
+          throw new Error(pathDecision.reason || 'Acesso à imagem não autorizado.')
+        }
+        bufferToProcess = await fs.readFile(pathDecision.resolvedPath)
       } else {
         bufferToProcess = imageInput
       }

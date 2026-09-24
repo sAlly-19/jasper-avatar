@@ -10,6 +10,20 @@ export interface WakeTrainerOptions {
   micRecorder: MicRecorder
 }
 
+function setTrustedIconText(element: HTMLElement, icon: string, message: string): void {
+  const iconElement = document.createElement('span')
+  iconElement.setAttribute('aria-hidden', 'true')
+  iconElement.innerHTML = icon
+  element.replaceChildren(iconElement, document.createTextNode(` ${message}`))
+}
+
+function setAgentTitle(element: HTMLElement, prefix: string, agentName: string): void {
+  const name = document.createElement('span')
+  name.className = 'lbl-agent-target-name'
+  name.textContent = agentName
+  element.replaceChildren(document.createTextNode(prefix), name)
+}
+
 export class WakeTrainerUI {
   private options: WakeTrainerOptions
 
@@ -65,7 +79,7 @@ export class WakeTrainerUI {
         badgeModelState.style.borderColor = 'rgba(0, 255, 136, 0.3)'
       }
       if (wakeStatusTitle) {
-        wakeStatusTitle.innerHTML = `Motor Neural Ativo para: <span class="lbl-agent-target-name">${currentAgentName}</span>`
+        setAgentTitle(wakeStatusTitle, 'Motor Neural Ativo para: ', currentAgentName)
       }
       if (wakeStatusDesc) {
         wakeStatusDesc.textContent = `Pronto! Diga "${currentAgentName}" no microfone para ativar o assistente via TensorFlow. Fala comum ou ruídos aleatórios serão ignorados.`
@@ -79,7 +93,7 @@ export class WakeTrainerUI {
         badgeModelState.style.borderColor = 'rgba(255, 68, 68, 0.3)'
       }
       if (wakeStatusTitle) {
-        wakeStatusTitle.innerHTML = `Calibração Incompleta: <span class="lbl-agent-target-name">${currentAgentName}</span>`
+        setAgentTitle(wakeStatusTitle, 'Calibração Incompleta: ', currentAgentName)
       }
       if (wakeStatusDesc) {
         wakeStatusDesc.textContent = `O modelo salvo possui apenas 2 classes (ativa com qualquer voz). Grave 3 amostras de "Outras Palavras" e clique em "Treinar" para corrigir.`
@@ -93,7 +107,7 @@ export class WakeTrainerUI {
         badgeModelState.style.borderColor = 'rgba(255, 170, 0, 0.3)'
       }
       if (wakeStatusTitle) {
-        wakeStatusTitle.innerHTML = `Calibração TensorFlow para: <span class="lbl-agent-target-name">${currentAgentName}</span>`
+        setAgentTitle(wakeStatusTitle, 'Calibração TensorFlow para: ', currentAgentName)
       }
       if (wakeStatusDesc) {
         wakeStatusDesc.textContent = `Grave 3 amostras dizendo "${currentAgentName}", 2 de silêncio e 3 de outras palavras comuns para treinar a rede neural sem falsos positivos.`
@@ -146,7 +160,7 @@ export class WakeTrainerUI {
         setSampleButtonsDisabled(true)
         playTone(880, 0.12)
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.dotRecord} Gravando... Diga claramente "${currentAgentName}" agora!`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.dotRecord, `Gravando... Diga claramente "${currentAgentName}" agora!`)
           trainerFeedback.style.color = 'var(--accent-cyan)'
         }
         btnSampleName.innerHTML = `${SVG_ICONS.dotRecord} Gravando...`
@@ -155,7 +169,7 @@ export class WakeTrainerUI {
 
         playTone(523.25, 0.15)
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.check} Amostra de "${currentAgentName}" gravada com sucesso! (${result.count}/3)`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.check, `Amostra de "${currentAgentName}" gravada com sucesso! (${result.count}/3)`)
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()
@@ -167,7 +181,7 @@ export class WakeTrainerUI {
         }
       } finally {
         setSampleButtonsDisabled(false)
-        btnSampleName.innerHTML = `${SVG_ICONS.mic} Gravar "<span class="lbl-agent-target-name">${currentAgentName}</span>"`
+        setTrustedIconText(btnSampleName, SVG_ICONS.mic, `Gravar "${currentAgentName}"`)
       }
     })
 
@@ -186,7 +200,7 @@ export class WakeTrainerUI {
         setSampleButtonsDisabled(true)
         playTone(659.25, 0.12)
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.micOff} Gravando ruído ambiente... Fique em silêncio por 1 segundo.`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.micOff, 'Gravando ruído ambiente... Fique em silêncio por 1 segundo.')
           trainerFeedback.style.color = 'var(--accent-cyan)'
         }
         btnSampleNoise.innerHTML = `${SVG_ICONS.dotRecord} Gravando...`
@@ -195,7 +209,7 @@ export class WakeTrainerUI {
 
         playTone(523.25, 0.15)
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.check} Silêncio capturado com sucesso! (${result.count}/2)`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.check, `Silêncio capturado com sucesso! (${result.count}/2)`)
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()
@@ -226,7 +240,7 @@ export class WakeTrainerUI {
         setSampleButtonsDisabled(true)
         playTone(740, 0.12)
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.dotRecord} Gravando... Diga qualquer palavra comum (ex: "olá", "teste", "ok")!`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.dotRecord, 'Gravando... Diga qualquer palavra comum (ex: "olá", "teste", "ok")!')
           trainerFeedback.style.color = '#c084fc'
         }
         btnSampleOther.innerHTML = `${SVG_ICONS.dotRecord} Gravando...`
@@ -235,7 +249,7 @@ export class WakeTrainerUI {
 
         playTone(523.25, 0.15)
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.check} Amostra de outras palavras gravada com sucesso! (${result.count}/3)`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.check, `Amostra de outras palavras gravada com sucesso! (${result.count}/3)`)
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()
@@ -259,7 +273,7 @@ export class WakeTrainerUI {
       try {
         btnTrainCustomModel.disabled = true
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.bolt} Compilando e treinando modelo neural local de 3 classes para "${currentAgentName}"...`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.bolt, `Compilando e treinando modelo neural local de 3 classes para "${currentAgentName}"...`)
           trainerFeedback.style.color = 'var(--accent-cyan)'
         }
 
@@ -272,7 +286,7 @@ export class WakeTrainerUI {
         this.options.wakeWordManager.syncRunningState()
         playWakeChime()
         if (trainerFeedback) {
-          trainerFeedback.innerHTML = `${SVG_ICONS.sparkle} Sucesso! O assistente agora responde com alta precisão ao nome "${currentAgentName}". Fala comum será ignorada.`
+          setTrustedIconText(trainerFeedback, SVG_ICONS.sparkle, `Sucesso! O assistente agora responde com alta precisão ao nome "${currentAgentName}". Fala comum será ignorada.`)
           trainerFeedback.style.color = '#00ff88'
         }
         this.updateUI()

@@ -17,6 +17,13 @@ export interface SettingsModalOptions {
   wakeTrainerUI: WakeTrainerUI
 }
 
+function setIconMessage(element: HTMLElement, icon: string, message: string): void {
+  const iconElement = document.createElement('span')
+  iconElement.setAttribute('aria-hidden', 'true')
+  iconElement.innerHTML = icon
+  element.replaceChildren(iconElement, document.createTextNode(` ${message}`))
+}
+
 export class SettingsModal {
   private options: SettingsModalOptions
 
@@ -36,14 +43,24 @@ export class SettingsModal {
         memoryCountBadge.textContent = `${facts.length} ${facts.length === 1 ? 'fato' : 'fatos'}`
       }
       if (facts.length === 0) {
-        memoryFactsList.innerHTML = '<span class="memory-empty">Nenhum fato memorizado ainda. Converse com o agente para ele aprender sobre você.</span>'
+        const emptyState = document.createElement('span')
+        emptyState.className = 'memory-empty'
+        emptyState.textContent = 'Nenhum fato memorizado ainda. Converse com o agente para ele aprender sobre você.'
+        memoryFactsList.replaceChildren(emptyState)
         return
       }
-      memoryFactsList.innerHTML = facts
-        .map((f) => `<div class="memory-fact-item">${f.fact}</div>`)
-        .join('')
+      const items = facts.map((fact) => {
+        const item = document.createElement('div')
+        item.className = 'memory-fact-item'
+        item.textContent = fact.fact
+        return item
+      })
+      memoryFactsList.replaceChildren(...items)
     } catch {
-      memoryFactsList.innerHTML = '<span class="memory-empty">Erro ao carregar memórias.</span>'
+      const errorState = document.createElement('span')
+      errorState.className = 'memory-empty'
+      errorState.textContent = 'Erro ao carregar memórias.'
+      memoryFactsList.replaceChildren(errorState)
     }
   }
 
@@ -121,7 +138,6 @@ export class SettingsModal {
       checkSystemHealth,
       checkSemanticMemory,
       checkKnowledgeGraph,
-      checkCodeInterpreter,
       checkHeadlessBrowser,
       checkGitWatcher,
       checkFolderOrganizer,
@@ -216,7 +232,7 @@ export class SettingsModal {
         }
       }
       selectVoice.value = config.voiceName || 'Charon'
-      selectModel.value = config.model || 'gemini-2.5-flash-native-audio-latest'
+      selectModel.value = config.model || 'gemini-3.1-flash-live-preview'
 
       if (checkWakeWord) {
         checkWakeWord.checked = config.enableWakeWord !== false
@@ -259,9 +275,6 @@ export class SettingsModal {
       }
       if (checkKnowledgeGraph) {
         checkKnowledgeGraph.checked = config.enableKnowledgeGraph !== false
-      }
-      if (checkCodeInterpreter) {
-        checkCodeInterpreter.checked = config.enableCodeInterpreter !== false
       }
       if (checkHeadlessBrowser) {
         checkHeadlessBrowser.checked = config.enableHeadlessBrowser !== false
@@ -527,14 +540,14 @@ export class SettingsModal {
       try {
         const res = await window.electronAPI.testSmartHomeConnection(url, token)
         if (res.success) {
-          hassTestFeedback.innerHTML = `${SVG_ICONS.check} ${res.message}`
+          setIconMessage(hassTestFeedback, SVG_ICONS.check, res.message)
           hassTestFeedback.className = 'config-test-feedback success'
         } else {
-          hassTestFeedback.innerHTML = `${SVG_ICONS.error} ${res.message}`
+          setIconMessage(hassTestFeedback, SVG_ICONS.error, res.message)
           hassTestFeedback.className = 'config-test-feedback error'
         }
       } catch (err: any) {
-        hassTestFeedback.innerHTML = `${SVG_ICONS.error} Erro: ${err.message || 'Falha'}`
+        setIconMessage(hassTestFeedback, SVG_ICONS.error, `Erro: ${err?.message || 'Falha'}`)
         hassTestFeedback.className = 'config-test-feedback error'
       }
     })
@@ -543,7 +556,7 @@ export class SettingsModal {
       if (!webhookTestFeedback) return
       const url = inputWebhookUrl?.value.trim()
       if (!url) {
-        webhookTestFeedback.innerHTML = `${SVG_ICONS.error} Informe uma URL primeiro`
+        setIconMessage(webhookTestFeedback, SVG_ICONS.error, 'Informe uma URL primeiro')
         webhookTestFeedback.className = 'config-test-feedback error'
         return
       }
@@ -554,14 +567,14 @@ export class SettingsModal {
       try {
         const res = await window.electronAPI.testWebhook(url)
         if (res.success) {
-          webhookTestFeedback.innerHTML = `${SVG_ICONS.check} Sucesso! (HTTP ${res.status} em ${res.executionTimeMs}ms)`
+          setIconMessage(webhookTestFeedback, SVG_ICONS.check, `Sucesso! (HTTP ${res.status} em ${res.executionTimeMs}ms)`)
           webhookTestFeedback.className = 'config-test-feedback success'
         } else {
-          webhookTestFeedback.innerHTML = `${SVG_ICONS.error} Falha: ${res.error || `HTTP ${res.status}`}`
+          setIconMessage(webhookTestFeedback, SVG_ICONS.error, `Falha: ${res.error || `HTTP ${res.status}`}`)
           webhookTestFeedback.className = 'config-test-feedback error'
         }
       } catch (err: any) {
-        webhookTestFeedback.innerHTML = `${SVG_ICONS.error} Erro: ${err.message || 'Falha'}`
+        setIconMessage(webhookTestFeedback, SVG_ICONS.error, `Erro: ${err?.message || 'Falha'}`)
         webhookTestFeedback.className = 'config-test-feedback error'
       }
     })
@@ -607,7 +620,6 @@ export class SettingsModal {
         enableSystemHealth: checkSystemHealth ? checkSystemHealth.checked : true,
         enableSemanticMemory: checkSemanticMemory ? checkSemanticMemory.checked : true,
         enableKnowledgeGraph: checkKnowledgeGraph ? checkKnowledgeGraph.checked : true,
-        enableCodeInterpreter: checkCodeInterpreter ? checkCodeInterpreter.checked : true,
         enableHeadlessBrowser: checkHeadlessBrowser ? checkHeadlessBrowser.checked : true,
         enableGitWatcher: checkGitWatcher ? checkGitWatcher.checked : true,
         enableFolderOrganizer: checkFolderOrganizer ? checkFolderOrganizer.checked : true,

@@ -1,7 +1,27 @@
 import { execFile } from 'child_process'
-import { join } from 'path'
-import { app } from 'electron'
-import fs from 'fs'
+import { resolvePowerShellScript } from './script-path'
+import { securityBroker } from '../services/security-broker'
+
+const SENSITIVE_WINDOW_PATTERN = /(?:windows security|seguran[cÃ§]a do windows|user account control|controle de conta de usu[aÃ¡]rio|credential|credencial|secure desktop|powershell|prompt de comando|command prompt|windows terminal)/i
+const SENSITIVE_FIELD_PATTERN = /(?:password|passwd|senha|pin|token|secret|segredo|credential|credencial|api[ _-]?key|chave[ _-]?(?:api|privada)|terminal|console|powershell|prompt de comando)/i
+
+function validateTarget(windowTitle: string, elementName?: string): string | null {
+  if (!windowTitle.trim() || windowTitle.length > 240 || /[\r\n\0]/.test(windowTitle)) {
+    return 'TÃ­tulo de janela invÃ¡lido.'
+  }
+  if (SENSITIVE_WINDOW_PATTERN.test(windowTitle)) {
+    return 'AutomaÃ§Ã£o bloqueada em janelas de seguranÃ§a ou credenciais.'
+  }
+  if (elementName !== undefined) {
+    if (!elementName.trim() || elementName.length > 240 || /[\r\n\0]/.test(elementName)) {
+      return 'Nome de elemento invÃ¡lido.'
+    }
+    if (SENSITIVE_FIELD_PATTERN.test(elementName)) {
+      return 'AutomaÃ§Ã£o bloqueada para campos de senha, token ou credenciais.'
+    }
+  }
+  return null
+}
 
 export interface UIElementInfo {
   name: string
@@ -29,19 +49,7 @@ export class UIAutomationService {
   }
 
   private getScriptPath(): string {
-    try {
-      const srcPath = join(app.getAppPath(), 'src', 'main', 'autonomous', 'scripts', 'ui-automation.ps1')
-      if (fs.existsSync(srcPath)) return srcPath
-    } catch {}
-
-    try {
-      if (typeof __dirname !== 'undefined') {
-        const devPath = join(__dirname, 'scripts', 'ui-automation.ps1')
-        if (fs.existsSync(devPath)) return devPath
-      }
-    } catch {}
-
-    return join(process.cwd(), 'src', 'main', 'autonomous', 'scripts', 'ui-automation.ps1')
+    return resolvePowerShellScript('ui-automation.ps1')
   }
 
   /**
@@ -71,11 +79,16 @@ export class UIAutomationService {
    * Inspect buttons and interactive elements in a window
    */
   public async inspectWindow(windowTitle: string, limit: number = 20): Promise<WindowElementsResult> {
+    const validationError = validateTarget(windowTitle)
+    if (validationError) {
+      return { windowTitle, processId: 0, elements: [], error: validationError }
+    }
+    const safeLimit = Math.max(1, Math.min(50, Number(limit) || 20))
     return new Promise((resolve) => {
       const scriptPath = this.getScriptPath()
       execFile(
         'powershell',
-        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-Action', 'inspect-window', '-WindowTitle', windowTitle, '-Limit', String(limit)],
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-Action', 'inspect-window', '-WindowTitle', windowTitle, '-Limit', String(safeLimit)],
         { timeout: 8000, windowsHide: true },
         (error, stdout) => {
           if (error || !stdout) {
@@ -96,6 +109,17 @@ export class UIAutomationService {
    * Find and click a button or interactive element in a window
    */
   public async clickElement(windowTitle: string, elementName: string): Promise<{ success: boolean; message: string }> {
+    const validationError = validateTarget(windowTitle, elementName)
+    if (validationError) return { success: false, message: validationError }
+
+    const approved = await securityBroker.confirmOperation({
+      title: 'Autorizar clique na interface',
+      message: `Permitir um clique em "${elementName}"?`,
+      detail: `Janela de destino: ${windowTitle}. Confirme somente se esta aÃ§Ã£o corresponde ao que vocÃª solicitou.`,
+      confirmLabel: 'Executar clique'
+    })
+    if (!approved) return { success: false, message: 'Clique cancelado pelo usuÃ¡rio.' }
+
     return new Promise((resolve) => {
       const scriptPath = this.getScriptPath()
       execFile(
@@ -125,6 +149,20 @@ export class UIAutomationService {
    * Insert text into an input or edit box in a window
    */
   public async setElementText(windowTitle: string, elementName: string, text: string): Promise<{ success: boolean; message: string }> {
+    const validationError = validateTarget(windowTitle, elementName)
+    if (validationError) return { success: false, message: validationError }
+    if (!text || text.length > 10000 || text.includes('\0')) {
+      return { success: false, message: 'Texto vazio ou acima do limite permitido.' }
+    }
+
+    const approved = await securityBroker.confirmOperation({
+      title: 'Autorizar preenchimento de campo',
+      message: `Permitir que o Jasper preencha o campo "${elementName}"?`,
+      detail: `Janela de destino: ${windowTitle}. O conteÃºdo digitado nÃ£o Ã© exibido nesta confirmaÃ§Ã£o nem no log.`,
+      confirmLabel: 'Preencher campo'
+    })
+    if (!approved) return { success: false, message: 'Preenchimento cancelado pelo usuÃ¡rio.' }
+
     return new Promise((resolve) => {
       const scriptPath = this.getScriptPath()
       execFile(

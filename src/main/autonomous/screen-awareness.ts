@@ -1,4 +1,5 @@
 import { desktopCapturer } from 'electron'
+import { securityBroker } from '../services/security-broker'
 
 export class ScreenAwarenessService {
   private isEnabled: boolean = true
@@ -34,6 +35,16 @@ export class ScreenAwarenessService {
     }
 
     try {
+      const approved = await securityBroker.confirmOperation({
+        title: 'Autorizar captura de tela',
+        message: 'O Jasper solicitou uma captura da tela principal.',
+        detail: 'A imagem será enviada ao Gemini para responder à solicitação atual. Autorize somente se não houver informações sensíveis visíveis.',
+        confirmLabel: 'Capturar e enviar'
+      })
+      if (!approved) {
+        return { success: false, error: 'Captura de tela cancelada pelo usuário.' }
+      }
+
       const sources = await desktopCapturer.getSources({
         types: ['screen'],
         thumbnailSize: { width: 1280, height: 720 }

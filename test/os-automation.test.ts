@@ -30,6 +30,10 @@ test('Parte 1: Automação do Sistema Operacional, Processos & Hardware', async 
     const res3 = await processManager.launchProgram('calc & calc')
     assert.equal(res3.success, false)
     assert.match(res3.message, /caracteres inválidos/i)
+
+    const shellRes = await processManager.launchProgram('powershell.exe')
+    assert.equal(shellRes.success, false)
+    assert.match(shellRes.message, /Interpretadores de comando/i)
   })
 
   await t.test('ProcessManagerService: proteção contra encerramento de processos críticos', async () => {
@@ -79,6 +83,13 @@ test('Parte 1: Automação do Sistema Operacional, Processos & Hardware', async 
 
     const textRes = await uiAutomation.setElementText('', '', '')
     assert.equal(textRes.success, false)
+
+    const credentialRes = await uiAutomation.setElementText('Aplicativo', 'Senha', 'nao-deve-ser-digitada')
+    assert.equal(credentialRes.success, false)
+    assert.match(credentialRes.message, /senha|credenciais/i)
+
+    const terminalRes = await uiAutomation.clickElement('Windows Terminal', 'Nova aba')
+    assert.equal(terminalRes.success, false)
   })
 
   await t.test('SystemHealthService: diagnóstico detalhado com systeminformation', async () => {

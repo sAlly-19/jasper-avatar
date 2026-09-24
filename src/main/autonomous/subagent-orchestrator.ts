@@ -1,6 +1,5 @@
 import type { SubagentRole, SubagentTask, AutonomyNotification } from '@shared'
 import { headlessBrowser } from './headless-browser'
-import { codeInterpreter } from './code-interpreter'
 import { gitWatcher } from './git-watcher'
 import { systemHealth } from './system-health'
 
@@ -84,7 +83,7 @@ export class SubagentOrchestrator {
   }
 
   private async executeSubagentTask(subTask: SubagentTask, signal: AbortSignal): Promise<void> {
-    console.log(`[SubagentOrchestrator] Started subagent [${subTask.role.toUpperCase()}] for: "${subTask.task}"`)
+    console.log(`[SubagentOrchestrator] Started ${subTask.role} task.`)
 
     try {
       if (signal.aborted) throw new Error('Tarefa abortada antes da execução.')
@@ -109,23 +108,12 @@ export class SubagentOrchestrator {
         }
 
         case 'coder': {
-          // Execute quick code analysis or calculation with real abort signal
-          const escapedTask = JSON.stringify(subTask.task)
-          const pythonCode = `
-# Subagente Coder: Execução autônoma
-import sys, math
-print("Execução de análise de código para:", ${escapedTask})
-print("Status: Rotina concluída com sucesso.")
-`
-          const codeRes = await codeInterpreter.execute('python', pythonCode, 20000, signal)
-          resultText = codeRes.success
-            ? `Script executado pelo subagente (${codeRes.executionTimeMs}ms):\n${codeRes.stdout}`
-            : `Erro no subagente coder: ${codeRes.stderr || codeRes.error}`
+          resultText = `Análise preparada para: "${subTask.task}". A execução local de scripts foi removida por segurança.`
           break
         }
 
         case 'tester': {
-          const testRes = await gitWatcher.runTests(undefined, undefined, signal)
+          const testRes = await gitWatcher.runTests(undefined, signal)
           resultText = `Suíte de testes executada:\n${testRes.output}`
           break
         }
@@ -139,7 +127,7 @@ print("Status: Rotina concluída com sucesso.")
 
         default: {
           await new Promise((r) => setTimeout(r, 1500))
-          resultText = `Subagente completou o processamento de: "${subTask.task}" com sucesso.`
+          resultText = `Rotina em segundo plano concluiu: "${subTask.task}".`
           break
         }
       }
@@ -149,7 +137,7 @@ print("Status: Rotina concluída com sucesso.")
       subTask.result = resultText
       subTask.endTime = Date.now()
 
-      console.log(`[SubagentOrchestrator] Completed subagent [${subTask.role.toUpperCase()}] ID: ${subTask.id}`)
+      console.log(`[SubagentOrchestrator] Completed ${subTask.role} task.`)
 
       if (this.onNotification) {
         this.onNotification({

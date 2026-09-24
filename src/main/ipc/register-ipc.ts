@@ -1,4 +1,10 @@
-import { ipcMain, dialog } from 'electron'
+import {
+  dialog,
+  ipcMain,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+  type OpenDialogOptions
+} from 'electron'
 import { IPC_CHANNELS, type UpdateConfigPayload } from '@shared'
 import { GeminiLiveClient } from '../gemini-live'
 import { configStore } from '../config/config-store'
@@ -14,95 +20,132 @@ import {
 } from '../windows/main-window'
 import { licenseManager } from '../services/license-manager'
 import { getHardwareInfo } from '../services/hwid'
+import { isTrustedRendererUrl } from '../utils/trusted-renderer'
 import {
   autonomyCoordinator,
-  systemHealth,
-  cronEngine,
-  screenAwareness,
-  windowTracker,
-  knowledgeGraph,
-  briefingService,
-  codeInterpreter,
-  headlessBrowser,
-  gitWatcher,
-  folderOrganizer,
-  subagentOrchestrator,
   reflexionEngine,
-  calendarEmail,
-  webhookManager,
-  smartHome
+  smartHome,
+  webhookManager
 } from '../autonomous'
 
+type TrustedEvent = IpcMainEvent | IpcMainInvokeEvent
+
+function assertTrustedSender(event: TrustedEvent): void {
+  const win = getMainWindow()
+  const frame = event.senderFrame
+  const developmentUrl = process.env['ELECTRON_RENDERER_URL']
+  if (!win || win.isDestroyed() || event.sender !== win.webContents || frame !== event.sender.mainFrame ||
+    !isTrustedRendererUrl(frame?.url || '', developmentUrl)) {
+    throw new Error('IPC rejeitado: origem não autorizada.')
+  }
+}
+
+function assertText(value: unknown, field: string, maxLength: number): asserts value is string {
+  if (typeof value !== 'string' || value.length > maxLength || value.includes('\0')) {
+    throw new Error(`${field} inválido.`)
+  }
+}
+
+const CONFIG_BOOLEAN_FIELDS = new Set([
+  'enableSystemTools', 'enableMediaTools', 'enableWakeWord', 'enableBloom', 'enableNeuralBg',
+  'enableEyeTracking', 'enableScreenAwareness', 'enableWindowTracker', 'enableClipboardWatcher',
+  'enableCronEngine', 'enableDailyBriefing', 'enableSystemHealth', 'enableSemanticMemory',
+  'enableKnowledgeGraph', 'enableHeadlessBrowser', 'enableGitWatcher', 'enableFolderOrganizer',
+  'enableSubagents', 'enableReflexionLoop', 'enableCalendarEmail', 'enableWebhooks', 'enableSmartHome',
+  'enableProcessManager', 'enableUiAutomation', 'enableMediaController', 'enableReportGenerator',
+  'enableFileSummarizer', 'enableQrService', 'enableOcrService', 'enablePresentationMode', 'enableFocusMode'
+])
+
+const CONFIG_STRING_LIMITS: Record<string, number> = {
+  apiKey: 512,
+  voiceName: 80,
+  model: 160,
+  agentName: 80,
+  hassUrl: 2048,
+  hassToken: 4096,
+  gitRepoPath: 4096,
+  webhookDefaultUrl: 2048,
+  emailUser: 254,
+  emailImapHost: 255,
+  emailPassword: 4096,
+  folderDefaultTarget: 4096
+}
+
+function assertConfigPayload(payload: unknown): asserts payload is UpdateConfigPayload {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Configuração inválida.')
+  for (const [key, value] of Object.entries(payload)) {
+    if (CONFIG_BOOLEAN_FIELDS.has(key)) {
+      if (typeof value !== 'boolean') throw new Error(`Campo de configuração inválido: ${key}.`)
+      continue
+    }
+    const maxLength = CONFIG_STRING_LIMITS[key]
+    if (maxLength !== undefined) {
+      assertText(value, key, maxLength)
+      continue
+    }
+    if (key === 'emailImapPort' && Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 65_535) continue
+    throw new Error(`Campo de configuração não permitido: ${key}.`)
+  }
+}
+
 export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | null): void {
-  // 1. Audio streaming from user mic to Gemini
-  ipcMain.on(IPC_CHANNELS.AUDIO_CHUNK, (_event, chunk: ArrayBuffer) => {
+  ipcMain.on(IPC_CHANNELS.AUDIO_CHUNK, (event, chunk: ArrayBuffer) => {
+    assertTrustedSender(event)
+    if (!(chunk instanceof ArrayBuffer) || chunk.byteLength > 1024 * 1024) return
     getGeminiClient()?.sendAudioChunk(chunk)
   })
 
-  // 2. Audio stream end (turn finalization)
-  ipcMain.on(IPC_CHANNELS.AUDIO_STREAM_END, () => {
-    getGeminiClient()?.sendAudioStreamEnd()
+  ipcMain.on(IPC_CHANNELS.CHAT_SEND, (event, message: string) => {
+    assertTrustedSender(event)
+    assertText(message, 'Mensagem', 20_000)
+    getGeminiClient()?.sendTextPrompt(message)
   })
 
-  // 3. Text prompt sending to Gemini
-  ipcMain.on(IPC_CHANNELS.CHAT_SEND, (_event, text: string) => {
-    getGeminiClient()?.sendTextPrompt(text)
-  })
+  ipcMain.handle(IPC_CHANNELS.GEMINI_CONNECT, async (event, payload?: UpdateConfigPayload) => {
+    assertTrustedSender(event)
+    if (payload !== undefined) assertConfigPayload(payload)
+    if (payload) configStore.updateConfig(payload)
 
-  // 4. Gemini connection controls
-  ipcMain.handle(
-    IPC_CHANNELS.GEMINI_CONNECT,
-    async (_event, payload?: UpdateConfigPayload) => {
-      if (payload) {
-        configStore.updateConfig(payload)
-      }
-      const cfg = configStore.getConfig()
-      if (cfg.licenseStatus !== 'active') {
-        return {
-          success: false,
-          error: 'Esta estação Jasper requer uma chave de licença vitalícia ativa.'
-        }
-      }
-
-      const client = getGeminiClient()
-
-      try {
-        await client?.connect(
-          cfg.apiKey,
-          cfg.voiceName,
-          cfg.model,
-          cfg.enableSystemTools,
-          cfg.enableMediaTools,
-          cfg.agentName
-        )
-        return { success: true }
-      } catch (err: any) {
-        return { success: false, error: err.message }
-      }
+    const licenseResult = await licenseManager.checkAccess24h()
+    const cfg = configStore.getConfig()
+    if (cfg.licenseStatus !== 'active' || !licenseResult.valid) {
+      return { success: false, error: 'Esta estação Jasper requer uma chave de licença ativa.' }
     }
-  )
 
-  ipcMain.handle(IPC_CHANNELS.GEMINI_DISCONNECT, async () => {
+    try {
+      await getGeminiClient()?.connect(
+        cfg.apiKey,
+        cfg.voiceName,
+        cfg.model,
+        cfg.enableSystemTools,
+        cfg.enableMediaTools,
+        cfg.agentName
+      )
+      return { success: true }
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Falha ao conectar.' }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.GEMINI_DISCONNECT, (event) => {
+    assertTrustedSender(event)
     getGeminiClient()?.disconnect()
     return true
   })
 
-  // 5. Configuration handlers
-  ipcMain.handle(IPC_CHANNELS.CONFIG_GET, () => {
+  ipcMain.handle(IPC_CHANNELS.CONFIG_GET, (event) => {
+    assertTrustedSender(event)
     const status = getGeminiClient()?.getStatus()
     return configStore.getConfigSummary(Boolean(status?.isConnected))
   })
 
-  ipcMain.handle(IPC_CHANNELS.CONFIG_SAVE, (_event, payload: UpdateConfigPayload) => {
+  ipcMain.handle(IPC_CHANNELS.CONFIG_SAVE, (event, payload: UpdateConfigPayload) => {
+    assertTrustedSender(event)
+    assertConfigPayload(payload)
     const updated = configStore.updateConfig(payload)
 
-    if (payload.agentName) {
-      safeSend(IPC_CHANNELS.CONFIG_AGENT_NAME_UPDATED, updated.agentName)
-    }
-
-    if (payload.apiKey !== undefined && payload.apiKey.trim() === '') {
-      getGeminiClient()?.disconnect()
-    }
+    if (payload.agentName) safeSend(IPC_CHANNELS.CONFIG_AGENT_NAME_UPDATED, updated.agentName)
+    if (payload.apiKey !== undefined && payload.apiKey.trim() === '') getGeminiClient()?.disconnect()
 
     getGeminiClient()?.updateConfig(
       updated.apiKey,
@@ -112,170 +155,86 @@ export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | nu
       updated.enableMediaTools,
       updated.agentName
     )
-
     autonomyCoordinator.updateServicesConfig()
-
     return { success: true }
   })
 
-  // 6. Memory handlers
-  ipcMain.handle(IPC_CHANNELS.MEMORY_GET, () => {
+  ipcMain.handle(IPC_CHANNELS.MEMORY_GET, (event) => {
+    assertTrustedSender(event)
     return loadMemory()
   })
 
-  ipcMain.handle(IPC_CHANNELS.MEMORY_CLEAR, () => {
+  ipcMain.handle(IPC_CHANNELS.MEMORY_CLEAR, (event) => {
+    assertTrustedSender(event)
     saveMemory({ userName: '', userPreferences: [], facts: [] })
     return true
   })
 
-  // 7. Window controls & PIP
-  ipcMain.handle(IPC_CHANNELS.WINDOW_TOGGLE_PIP, () => {
+  ipcMain.handle(IPC_CHANNELS.WINDOW_TOGGLE_PIP, (event) => {
+    assertTrustedSender(event)
     return togglePipMode()
   })
 
-  ipcMain.handle(IPC_CHANNELS.WINDOW_TOGGLE_FULLSCREEN, () => {
+  ipcMain.handle(IPC_CHANNELS.WINDOW_TOGGLE_FULLSCREEN, (event) => {
+    assertTrustedSender(event)
     return toggleFullScreenMode()
   })
 
-  ipcMain.on(IPC_CHANNELS.WINDOW_MINIMIZE, () => {
+  ipcMain.on(IPC_CHANNELS.WINDOW_MINIMIZE, (event) => {
+    assertTrustedSender(event)
     minimizeWindow()
   })
 
-  ipcMain.on(IPC_CHANNELS.WINDOW_MAXIMIZE, () => {
+  ipcMain.on(IPC_CHANNELS.WINDOW_MAXIMIZE, (event) => {
+    assertTrustedSender(event)
     maximizeWindow()
   })
 
-  ipcMain.on(IPC_CHANNELS.WINDOW_CLOSE, () => {
+  ipcMain.on(IPC_CHANNELS.WINDOW_CLOSE, (event) => {
+    assertTrustedSender(event)
     closeWindow()
   })
 
-  // 8. Autonomy & Proactive Services
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GET_SYSTEM_HEALTH, async () => {
-    return systemHealth.getHealth()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GET_SCHEDULES, () => {
-    return cronEngine.getTasks()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_ADD_SCHEDULE, (_event, title: string, minutesFromNow: number, recurrence?: 'once' | 'daily' | 'hourly') => {
-    return cronEngine.addTask(title, minutesFromNow, recurrence)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_REMOVE_SCHEDULE, (_event, id: string) => {
-    return cronEngine.removeTask(id)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_CAPTURE_SCREEN, async () => {
-    return screenAwareness.captureScreen()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GET_ACTIVE_WINDOW, async () => {
-    return windowTracker.getActiveWindow()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GET_KNOWLEDGE_GRAPH, () => {
-    return knowledgeGraph.getGraphData()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GET_BRIEFING, async () => {
-    return briefingService.generateBriefing()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_EXECUTE_CODE, async (_event, language: 'python' | 'javascript', code: string, timeoutMs?: number) => {
-    return codeInterpreter.execute(language, code, timeoutMs)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_BROWSE_PAGE, async (_event, url: string, options?: any) => {
-    return headlessBrowser.browse(url, options)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GIT_CHECK, async (_event, repoPath?: string) => {
-    return gitWatcher.checkRepo(repoPath)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GIT_SUGGEST_COMMIT, async (_event, repoPath?: string) => {
-    return gitWatcher.suggestCommit(repoPath)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_SCAN_FOLDER, async (_event, target?: string) => {
-    return folderOrganizer.scanDuplicatesAndOldFiles(target)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_ORGANIZE_FOLDER, async (_event, target?: string, dryRun?: boolean) => {
-    return folderOrganizer.organizeDirectory(target, dryRun)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_SPAWN_SUBAGENT, async (_event, role: any, task: string) => {
-    return subagentOrchestrator.spawnSubagent(role, task)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_GET_SUBAGENTS, () => {
-    return subagentOrchestrator.getTasks()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_CALENDAR_ADD_EVENT, (_event, title: string, startDateTime: any, durationMinutes?: number, description?: string, location?: string) => {
-    return calendarEmail.addEvent(title, startDateTime, durationMinutes, description, location)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_CALENDAR_GET_EVENTS, (_event, withinHours?: number) => {
-    return calendarEmail.getEvents(withinHours)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_EMAIL_CHECK, async (_event, options?: any) => {
-    return calendarEmail.checkEmails(options)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_WEBHOOK_TRIGGER, async (_event, nameOrUrl: string, payload?: any, method?: any) => {
-    return webhookManager.triggerWebhook(nameOrUrl, payload, method)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_WEBHOOK_LIST, () => {
-    return webhookManager.listWebhooks()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_SMART_HOME_GET_DEVICES, async (_event, domain?: string) => {
-    return smartHome.getEntities(domain)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_SMART_HOME_EXECUTE, async (_event, domain: string, service: string, entityId: string, serviceData?: any) => {
-    return smartHome.executeCommand(domain, service, entityId, serviceData)
-  })
-
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_REFLEXION_CONFIRMATION, (_event, confirmationId: string) => {
+  ipcMain.handle(IPC_CHANNELS.AUTONOMY_REFLEXION_CONFIRMATION, (event, confirmationId: string) => {
+    assertTrustedSender(event)
+    assertText(confirmationId, 'Confirmação', 160)
     return reflexionEngine.confirmAction(confirmationId)
   })
 
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_SMART_HOME_TEST_CONNECTION, async (_event, url?: string, token?: string) => {
+  ipcMain.handle(IPC_CHANNELS.AUTONOMY_SMART_HOME_TEST_CONNECTION, (event, url?: string, token?: string) => {
+    assertTrustedSender(event)
+    if (url !== undefined) assertText(url, 'URL', 2048)
+    if (token !== undefined) assertText(token, 'Token', 8192)
     return smartHome.testConnection(url, token)
   })
 
-  ipcMain.handle(IPC_CHANNELS.AUTONOMY_WEBHOOK_TEST, async (_event, url: string) => {
+  ipcMain.handle(IPC_CHANNELS.AUTONOMY_WEBHOOK_TEST, (event, url: string) => {
+    assertTrustedSender(event)
+    assertText(url, 'URL', 2048)
     return webhookManager.triggerWebhook(url, { test: true, ping: 'Jasper HUD AI' }, 'POST')
   })
 
-  ipcMain.handle(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY, async () => {
+  ipcMain.handle(IPC_CHANNELS.DIALOG_SELECT_DIRECTORY, async (event) => {
+    assertTrustedSender(event)
     const win = getMainWindow()
-    const result = await dialog.showOpenDialog(win || (undefined as any), {
-      properties: ['openDirectory'],
-      title: 'Selecionar Diretório do Repositório Git'
-    })
-    if (!result.canceled && result.filePaths.length > 0) {
-      return result.filePaths[0]
-    }
-    return null
+    const options: OpenDialogOptions = { properties: ['openDirectory'], title: 'Selecionar diretório' }
+    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+    return !result.canceled && result.filePaths.length > 0 ? result.filePaths[0] : null
   })
 
-  // License & Node-Locking Handlers
-  ipcMain.handle(IPC_CHANNELS.LICENSE_GET_STATUS, () => {
+  ipcMain.handle(IPC_CHANNELS.LICENSE_GET_STATUS, (event) => {
+    assertTrustedSender(event)
     return licenseManager.getLicenseInfo()
   })
 
-  ipcMain.handle(IPC_CHANNELS.LICENSE_ACTIVATE, async (_event, key: string) => {
-    return licenseManager.activateLicense(key)
+  ipcMain.handle(IPC_CHANNELS.LICENSE_ACTIVATE, (event, key: string) => {
+    assertTrustedSender(event)
+    assertText(key, 'Chave de licença', 256)
+    return licenseManager.activateLicense(key.trim())
   })
 
-  ipcMain.handle(IPC_CHANNELS.LICENSE_GET_HWID, () => {
+  ipcMain.handle(IPC_CHANNELS.LICENSE_GET_HWID, (event) => {
+    assertTrustedSender(event)
     return getHardwareInfo()
   })
 }

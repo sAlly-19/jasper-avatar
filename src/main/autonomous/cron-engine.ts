@@ -1,7 +1,11 @@
 import { app } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
+import { randomUUID } from 'crypto'
 import type { ScheduledTask, AutonomyNotification } from '@shared'
+import { atomicWriteJsonSync, readJsonFileSync } from '../utils/atomic-json'
+
+const COMPLETED_TASK_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 export class CronEngineService {
   private isEnabled: boolean = true
@@ -39,7 +43,12 @@ export class CronEngineService {
     try {
       const p = this.getFilePath()
       if (fs.existsSync(p)) {
-        this.tasks = JSON.parse(fs.readFileSync(p, 'utf-8'))
+        const parsed = readJsonFileSync<ScheduledTask[]>(p)
+        const cutoff = Date.now() - COMPLETED_TASK_RETENTION_MS
+        this.tasks = Array.isArray(parsed)
+          ? parsed.filter((task) => !task.completed || task.dueTimestamp >= cutoff)
+          : []
+        if (this.tasks.length !== parsed.length) this.saveTasks()
       }
     } catch (err) {
       console.warn('[CronEngine] Error reading schedules:', err)
@@ -50,7 +59,7 @@ export class CronEngineService {
   private saveTasks(): void {
     try {
       const p = this.getFilePath()
-      fs.writeFileSync(p, JSON.stringify(this.tasks, null, 2), 'utf-8')
+      atomicWriteJsonSync(p, this.tasks)
     } catch (err) {
       console.warn('[CronEngine] Error saving schedules:', err)
     }
@@ -74,7 +83,7 @@ export class CronEngineService {
   public addTask(title: string, minutesFromNow: number, recurrence: 'once' | 'daily' | 'hourly' = 'once', description?: string): ScheduledTask {
     const dueTimestamp = Date.now() + Math.max(1, minutesFromNow) * 60 * 1000
     const task: ScheduledTask = {
-      id: `task-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: `task-${randomUUID()}`,
       title,
       description,
       dueTimestamp,
@@ -84,7 +93,7 @@ export class CronEngineService {
     }
     this.tasks.push(task)
     this.saveTasks()
-    console.log(`[CronEngine] Scheduled task '${title}' for ${new Date(dueTimestamp).toLocaleTimeString()}`)
+    console.log('[CronEngine] Task scheduled.')
     return task
   }
 

@@ -7,7 +7,6 @@ import {
   briefingService,
   semanticMemory,
   knowledgeGraph,
-  codeInterpreter,
   headlessBrowser,
   gitWatcher,
   folderOrganizer,
@@ -119,26 +118,6 @@ async function executeToolInternal(toolName: string, args: Record<string, any>):
       }
       knowledgeGraph.addRelation(source, relation, target)
       return `Conexão salva no Grafo de Conhecimento: (${source}) -[${relation}]-> (${target}).`
-    }
-
-    case 'execute_code': {
-      const lang = (String(args.language || 'python').toLowerCase()) as 'python' | 'javascript'
-      const code = String(args.code || '').trim()
-      if (!code) return 'Nenhum código fornecido para execução.'
-
-      const res = await codeInterpreter.execute(lang, code)
-      if (!res.success) {
-        return `Falha na execução do script ${lang.toUpperCase()} (${res.executionTimeMs}ms):\n${res.stderr || res.error || 'Erro desconhecido'}`
-      }
-
-      let outputText = `Script ${lang.toUpperCase()} executado com sucesso em ${res.executionTimeMs}ms.\n`
-      if (res.stdout) {
-        outputText += `\nSaída:\n${res.stdout}`
-      }
-      if (res.generatedFiles && res.generatedFiles.length > 0) {
-        outputText += `\n\nArquivos gerados no Sandbox:\n- ${res.generatedFiles.join('\n- ')}`
-      }
-      return outputText
     }
 
     case 'browse_page': {

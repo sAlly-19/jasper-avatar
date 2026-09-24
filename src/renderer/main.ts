@@ -418,7 +418,7 @@ async function init(): Promise<void> {
     }
 
     showHudToast(notif.title, notif.message, notif.type, duration, action)
-    console.log(`[HUD] Received autonomy notification: ${notif.title}`)
+    console.log(`[HUD] Received autonomy notification of type ${notif.type}.`)
   })
 
   // Listener para suspender áudio, microfone e estado quando a licença for revogada

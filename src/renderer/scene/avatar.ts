@@ -1,7 +1,5 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { LipSyncTargets } from '../audio/lip-sync'
 
 export type MoodType = 'neutral' | 'surprised' | 'focused' | 'thoughtful' | 'friendly'
@@ -168,29 +166,15 @@ export class AvatarController {
     this.setupMouseTracking()
   }
 
-  public async loadModel(modelUrl?: string, transcoder?: string): Promise<void> {
+  public async loadModel(modelUrl?: string): Promise<void> {
     const isHttp = typeof window !== 'undefined' && window.location.protocol.startsWith('http')
     let finalUrl = modelUrl || (isHttp ? '/models/facecap.glb' : './models/facecap.glb')
     if (!isHttp && finalUrl.startsWith('/')) {
       finalUrl = `.${finalUrl}`
     }
-    const transcoderPath = transcoder || (isHttp ? '/basis/' : './basis/')
-    console.log(`[AvatarController] Loading model from ${finalUrl}... (transcoder: ${transcoderPath})`)
+    console.log(`[AvatarController] Loading model from ${finalUrl}...`)
 
-    // 1. Await MeshoptDecoder WebAssembly compilation
-    if ((MeshoptDecoder as any).ready) {
-      await (MeshoptDecoder as any).ready
-    }
-
-    // 2. Initialize KTX2Loader
-    const ktx2Loader = new KTX2Loader()
-      .setTranscoderPath(transcoderPath)
-      .detectSupport(this.renderer)
-
-    // 3. Configure GLTFLoader
     const gltfLoader = new GLTFLoader()
-    gltfLoader.setKTX2Loader(ktx2Loader)
-    gltfLoader.setMeshoptDecoder(MeshoptDecoder)
 
     return new Promise((resolve, reject) => {
       gltfLoader.load(

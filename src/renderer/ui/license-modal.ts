@@ -59,7 +59,7 @@ export class LicenseModal {
       }
     }).catch(() => {})
 
-    // Formatação automática da chave (JASPER-LT-XXXX-XXXX-XXXX)
+    // Normaliza a chave no formato atual com checksum de digitação.
     this.inputKeyEl?.addEventListener('input', (e) => {
       const target = e.target as HTMLInputElement
       let val = target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '')
@@ -123,7 +123,7 @@ export class LicenseModal {
 
     // Listener de Revogação de Licença / Bloqueio de 24h
     window.electronAPI.onLicenseRevoked((payload) => {
-      console.warn('[LicenseModal] Notificação de revogação recebida:', payload)
+      console.warn('[LicenseModal] Notificação de revogação recebida.')
       updateStatusBadge('error', 'Licença Bloqueada')
       this.goToStep1()
       this.showFeedback(
@@ -288,7 +288,7 @@ export class LicenseModal {
         this.goToStep1()
         this.show(true)
       } else {
-        console.log(`[LicenseModal] Estação licenciada para ${info.clientName || 'Cliente'}.`)
+        console.log('[LicenseModal] Estação licenciada.')
         // Se a licença estiver ativa, mas o usuário não tem a chave Gemini configurada
         const cfg = await window.electronAPI.getConfig()
         if (!cfg.hasFullKey) {

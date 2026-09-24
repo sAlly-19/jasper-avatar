@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import os from 'node:os'
 import path from 'node:path'
 import fs from 'node:fs'
+import { app } from 'electron'
 
 // Real production imports
 import {
@@ -19,11 +20,30 @@ import { buildMorphCacheMap } from '../src/renderer/scene/avatar'
 import { GitWatcher } from '../src/main/autonomous/git-watcher'
 import { ReflexionEngine } from '../src/main/autonomous/reflexion-engine'
 import http from 'node:http'
+import { webcrypto } from 'node:crypto'
 import { getHardwareInfo } from '../src/main/services/hwid'
 import { licenseManager, LicenseManager } from '../src/main/services/license-manager'
 import { configStore } from '../src/main/config/config-store'
+import { isTrustedRendererUrl } from '../src/main/utils/trusted-renderer'
+import { securityBroker } from '../src/main/services/security-broker'
 
 describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => {
+
+  describe('Origem confiável do renderer', () => {
+    test('aceita somente o host do protocolo app em produção', () => {
+      assert.equal(isTrustedRendererUrl('app://jasper/index.html'), true)
+      assert.equal(isTrustedRendererUrl('app://evil/index.html'), false)
+      assert.equal(isTrustedRendererUrl('file:///tmp/index.html'), false)
+      assert.equal(isTrustedRendererUrl('https://jasper/index.html'), false)
+    })
+
+    test('aceita somente a origem do servidor configurado em desenvolvimento', () => {
+      const developmentUrl = 'http://127.0.0.1:5173/'
+      assert.equal(isTrustedRendererUrl('http://127.0.0.1:5173/settings', developmentUrl), true)
+      assert.equal(isTrustedRendererUrl('http://127.0.0.1:5174/', developmentUrl), false)
+      assert.equal(isTrustedRendererUrl('https://127.0.0.1:5173/', developmentUrl), false)
+    })
+  })
 
   // 1. WebhookManager & SSRF / DNS Rebinding
   describe('WebhookManager & SSRF / DNS Rebinding (Módulo Real)', () => {
@@ -41,6 +61,9 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.equal(isPrivateOrLoopbackIP('172.31.255.255'), true)
       assert.equal(isPrivateOrLoopbackIP('192.168.1.1'), true)
       assert.equal(isPrivateOrLoopbackIP('100.64.0.1'), true) // CGNAT
+      assert.equal(isPrivateOrLoopbackIP('::ffff:127.0.0.1'), true)
+      assert.equal(isPrivateOrLoopbackIP('::ffff:192.168.1.1'), true)
+      assert.equal(isPrivateOrLoopbackIP('ff02::1'), true)
       assert.equal(isPrivateOrLoopbackIP('8.8.8.8'), false)
       assert.equal(isPrivateOrLoopbackIP('1.1.1.1'), false)
     })
@@ -71,45 +94,25 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       manager.removeWebhook('test-hook')
       assert.ok(!manager.listWebhooks().some((w) => w.name === 'test-hook'))
     })
+
+    test('WebhookManager exige HTTPS e bloqueia cabeçalhos de transporte', () => {
+      const manager = new WebhookManager()
+      assert.throws(() => manager.registerWebhook({
+        name: 'insecure-hook',
+        url: 'http://example.com/hook',
+        method: 'POST'
+      }), /HTTPS/)
+      assert.throws(() => manager.registerWebhook({
+        name: 'host-override',
+        url: 'https://example.com/hook',
+        method: 'POST',
+        headers: { Host: '127.0.0.1' }
+      }), /Cabeçalho/)
+    })
   })
 
   // 2. Central ToolPolicyEngine & Sandboxing
   describe('ToolPolicyEngine (Políticas Zero-Trust Reais)', () => {
-    test('bloqueia código Python perigoso com subprocessos, ctypes e traversal', () => {
-      const r1 = toolPolicyEngine.validateCode('python', 'import subprocess; subprocess.Popen(["calc"])')
-      assert.equal(r1.allowed, false)
-      assert.equal(r1.riskLevel, 'HIGH')
-
-      const r2 = toolPolicyEngine.validateCode('python', 'import os; os.system("dir")')
-      assert.equal(r2.allowed, false)
-
-      const r3 = toolPolicyEngine.validateCode('python', 'import ctypes; ctypes.cdll.LoadLibrary("kernel32")')
-      assert.equal(r3.allowed, false)
-
-      const r4 = toolPolicyEngine.validateCode('python', 'x = eval("__import__(\'os\')")')
-      assert.equal(r4.allowed, false)
-    })
-
-    test('permite código matemático/científico legítimo em Python', () => {
-      const safe = toolPolicyEngine.validateCode('python', 'import math\ndef calc(n):\n    return math.sqrt(n)\nprint(calc(16))')
-      assert.equal(safe.allowed, true)
-      assert.equal(safe.riskLevel, 'SAFE')
-    })
-
-    test('bloqueia código Node.js com child_process, worker_threads e eval', () => {
-      const r1 = toolPolicyEngine.validateCode('javascript', 'const { exec } = require("child_process"); exec("calc");')
-      assert.equal(r1.allowed, false)
-
-      const r2 = toolPolicyEngine.validateCode('javascript', 'eval("process.exit(1)")')
-      assert.equal(r2.allowed, false)
-    })
-
-    test('bloqueia execução de shell / bash arbitrário', () => {
-      const r = toolPolicyEngine.validateCode('bash', 'rm -rf /')
-      assert.equal(r.allowed, false)
-      assert.equal(r.riskLevel, 'CRITICAL')
-    })
-
     test('bloqueia acesso a diretórios de sistema do Windows', () => {
       assert.equal(toolPolicyEngine.validatePathContainment('C:\\Windows\\System32\\cmd.exe').allowed, false)
       assert.equal(toolPolicyEngine.validatePathContainment('C:\\Program Files\\app\\config.json').allowed, false)
@@ -119,6 +122,15 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       const base = 'C:\\temp\\sandbox'
       assert.equal(toolPolicyEngine.validatePathContainment('C:\\temp\\sandbox\\out.txt', base).allowed, true)
       assert.equal(toolPolicyEngine.validatePathContainment('C:\\temp\\sandbox\\..\\secret.key', base).allowed, false)
+    })
+
+    test('gerenciador de processos não usa shell ou cmd /c', () => {
+      const source = fs.readFileSync(path.join(process.cwd(), 'src/main/autonomous/process-manager.ts'), 'utf-8')
+      assert.equal(source.includes('shell: true'), false)
+      assert.equal(/cmd(?:\.exe)?[^\n]*\/c/i.test(source), false)
+      const gitWatcherSource = fs.readFileSync(path.join(process.cwd(), 'src/main/autonomous/git-watcher.ts'), 'utf-8')
+      assert.equal(gitWatcherSource.includes('shell: true'), false)
+      assert.equal(gitWatcherSource.includes('customCommand'), false)
     })
   })
 
@@ -136,26 +148,73 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       const sanitized = redactSecrets(text)
       assert.ok(sanitized.includes('Bearer [REDACTED_TOKEN]'))
     })
+
+    test('redige JWT, tokens GitHub, chaves AWS e chaves privadas', () => {
+      const text = [
+        'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEyMyJ9.signature_value_123456789',
+        'ghp_abcdefghijklmnopqrstuvwxyz123456',
+        'AKIAABCDEFGHIJKLMNOP', // secret-scan: allow
+        '-----BEGIN PRIVATE KEY-----\nsecret-material\n-----END PRIVATE KEY-----' // secret-scan: allow
+      ].join('\n')
+      const sanitized = redactSecrets(text)
+      assert.ok(sanitized.includes('[REDACTED_JWT]'))
+      assert.ok(sanitized.includes('[REDACTED_GITHUB_TOKEN]'))
+      assert.ok(sanitized.includes('[REDACTED_AWS_ACCESS_KEY]'))
+      assert.ok(sanitized.includes('[REDACTED_PRIVATE_KEY]'))
+      assert.equal(sanitized.includes('secret-material'), false)
+    })
   })
 
   // 4. SmartHomeService & Zero-Trust Domain Policy
   describe('SmartHomeService (Allowlist de Domínios Real)', () => {
-    test('permite eletrodomésticos seguros (light, climate, switch)', async () => {
+    test('não simula sucesso sem Home Assistant configurado', async () => {
       const service = new SmartHomeService()
       const res = await service.executeCommand('light', 'turn_on', 'light.sala')
-      assert.equal(res.success, true)
-      assert.ok(res.message.includes('Simulado') || res.message.includes('sucesso'))
+      assert.equal(res.success, false)
+      assert.equal(res.error, 'NOT_CONFIGURED')
     })
 
     test('bloqueia expressamente domínios de segurança física (lock, alarm, garage)', async () => {
       const service = new SmartHomeService()
       const lockRes = await service.executeCommand('lock', 'unlock', 'lock.porta_entrada')
       assert.equal(lockRes.success, false)
-      assert.ok(lockRes.message.includes('SEGURANÇA BLOQUEADA'))
+      assert.equal(lockRes.error, 'BLOCKED_DOMAIN')
 
       const alarmRes = await service.executeCommand('alarm_control_panel', 'disarm', 'alarm.casa')
       assert.equal(alarmRes.success, false)
-      assert.ok(alarmRes.message.includes('SEGURANÇA BLOQUEADA'))
+      assert.equal(alarmRes.error, 'BLOCKED_DOMAIN')
+    })
+
+    test('rejeita serviços e entidades fora da allowlist', async () => {
+      const service = new SmartHomeService()
+      assert.equal((await service.executeCommand('light', 'unlock', 'light.sala')).error, 'INVALID_SERVICE')
+      assert.equal((await service.executeCommand('light', 'turn_on', 'switch.sala')).error, 'INVALID_ENTITY')
+    })
+  })
+
+  describe('SecurityBroker (contenção de arquivos do usuário)', () => {
+    test('permite arquivo em Documentos e rejeita caminho externo', () => {
+      const allowedFile = path.join(app.getPath('documents'), 'broker-test.txt')
+      fs.writeFileSync(allowedFile, 'ok', 'utf-8')
+      try {
+        assert.equal(securityBroker.resolveUserPath(allowedFile).allowed, true)
+        assert.equal(securityBroker.resolveUserPath(path.join(os.tmpdir(), 'fora-do-perimetro.txt')).allowed, false)
+        assert.equal(securityBroker.resolveUserPath('..\\segredo.txt').allowed, false)
+      } finally {
+        fs.rmSync(allowedFile, { force: true })
+      }
+    })
+
+    test('rejeita link simbólico ou junction mesmo dentro de Documentos', () => {
+      const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jasper-outside-'))
+      const linkPath = path.join(app.getPath('documents'), `jasper-link-${Date.now()}`)
+      try {
+        fs.symlinkSync(outsideDir, linkPath, process.platform === 'win32' ? 'junction' : 'dir')
+        assert.equal(securityBroker.resolveUserPath(linkPath).allowed, false)
+      } finally {
+        fs.rmSync(linkPath, { recursive: true, force: true })
+        fs.rmSync(outsideDir, { recursive: true, force: true })
+      }
     })
   })
 
@@ -214,6 +273,10 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
 
     test('ReflexionEngine intercepta commit e exige confirmação prévia', () => {
       const engine = new ReflexionEngine()
+      let confirmationId = ''
+      engine.setOnNotification((notification) => {
+        confirmationId = String(notification.data?.confirmationId || '')
+      })
       const check = engine.preExecutionCheck('git_commit_changes', {
         message: 'feat: nova funcionalidade',
         files: ['src/app.ts']
@@ -221,6 +284,21 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.equal(check.allowed, false)
       assert.equal(check.requiresConfirmation, true)
       assert.ok(check.reason?.includes('Operação de commit Git solicitada'))
+      assert.match(confirmationId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+      assert.equal(engine.confirmAction(confirmationId), true)
+      assert.equal(engine.confirmAction(confirmationId), false, 'token de confirmação não pode ser reutilizado')
+
+      const authorized = engine.preExecutionCheck('git_commit_changes', {
+        files: ['src/app.ts'],
+        message: 'feat: nova funcionalidade'
+      })
+      assert.equal(authorized.allowed, true, 'autorização deve aceitar os mesmos parâmetros em ordem canônica')
+
+      const replay = engine.preExecutionCheck('git_commit_changes', {
+        message: 'feat: nova funcionalidade',
+        files: ['src/app.ts']
+      })
+      assert.equal(replay.allowed, false, 'autorização deve ser consumida em uma única operação')
     })
   })
 
@@ -240,7 +318,8 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       // Garante modo exclusivo TensorFlow
       assert.ok(wakeWordManagerSrc.includes("mode: isCalibrated ? 'tensorflow' : 'disabled'"))
       assert.ok(wakeWordManagerSrc.includes('syncRunningState'))
-      assert.ok(wakeWordManagerSrc.includes('[TensorFlow]'))
+      assert.ok(wakeWordManagerSrc.includes("import { SpeechCommandsWakeWord } from './speech-commands'"))
+      assert.ok(wakeWordManagerSrc.includes('new SpeechCommandsWakeWord({'))
 
       const speechCommandsSrc = fs.readFileSync(
         path.join(process.cwd(), 'src/renderer/audio/speech-commands.ts'),
@@ -336,7 +415,7 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.ok(audioPlayerSrc.includes('this.onPlaybackEnded?.()'))
     })
 
-    test('Gemini Live client utiliza o modelo oficial gemini-3.1-flash-live-preview', () => {
+    test('Gemini Live client utiliza o modelo configurado gemini-3.1-flash-live-preview', () => {
       const liveClientSrc = fs.readFileSync(
         path.join(process.cwd(), 'src/main/gemini-live.ts'),
         'utf-8'
@@ -359,102 +438,107 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.equal(hw1.machineId, hw2.machineId)
     })
 
-    test('LicenseManager valida formato de chaves JASPER-LT e legado JSPR-V1', () => {
-      assert.equal(licenseManager.validateKeyFormat('JASPER-LT-ZJV8-DVLK-942B'), true)
-      assert.equal(licenseManager.validateKeyFormat('JSPR-V1-ABCD-1234-EF56'), true)
-      assert.equal(licenseManager.validateKeyFormat('jasper-lt-1234-5678-90ab'), true)
-      assert.equal(licenseManager.validateKeyFormat('JASPER-LT-INVALID-KEY'), false)
+    test('LicenseManager aceita apenas o formato atual de chaves aleatórias', () => {
+      assert.equal(licenseManager.validateKeyFormat('JASPER-ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2-34'), true)
+      assert.equal(licenseManager.validateKeyFormat('jasper-abcde-fghjk-lmnpq-rstuv-wxyz2-34'), true)
+      assert.equal(licenseManager.validateKeyFormat('JASPER-ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2-35'), false)
+      assert.equal(licenseManager.validateKeyFormat('JASPER-LT-ZJV8-DVLK-942B'), false)
+      assert.equal(licenseManager.validateKeyFormat('JSPR-V1-ABCD-1234-EF56'), false)
+      assert.equal(licenseManager.validateKeyFormat('JASPER-INVALID-KEY'), false)
       assert.equal(licenseManager.validateKeyFormat(''), false)
       assert.equal(licenseManager.validateKeyFormat(null as any), false)
     })
 
-    test('LicenseManager realiza handshake com Firestore REST e processa ativação, heartbeat e Node-Locking', async () => {
-      let mockGetResponse: any = {
-        name: 'projects/jasper-avatar/databases/(default)/documents/licenses/JASPER-LT-ABCD-1234-EF56',
-        fields: {
-          key: { stringValue: 'JASPER-LT-ABCD-1234-EF56' },
-          name: { stringValue: 'Empresa Teste Ltda' },
-          email: { stringValue: 'contato@empresa.com' },
-          status: { stringValue: 'active' },
-          machineId: { nullValue: null }
+    test('LicenseManager valida lease Ed25519 do Worker e renova por heartbeat', async () => {
+      const pair = await webcrypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']) as CryptoKeyPair
+      const publicJwk = await webcrypto.subtle.exportKey('jwk', pair.publicKey)
+      let activationBody: any = null
+
+      const signLease = async (installationId: string, machineHash: string): Promise<{ token: string; expiresAt: string }> => {
+        const now = Math.floor(Date.now() / 1000)
+        const header = Buffer.from(JSON.stringify({ alg: 'EdDSA', typ: 'JWT' })).toString('base64url')
+        const payload = Buffer.from(JSON.stringify({
+          iss: 'jasper-license-api',
+          aud: 'jasper-avatar-desktop',
+          installationId,
+          machineHash,
+          iat: now,
+          exp: now + (72 * 60 * 60)
+        })).toString('base64url')
+        const signature = await webcrypto.subtle.sign(
+          { name: 'Ed25519' },
+          pair.privateKey,
+          Buffer.from(`${header}.${payload}`, 'utf-8')
+        )
+        return {
+          token: `${header}.${payload}.${Buffer.from(signature).toString('base64url')}`,
+          expiresAt: new Date((now + (72 * 60 * 60)) * 1000).toISOString()
         }
       }
-      let mockGetStatus = 200
-      let mockPatchStatus = 200
 
-      const server = http.createServer((req, res) => {
-        if (req.method === 'GET') {
-          res.writeHead(mockGetStatus, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify(mockGetResponse))
+      const readJsonBody = (req: http.IncomingMessage): Promise<any> => new Promise((resolve) => {
+        let raw = ''
+        req.on('data', chunk => { raw += chunk })
+        req.on('end', () => resolve(JSON.parse(raw || '{}')))
+      })
+
+      const server = http.createServer(async (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method === 'GET' && req.url === '/v1/licenses/public-key') {
+          res.end(JSON.stringify({ key: publicJwk }))
           return
         }
-        if (req.method === 'PATCH') {
-          let raw = ''
-          req.on('data', chunk => { raw += chunk })
-          req.on('end', () => {
-            res.writeHead(mockPatchStatus, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ name: 'updated-doc' }))
-          })
+        if (req.method === 'POST' && req.url === '/v1/licenses/activate') {
+          activationBody = await readJsonBody(req)
+          res.end(JSON.stringify({
+            status: 'active',
+            deviceId: 'device-test-1',
+            deviceSecret: 'device-secret-test-value',
+            lease: await signLease(activationBody.installationId, activationBody.machineHash)
+          }))
           return
         }
+        if (req.method === 'POST' && req.url === '/v1/licenses/heartbeat') {
+          await readJsonBody(req)
+          res.end(JSON.stringify({
+            status: 'active',
+            lease: await signLease(activationBody.installationId, activationBody.machineHash)
+          }))
+          return
+        }
+        res.statusCode = 404
+        res.end(JSON.stringify({ error: { code: 'not_found' } }))
       })
 
       await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => resolve()))
-      const address = server.address() as any
-      const testBaseUrl = `http://127.0.0.1:${address.port}/licenses`
-
+      const address = server.address() as { port: number }
       const manager = new LicenseManager()
-      manager.setCustomBaseUrl(testBaseUrl)
+      manager.setCustomBaseUrl(`http://127.0.0.1:${address.port}`)
+      configStore.updateConfig({
+        licenseKey: '',
+        licenseStatus: 'unlicensed',
+        licenseMachineId: '',
+        licenseInstallationId: '',
+        licenseDeviceId: '',
+        licenseDeviceSecret: '',
+        licenseLeaseToken: '',
+        licenseLeaseExpiresAt: '',
+        licensePublicJwk: ''
+      })
 
       try {
-        // Caso A: 200 OK no GET e PATCH (Primeira Ativação na Máquina)
-        const resA = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
-        assert.equal(resA.valid, true)
-        assert.equal(resA.status, 'ACTIVATED')
+        const activated = await manager.activateLicense('JASPER-ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2-34')
+        assert.equal(activated.valid, true)
+        assert.equal(activated.status, 'ACTIVATED')
         assert.equal(configStore.getConfig().licenseStatus, 'active')
-        assert.equal(configStore.getConfig().licenseClientName, 'Empresa Teste Ltda')
+        assert.ok(configStore.getConfig().licenseLeaseToken?.includes('.'))
 
-        const info = manager.getLicenseInfo()
-        assert.equal(info.isLicensed, true)
-        assert.equal(info.clientName, 'Empresa Teste Ltda')
-        assert.ok(info.keyMasked?.startsWith('JASPER-LT-'))
-
-        // Caso B: Mesma Máquina -> Atualiza heartbeat (Status ACTIVE)
-        const hw = getHardwareInfo()
-        mockGetResponse.fields.machineId = { stringValue: hw.machineId }
-        mockGetResponse.fields.machineName = { stringValue: hw.machineName }
-        const resSame = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
-        assert.equal(resSame.valid, true)
-        assert.equal(resSame.status, 'ACTIVE')
-
-        // Caso C: Node-Locking Mismatch em máquina divergente
-        mockGetResponse.fields.machineId = { stringValue: 'HWID-OUTRO-COMPUTADOR-9999' }
-        mockGetResponse.fields.machineName = { stringValue: 'PC-DO-CLIENTE-ANTERIOR' }
-        const resMismatch = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
-        assert.equal(resMismatch.valid, false)
-        assert.equal(resMismatch.error, 'MACHINE_MISMATCH')
-        assert.equal(configStore.getConfig().licenseStatus, 'disabled')
-
-        // Caso D: Licença suspensa (disabled)
-        mockGetResponse.fields.status = { stringValue: 'disabled' }
-        const resDisabled = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
-        assert.equal(resDisabled.valid, false)
-        assert.equal(resDisabled.error, 'LICENSE_DISABLED')
-
-        // Caso E: Licença revogada (revoked)
-        mockGetResponse.fields.status = { stringValue: 'revoked' }
-        const resRevoked = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
-        assert.equal(resRevoked.valid, false)
-        assert.equal(resRevoked.error, 'LICENSE_REVOKED')
-
-        // Caso F: Licença inexistente (404 NOT_FOUND no Firestore)
-        mockGetStatus = 404
-        mockGetResponse = { error: { code: 404, status: 'NOT_FOUND' } }
-        const resNotFound = await manager.activateLicense('JASPER-LT-ABCD-1234-EF56')
-        assert.equal(resNotFound.valid, false)
-        assert.equal(resNotFound.error, 'LICENSE_NOT_FOUND')
+        const renewed = await manager.verifyCurrentLicense()
+        assert.equal(renewed.valid, true)
+        assert.equal(renewed.status, 'ACTIVE')
+        assert.equal(manager.getLicenseInfo().isLicensed, true)
       } finally {
-        server.close()
+        await new Promise<void>(resolve => server.close(() => resolve()))
       }
     })
 
@@ -462,8 +546,8 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       const manager = new LicenseManager()
       manager.setCustomBaseUrl('http://127.0.0.1:59999/non-existent')
 
-      // Como o modo DEV foi removido, a chave tenta consultar o Firestore e falha com NETWORK_ERROR (pois a URL não existe)
-      const devResult = await manager.activateLicense('JASPER-LT-DEV0-0000-0001')
+      // Sem atalho DEV: uma chave sintaticamente válida ainda precisa do servidor.
+      const devResult = await manager.activateLicense('JASPER-ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2-34')
       assert.equal(devResult.valid, false)
       assert.equal(devResult.error, 'NETWORK_ERROR')
     })

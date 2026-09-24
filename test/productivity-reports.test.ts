@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'fs/promises'
 import path from 'path'
-import os from 'os'
+import { app } from 'electron'
 import { reportGenerator } from '../src/main/autonomous/report-generator'
 import { fileSummarizer } from '../src/main/autonomous/file-summarizer'
 import { qrService } from '../src/main/autonomous/qr-service'
@@ -76,8 +76,8 @@ test('Parte 2: Produtividade, Relatórios Executivos, Arquivos & QR Code', async
 
   await t.test('FileSummarizerService: leitura e análise de arquivo de texto local', async () => {
     // Criar arquivo temporário de teste
-    const tempFile = path.join(os.tmpdir(), 'teste_documento_jasper.txt')
-    const sampleText = `Relatório de Auditoria Jasper\nData: 2026-09-21\nStatus: APROVADO\nToken Secreto: sk-1234567890abcdef1234567890\nLinha final do documento.`
+    const tempFile = path.join(app.getPath('documents'), 'teste_documento_jasper.txt')
+    const sampleText = `Relatório de Auditoria Jasper\nData: 2026-09-21\nStatus: APROVADO\nToken Secreto: sk-1234567890abcdef1234567890\nLinha final do documento.` // secret-scan: allow
     await fs.writeFile(tempFile, sampleText, 'utf-8')
 
     const res = await fileSummarizer.readFileContent(tempFile)
@@ -91,7 +91,7 @@ test('Parte 2: Produtividade, Relatórios Executivos, Arquivos & QR Code', async
     assert.match(analysis, /Status: APROVADO/i)
 
     // Arquivo inexistente
-    const errRes = await fileSummarizer.readFileContent(path.join(os.tmpdir(), 'arquivo_que_nao_existe_xyz.txt'))
+    const errRes = await fileSummarizer.readFileContent(path.join(app.getPath('documents'), 'arquivo_que_nao_existe_xyz.txt'))
     assert.equal(errRes.success, false)
     assert.ok(errRes.error)
   })

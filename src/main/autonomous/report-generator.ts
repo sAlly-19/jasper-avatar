@@ -23,6 +23,18 @@ export interface WordSection {
   paragraph: string
 }
 
+function safeOutputName(requestedName: string | undefined, fallback: string, extension: string): string {
+  const source = requestedName?.trim() || fallback
+  const base = path.basename(source, path.extname(source))
+  const normalized = base
+    .normalize('NFKC')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 100)
+
+  return `${normalized || `jasper_${Date.now()}`}.${extension}`
+}
+
 export class ReportGeneratorService {
   private isEnabled: boolean = true
 
@@ -65,7 +77,7 @@ export class ReportGeneratorService {
   ): Promise<ReportGenerationResult> {
     const targetDir = await this.getTargetDirectory()
     const cleanTitle = title.trim() || 'Relatorio_Executivo'
-    const safeName = (fileName || `${cleanTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.pdf`).replace(/\.pdf$/i, '') + '.pdf'
+    const safeName = safeOutputName(fileName, `${cleanTitle}_${Date.now()}`, 'pdf')
     const finalPath = path.join(targetDir, safeName)
 
     const dateStr = new Date().toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' })
@@ -237,7 +249,7 @@ export class ReportGeneratorService {
     try {
       const targetDir = await this.getTargetDirectory()
       const cleanTitle = title.trim() || 'Planilha_Jasper'
-      const safeName = (fileName || `${cleanTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.xlsx`).replace(/\.xlsx$/i, '') + '.xlsx'
+      const safeName = safeOutputName(fileName, `${cleanTitle}_${Date.now()}`, 'xlsx')
       const finalPath = path.join(targetDir, safeName)
 
       const workbook = new ExcelJS.Workbook()
@@ -316,7 +328,7 @@ export class ReportGeneratorService {
     try {
       const targetDir = await this.getTargetDirectory()
       const cleanTitle = title.trim() || 'Documento_Jasper'
-      const safeName = (fileName || `${cleanTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.docx`).replace(/\.docx$/i, '') + '.docx'
+      const safeName = safeOutputName(fileName, `${cleanTitle}_${Date.now()}`, 'docx')
       const finalPath = path.join(targetDir, safeName)
 
       const docParagraphs: docx.Paragraph[] = []

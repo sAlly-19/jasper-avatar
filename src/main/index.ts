@@ -1,4 +1,6 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, net, protocol } from 'electron'
+import { relative, resolve } from 'path'
+import { pathToFileURL } from 'url'
 import { IPC_CHANNELS } from '@shared'
 import { configStore } from './config/config-store'
 import { createMainWindow, safeSend } from './windows/main-window'
@@ -9,6 +11,31 @@ import { licenseManager } from './services/license-manager'
 
 let geminiClient: GeminiLiveClient | null = null
 let licenseCheckTimer: NodeJS.Timeout | null = null
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true }
+  }
+])
+
+function registerAppProtocol(): void {
+  const rendererRoot = resolve(__dirname, '../renderer')
+  protocol.handle('app', (request) => {
+    try {
+      if (request.method !== 'GET') return new Response('Method not allowed', { status: 405 })
+      const requestedPath = decodeURIComponent(new URL(request.url).pathname).replace(/^\/+/, '') || 'index.html'
+      const targetPath = resolve(rendererRoot, requestedPath)
+      const relativePath = relative(rendererRoot, targetPath)
+      if (relativePath.startsWith('..') || relativePath.includes('\0')) {
+        return new Response('Forbidden', { status: 403 })
+      }
+      return net.fetch(pathToFileURL(targetPath).toString())
+    } catch {
+      return new Response('Bad request', { status: 400 })
+    }
+  })
+}
 
 function initGeminiClient(): GeminiLiveClient {
   const cfg = configStore.getConfig()
@@ -42,19 +69,11 @@ function initGeminiClient(): GeminiLiveClient {
     safeSend(IPC_CHANNELS.GEMINI_STATUS, status, message)
   }
 
-  // Auto-connect if API key is present and station is licensed
-  if (cfg.apiKey && cfg.apiKey.trim().length > 0 && cfg.licenseStatus === 'active') {
-    setTimeout(() => {
-      client.connect().catch((err) => {
-        console.warn('[Main] Auto-connect to Gemini Live failed:', err.message)
-      })
-    }, 1500)
-  }
-
   return client
 }
 
 app.whenReady().then(() => {
+  registerAppProtocol()
   configStore.initialize()
 
   // Listener para bloqueio imediato se a licença for revogada ou suspensa
@@ -75,14 +94,14 @@ app.whenReady().then(() => {
   createMainWindow()
   autonomyCoordinator.init()
 
-  // Verificação inicial de 24 horas no boot da aplicação
+  // Verificação inicial do lease no boot da aplicação.
   setTimeout(() => {
     licenseManager.checkAccess24h().catch((err) => {
       console.warn('[Main] Erro na verificação inicial de licença:', err.message)
     })
   }, 3000)
 
-  // Verificação periódica a cada 1 hora para inspecionar o limite de 24 horas
+  // Verificação periódica online; o lease assinado limita o modo offline a 72 horas.
   licenseCheckTimer = setInterval(() => {
     licenseManager.checkAccess24h().catch((err) => {
       console.warn('[Main] Erro no check periódico de licença:', err.message)

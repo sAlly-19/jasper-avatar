@@ -2,10 +2,37 @@ import { app, BrowserWindow, shell, screen, session } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import { IPC_CHANNELS } from '@shared'
+import { isTrustedRendererUrl } from '../utils/trusted-renderer'
 
 let mainWindow: BrowserWindow | null = null
 let isPipMode = false
 let normalBounds = { x: 100, y: 100, width: 1100, height: 860 }
+const LOG_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+
+function redactLogMessage(message: string): string {
+  return message
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[REDACTED_JWT]')
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, '[REDACTED_GOOGLE_KEY]')
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '[REDACTED_GITHUB_TOKEN]')
+    .replace(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '[REDACTED_AWS_ACCESS_KEY]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/\b(sk-|ACCESS_TOKEN[=: ]+)[A-Za-z0-9._-]{12,}/gi, '$1[REDACTED]')
+    .replace(/\b(password|secret|token|api[_-]?key)\s*[:=]\s*(["'])[^"'\r\n]+\2/gi, '$1: "[REDACTED]"')
+}
+
+function removeExpiredRuntimeLogs(logDirectory: string): void {
+  const cutoff = Date.now() - LOG_RETENTION_MS
+  try {
+    for (const entry of fs.readdirSync(logDirectory, { withFileTypes: true })) {
+      if (!entry.isFile() || !/^jasper-runtime-\d{4}-\d{2}-\d{2}\.log$/.test(entry.name)) continue
+      const filePath = join(logDirectory, entry.name)
+      if (fs.statSync(filePath).mtimeMs < cutoff) fs.unlinkSync(filePath)
+    }
+  } catch (error) {
+    console.warn('[RuntimeLog] Não foi possível aplicar a retenção de 30 dias:', error)
+  }
+}
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow
@@ -18,6 +45,8 @@ export function safeSend(channel: string, ...args: any[]): void {
 }
 
 export function createMainWindow(): BrowserWindow {
+  const isDevelopment = Boolean(process.env['ELECTRON_RENDERER_URL'])
+  const developmentUrl = process.env['ELECTRON_RENDERER_URL']
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 860,
@@ -33,7 +62,8 @@ export function createMainWindow(): BrowserWindow {
         : join(__dirname, '../preload/index.js'),
       sandbox: true,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      devTools: isDevelopment
     }
   })
 
@@ -45,7 +75,7 @@ export function createMainWindow(): BrowserWindow {
   mainWindow.webContents.setWindowOpenHandler((details) => {
     try {
       const parsed = new URL(details.url)
-      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      if (parsed.protocol === 'https:' && parsed.hostname === 'aistudio.google.com') {
         shell.openExternal(details.url)
       }
     } catch {}
@@ -54,47 +84,63 @@ export function createMainWindow(): BrowserWindow {
 
   // Prevent renderer from navigating away from the app
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    try {
-      const currentUrl = mainWindow?.webContents.getURL() || ''
-      const currentOrigin = currentUrl ? new URL(currentUrl).origin : ''
-      const navOrigin = new URL(navigationUrl).origin
-      if (currentOrigin && navOrigin !== currentOrigin) {
-        event.preventDefault()
-      }
-    } catch {
-      event.preventDefault()
-    }
+    if (!isTrustedRendererUrl(navigationUrl, developmentUrl)) event.preventDefault()
   })
 
   // Auto-grant media (microphone/audio) permissions to the renderer window
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    if (permission === 'media' || (permission as string) === 'microphone' || (permission as string) === 'speech') {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const isMainRenderer = mainWindow !== null && !mainWindow.isDestroyed() &&
+      webContents === mainWindow.webContents && isTrustedRendererUrl(webContents.getURL(), developmentUrl)
+    if (isMainRenderer && (permission === 'media' || (permission as string) === 'microphone' || (permission as string) === 'speech')) {
       return callback(true)
     }
     callback(false)
   })
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-    return permission === 'media' || (permission as string) === 'microphone' || (permission as string) === 'speech'
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+    const isMainRenderer = mainWindow !== null && !mainWindow.isDestroyed() &&
+      webContents === mainWindow.webContents && isTrustedRendererUrl(webContents.getURL(), developmentUrl)
+    return isMainRenderer && (permission === 'media' || (permission as string) === 'microphone' || (permission as string) === 'speech')
   })
 
   // Forward renderer console logs to terminal and disk log file
-  const runtimeLogPath = join(app.getPath('userData'), 'jasper-runtime.log')
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    const formatted = `[Renderer] [L${level}] ${message} (${sourceId}:${line})`
+  const runtimeLogDirectory = app.getPath('userData')
+  fs.mkdirSync(runtimeLogDirectory, { recursive: true })
+  removeExpiredRuntimeLogs(runtimeLogDirectory)
+  const runtimeLogPath = join(runtimeLogDirectory, `jasper-runtime-${new Date().toISOString().slice(0, 10)}.log`)
+  fs.appendFileSync(runtimeLogPath, `[${new Date().toISOString()}] [Main] Runtime iniciado.\n`)
+  mainWindow.webContents.on('console-message', (event, legacyLevel, legacyMessage, legacyLine, legacySourceId) => {
+    const details = event as unknown as {
+      level?: string
+      message?: string
+      lineNumber?: number
+      sourceId?: string
+    }
+    const level = details.level ?? String(legacyLevel ?? 'info')
+    const message = details.message ?? legacyMessage ?? ''
+    const line = details.lineNumber ?? legacyLine ?? 0
+    const sourceId = details.sourceId ?? legacySourceId ?? ''
+    const source = sourceId ? sourceId.split(/[\\/]/).pop() : 'renderer'
+    const formatted = redactLogMessage(`[Renderer] [${level}] ${message} (${source}:${line})`)
     console.log(formatted)
     try {
       fs.appendFileSync(runtimeLogPath, `[${new Date().toISOString()}] ${formatted}\n`)
     } catch {}
   })
 
-  // Press F12 to toggle Fullscreen; Ctrl+Shift+I to toggle DevTools
+  if (!isDevelopment) {
+    mainWindow.webContents.on('devtools-opened', () => mainWindow?.webContents.closeDevTools())
+  }
+
+  // Press F12 to toggle Fullscreen; DevTools are available only during development.
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown') {
       if (input.key === 'F12') {
         event.preventDefault()
         toggleFullScreenMode()
-      } else if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+      } else if (isDevelopment && input.control && input.shift && input.key.toLowerCase() === 'i') {
         mainWindow?.webContents.toggleDevTools()
+      } else if (!isDevelopment && input.control && input.shift && input.key.toLowerCase() === 'i') {
+        event.preventDefault()
       }
     }
   })
@@ -107,11 +153,11 @@ export function createMainWindow(): BrowserWindow {
     safeSend(IPC_CHANNELS.WINDOW_FULLSCREEN_CHANGE, false)
   })
 
-  // Load renderer via Vite HMR or built index.html
+  // Load renderer via Vite HMR or the privileged production protocol.
   if (process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadURL('app://jasper/index.html')
   }
 
   // Automatic screenshot capture for visual verification when requested via CLI

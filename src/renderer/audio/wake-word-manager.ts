@@ -62,7 +62,7 @@ export class WakeWordManager {
 
     const agentName = this.options.getAgentName()
     try {
-      console.log(`[WakeWord] Inicializando TensorFlow.js para o agente "${agentName}"...`)
+      console.log('[WakeWord] Inicializando TensorFlow.js.')
 
       this.engine = new SpeechCommandsWakeWord({
         probabilityThreshold: 0.85,
@@ -74,7 +74,7 @@ export class WakeWordManager {
 
       // Bind detection exclusively via TensorFlow
       this.engine.onDetect = (word: string, score: number) => {
-        console.log(`[WakeWord] [TensorFlow] Nome detectado: "${word}" (confiança: ${(score * 100).toFixed(1)}%)! Chamando agente ${agentName}...`)
+        console.log(`[WakeWord] Ativação detectada com confiança de ${(score * 100).toFixed(1)}%.`)
         playWakeChime()
         updateStatusBadge('listening', `${agentName} Ouvindo...`)
         // Aguarda o término do sinal sonoro (260ms) antes de abrir o microfone,
@@ -91,12 +91,12 @@ export class WakeWordManager {
       if (this.engine.isCustomModelActive()) {
         await this.engine.start()
         this.isRunning = true
-        console.log(`[WakeWord] TensorFlow.js Speech Commands ATIVO para "${agentName}" (3 classes)!`)
+        console.log('[WakeWord] TensorFlow.js Speech Commands ativo com 3 classes.')
       } else {
         if (this.engine.isLegacyModel()) {
-          console.warn(`[WakeWord] Modelo legado de 2 classes detectado para "${agentName}". Escuta pausada até calibração com amostras de outras palavras.`)
+          console.warn('[WakeWord] Modelo legado de 2 classes detectado. Escuta pausada até nova calibração.')
         } else {
-          console.log(`[WakeWord] TensorFlow pronto. Modelo de voz para "${agentName}" pendente de calibração nas configurações.`)
+          console.log('[WakeWord] TensorFlow pronto; modelo de voz pendente de calibração.')
         }
         this.isRunning = false
       }

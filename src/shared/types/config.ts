@@ -18,7 +18,6 @@ export interface JasperConfig {
   enableSystemHealth: boolean
   enableSemanticMemory: boolean
   enableKnowledgeGraph: boolean
-  enableCodeInterpreter: boolean
   enableHeadlessBrowser: boolean
   enableGitWatcher: boolean
   enableFolderOrganizer: boolean
@@ -49,11 +48,15 @@ export interface JasperConfig {
   // License & Node-Locking
   licenseKey?: string
   licenseStatus?: 'active' | 'disabled' | 'revoked' | 'unlicensed'
-  licenseClientName?: string
-  licenseClientEmail?: string
   licenseMachineId?: string
   licenseActivatedAt?: string
   licenseLastCheckedAt?: string
+  licenseInstallationId?: string
+  licenseDeviceId?: string
+  licenseDeviceSecret?: string
+  licenseLeaseToken?: string
+  licenseLeaseExpiresAt?: string
+  licensePublicJwk?: string
 }
 
 export interface UpdateConfigPayload {
@@ -76,7 +79,6 @@ export interface UpdateConfigPayload {
   enableSystemHealth?: boolean
   enableSemanticMemory?: boolean
   enableKnowledgeGraph?: boolean
-  enableCodeInterpreter?: boolean
   enableHeadlessBrowser?: boolean
   enableGitWatcher?: boolean
   enableFolderOrganizer?: boolean
@@ -107,11 +109,15 @@ export interface UpdateConfigPayload {
   // License & Node-Locking
   licenseKey?: string
   licenseStatus?: 'active' | 'disabled' | 'revoked' | 'unlicensed'
-  licenseClientName?: string
-  licenseClientEmail?: string
   licenseMachineId?: string
   licenseActivatedAt?: string
   licenseLastCheckedAt?: string
+  licenseInstallationId?: string
+  licenseDeviceId?: string
+  licenseDeviceSecret?: string
+  licenseLeaseToken?: string
+  licenseLeaseExpiresAt?: string
+  licensePublicJwk?: string
 }
 
 export interface ConfigSummary {
@@ -135,7 +141,6 @@ export interface ConfigSummary {
   enableSystemHealth: boolean
   enableSemanticMemory: boolean
   enableKnowledgeGraph: boolean
-  enableCodeInterpreter: boolean
   enableHeadlessBrowser: boolean
   enableGitWatcher: boolean
   enableFolderOrganizer: boolean
@@ -168,7 +173,6 @@ export interface ConfigSummary {
   hasLicense: boolean
   licenseKeyMasked?: string
   licenseStatus: 'active' | 'disabled' | 'revoked' | 'unlicensed'
-  licenseClientName?: string
   licenseMachineId?: string
   hwid: string
 }

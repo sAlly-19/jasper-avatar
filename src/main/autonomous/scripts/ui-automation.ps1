@@ -64,6 +64,8 @@ switch ($Action.ToLower()) {
             $name = $el.Current.Name
             $autoId = $el.Current.AutomationId
             $ctrlType = $el.Current.ControlType.ProgrammaticName
+            $sensitiveName = "$name $autoId" -match '(?i)(password|passwd|senha|pin|token|secret|segredo|credential|credencial|api[ _-]?key|chave[ _-]?(api|privada))'
+            if ($el.Current.IsPassword -or $sensitiveName) { continue }
             if (-not [string]::IsNullOrWhiteSpace($name) -or -not [string]::IsNullOrWhiteSpace($autoId)) {
                 $elementList += [PSCustomObject]@{
                     name = $name
@@ -174,6 +176,11 @@ switch ($Action.ToLower()) {
         if (-not $found) {
             $err = "Elemento '$ElementName' nao encontrado."
             [PSCustomObject]@{ error = $err } | ConvertTo-Json -Compress
+            exit
+        }
+
+        if ($found.Current.IsPassword -or "$($found.Current.Name) $($found.Current.AutomationId)" -match '(?i)(password|passwd|senha|pin|token|secret|segredo|credential|credencial|api[ _-]?key|chave[ _-]?(api|privada))') {
+            [PSCustomObject]@{ success = $false; error = "Campos de credenciais nao podem ser preenchidos por automacao." } | ConvertTo-Json -Compress
             exit
         }
 

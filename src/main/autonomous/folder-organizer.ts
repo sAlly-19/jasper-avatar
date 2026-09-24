@@ -1,8 +1,8 @@
-import { app } from 'electron'
 import { join, extname, basename } from 'path'
 import fs from 'fs'
 import crypto from 'crypto'
 import type { FolderScanResult, FolderOrganizeResult, DuplicateFileGroup, OldInstallerItem } from '@shared'
+import { securityBroker } from '../services/security-broker'
 
 const CATEGORIES: Record<string, string[]> = {
   'Documentos': ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.txt', '.csv', '.odt', '.rtf'],
@@ -25,18 +25,11 @@ export class FolderOrganizer {
   }
 
   public resolveTargetDir(target: string): string {
-    const lower = target.toLowerCase().trim()
-    if (lower === 'downloads' || lower === 'download') {
-      return app.getPath('downloads')
+    const decision = securityBroker.resolveUserPath(target)
+    if (!decision.allowed || !decision.resolvedPath) {
+      throw new Error(decision.reason || 'Pasta não autorizada.')
     }
-    if (lower === 'desktop' || lower === 'área de trabalho' || lower === 'area de trabalho') {
-      return app.getPath('desktop')
-    }
-    // If it's an absolute path that exists
-    if (fs.existsSync(target)) {
-      return target
-    }
-    return app.getPath('downloads')
+    return decision.resolvedPath
   }
 
   private calculateFileHash(filePath: string, size: number): string | null {
@@ -64,7 +57,19 @@ export class FolderOrganizer {
   }
 
   public async scanDuplicatesAndOldFiles(target: string = 'downloads'): Promise<FolderScanResult> {
-    const dir = this.resolveTargetDir(target)
+    let dir = target
+    try {
+      dir = this.resolveTargetDir(target)
+    } catch (error) {
+      return {
+        target,
+        totalFilesScanned: 0,
+        duplicates: [],
+        oldInstallers: [],
+        totalReclaimableBytes: 0,
+        summary: error instanceof Error ? error.message : 'Pasta não autorizada.'
+      }
+    }
 
     if (!this.enabled) {
       return {
@@ -93,7 +98,7 @@ export class FolderOrganizer {
 
         let stat: fs.Stats
         try {
-          stat = fs.statSync(fullPath)
+          stat = fs.lstatSync(fullPath)
         } catch {
           continue
         }
@@ -174,7 +179,18 @@ export class FolderOrganizer {
   }
 
   public async organizeDirectory(target: string = 'downloads', dryRun: boolean = true): Promise<FolderOrganizeResult> {
-    const dir = this.resolveTargetDir(target)
+    let dir = target
+    try {
+      dir = this.resolveTargetDir(target)
+    } catch (error) {
+      return {
+        success: false,
+        dryRun,
+        targetDir: target,
+        movedFiles: [],
+        summary: error instanceof Error ? error.message : 'Pasta não autorizada.'
+      }
+    }
 
     if (!this.enabled) {
       return {
@@ -183,6 +199,24 @@ export class FolderOrganizer {
         targetDir: dir,
         movedFiles: [],
         summary: 'Organizador de pastas desativado nas configurações.'
+      }
+    }
+
+    if (!dryRun) {
+      const approved = await securityBroker.confirmOperation({
+        title: 'Autorizar organização de arquivos',
+        message: `Mover arquivos dentro de ${basename(dir)}?`,
+        detail: `O Jasper organizará arquivos apenas dentro da pasta autorizada: ${dir}. Links simbólicos e junctions serão ignorados.`,
+        confirmLabel: 'Organizar arquivos'
+      })
+      if (!approved) {
+        return {
+          success: false,
+          dryRun,
+          targetDir: dir,
+          movedFiles: [],
+          summary: 'Organização cancelada pelo usuário.'
+        }
       }
     }
 
@@ -199,7 +233,7 @@ export class FolderOrganizer {
         const fullPath = join(dir, item)
         let stat: fs.Stats
         try {
-          stat = fs.statSync(fullPath)
+          stat = fs.lstatSync(fullPath)
         } catch {
           continue
         }
@@ -240,7 +274,7 @@ export class FolderOrganizer {
 
             fs.renameSync(fullPath, targetFilePath)
           } catch (fileErr: any) {
-            console.warn(`[FolderOrganizer] Não foi possível mover arquivo "${item}":`, fileErr.message)
+            console.warn('[FolderOrganizer] Não foi possível mover um arquivo:', fileErr.message)
             continue
           }
         }

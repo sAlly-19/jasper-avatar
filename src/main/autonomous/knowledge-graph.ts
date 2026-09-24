@@ -2,22 +2,10 @@ import { app } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import type { KnowledgeNode, KnowledgeEdge, KnowledgeGraphData } from '@shared'
+import { atomicWriteJsonSync, readJsonFileSync } from '../utils/atomic-json'
 
-function atomicWriteFileSync(filePath: string, data: string): void {
-  const tmpPath = `${filePath}.tmp.${Date.now()}`
-  fs.writeFileSync(tmpPath, data, 'utf-8')
-  try {
-    fs.renameSync(tmpPath, filePath)
-  } catch (err) {
-    // Windows fallback if destination file is locked or cross-device
-    try {
-      fs.copyFileSync(tmpPath, filePath)
-      fs.unlinkSync(tmpPath)
-    } catch {
-      fs.writeFileSync(filePath, data, 'utf-8')
-    }
-  }
-}
+const GRAPH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+const PERMANENT_NODE_IDS = new Set(['user', 'jasper'])
 
 export class KnowledgeGraphService {
   private isEnabled: boolean = true
@@ -44,7 +32,17 @@ export class KnowledgeGraphService {
     try {
       const p = this.getFilePath()
       if (fs.existsSync(p)) {
-        this.data = JSON.parse(fs.readFileSync(p, 'utf-8'))
+        const parsed = readJsonFileSync<KnowledgeGraphData>(p)
+        const cutoff = Date.now() - GRAPH_RETENTION_MS
+        const nodes = Array.isArray(parsed.nodes)
+          ? parsed.nodes.filter((node) => PERMANENT_NODE_IDS.has(node.id) || node.createdAt >= cutoff)
+          : []
+        const nodeIds = new Set(nodes.map((node) => node.id))
+        const edges = Array.isArray(parsed.edges)
+          ? parsed.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target) && (edge.id === 'e1' || edge.createdAt >= cutoff))
+          : []
+        this.data = { nodes, edges }
+        if (nodes.length !== parsed.nodes?.length || edges.length !== parsed.edges?.length) this.saveGraph()
       } else {
         // Initialize with core user/agent entities
         this.initDefaultGraph()
@@ -71,7 +69,7 @@ export class KnowledgeGraphService {
   private saveGraph(): void {
     try {
       const p = this.getFilePath()
-      atomicWriteFileSync(p, JSON.stringify(this.data, null, 2))
+      atomicWriteJsonSync(p, this.data)
     } catch (err) {
       console.warn('[KnowledgeGraph] Error saving graph:', err)
     }
@@ -94,7 +92,7 @@ export class KnowledgeGraphService {
       }
       this.data.nodes.push(node)
       this.saveGraph()
-      console.log(`[KnowledgeGraph] Added entity: ${label} [${type}]`)
+      console.log(`[KnowledgeGraph] Added entity of type ${type}.`)
     } else if (properties) {
       node.properties = { ...node.properties, ...properties }
       this.saveGraph()
@@ -119,7 +117,7 @@ export class KnowledgeGraphService {
       }
       this.data.edges.push(edge)
       this.saveGraph()
-      console.log(`[KnowledgeGraph] Added relation: (${sourceLabel}) -[${relation}]-> (${targetLabel})`)
+      console.log('[KnowledgeGraph] Added relation.')
     }
     return edge
   }

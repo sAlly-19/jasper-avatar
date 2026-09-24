@@ -2,13 +2,14 @@ import { app } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import type { MemoryItem, JasperMemory } from '@shared'
+import { atomicWriteJsonSync, readJsonFileSync } from './utils/atomic-json'
 
 export type { MemoryItem, JasperMemory }
 
-const defaultMemory: JasperMemory = {
-  userName: '',
-  userPreferences: [],
-  facts: []
+const MEMORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+
+function freshDefaultMemory(): JasperMemory {
+  return { userName: '', userPreferences: [], facts: [] }
 }
 
 export function getMemoryFilePath(): string {
@@ -19,31 +20,37 @@ export function loadMemory(): JasperMemory {
   try {
     const memPath = getMemoryFilePath()
     if (fs.existsSync(memPath)) {
-      const data = JSON.parse(fs.readFileSync(memPath, 'utf-8'))
-      return {
+      if (fs.statSync(memPath).mtimeMs < Date.now() - MEMORY_RETENTION_MS) {
+        const emptyMemory = freshDefaultMemory()
+        saveMemory(emptyMemory)
+        return emptyMemory
+      }
+      const data = readJsonFileSync<JasperMemory>(memPath)
+      const allFacts: MemoryItem[] = Array.isArray(data.facts) ? data.facts : []
+      const cutoff = Date.now() - MEMORY_RETENTION_MS
+      const retainedFacts = allFacts.filter((item) => {
+        const createdAt = Date.parse(item?.createdAt)
+        return Number.isFinite(createdAt) && createdAt >= cutoff
+      })
+      const memory = {
         userName: data.userName || '',
         userPreferences: Array.isArray(data.userPreferences) ? data.userPreferences : [],
-        facts: Array.isArray(data.facts) ? data.facts : []
+        facts: retainedFacts
       }
+      if (retainedFacts.length !== allFacts.length) saveMemory(memory)
+      return memory
     }
   } catch (err) {
     console.warn('[Memory] Error reading jasper-memory.json:', err)
   }
-  return { ...defaultMemory }
+  return freshDefaultMemory()
 }
 
 export function saveMemory(memory: JasperMemory): void {
   try {
     const memPath = getMemoryFilePath()
-    const tmpPath = `${memPath}.tmp.${Date.now()}`
-    fs.writeFileSync(tmpPath, JSON.stringify(memory, null, 2), 'utf-8')
-    try {
-      fs.renameSync(tmpPath, memPath)
-    } catch {
-      fs.copyFileSync(tmpPath, memPath)
-      fs.unlinkSync(tmpPath)
-    }
-    console.log('[Memory] Saved memory successfully to', memPath)
+    atomicWriteJsonSync(memPath, memory)
+    console.log('[Memory] Memory saved successfully.')
   } catch (err) {
     console.warn('[Memory] Error writing to jasper-memory.json:', err)
   }

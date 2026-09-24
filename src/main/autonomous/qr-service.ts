@@ -1,4 +1,6 @@
 import QRCode from 'qrcode'
+import jsQR from 'jsqr'
+import { nativeImage } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import { reportGenerator } from './report-generator'
@@ -55,7 +57,13 @@ export class QrService {
       }
 
       const targetDir = await reportGenerator.getTargetDirectory()
-      const safeName = (fileName || `qrcode_${Date.now()}.png`).replace(/\.png$/i, '') + '.png'
+      const requestedBase = path.basename(fileName?.trim() || `qrcode_${Date.now()}`, path.extname(fileName?.trim() || ''))
+      const normalizedBase = requestedBase
+        .normalize('NFKC')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 100)
+      const safeName = `${normalizedBase || `qrcode_${Date.now()}`}.png`
       const finalPath = path.join(targetDir, safeName)
 
       const buffer = await QRCode.toBuffer(cleanData, {
@@ -90,12 +98,39 @@ export class QrService {
     const cleanPath = path.resolve(imagePath.trim())
 
     try {
-      await fs.access(cleanPath)
-      // Note: Full image decode with jsqr requires pixel parsing (RGBA).
-      // Here we provide the file reader check and confirmation
+      const stat = await fs.stat(cleanPath)
+      if (!stat.isFile() || stat.size > 20 * 1024 * 1024) {
+        return { success: false, message: 'A imagem deve ser um arquivo de até 20 MB.' }
+      }
+
+      const image = nativeImage.createFromPath(cleanPath)
+      if (image.isEmpty()) {
+        return { success: false, message: 'O arquivo não contém uma imagem compatível.' }
+      }
+
+      const { width, height } = image.getSize()
+      if (width < 1 || height < 1 || width * height > 25_000_000) {
+        return { success: false, message: 'A imagem excede o limite de 25 megapixels.' }
+      }
+
+      const bgra = image.toBitmap()
+      const rgba = new Uint8ClampedArray(bgra.length)
+      for (let index = 0; index < bgra.length; index += 4) {
+        rgba[index] = bgra[index + 2]
+        rgba[index + 1] = bgra[index + 1]
+        rgba[index + 2] = bgra[index]
+        rgba[index + 3] = bgra[index + 3]
+      }
+
+      const decoded = jsQR(rgba, width, height, { inversionAttempts: 'attemptBoth' })
+      if (!decoded?.data) {
+        return { success: false, message: 'Nenhum QR Code legível foi encontrado na imagem.' }
+      }
+
       return {
         success: true,
-        message: `Arquivo de imagem "${path.basename(cleanPath)}" pronto para decodificação visual.`
+        data: decoded.data,
+        message: `QR Code lido com sucesso em "${path.basename(cleanPath)}".`
       }
     } catch {
       return {
