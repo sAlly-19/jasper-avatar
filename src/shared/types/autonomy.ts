@@ -12,7 +12,6 @@ export interface AutonomyConfig {
   enableSemanticMemory: boolean
   enableKnowledgeGraph: boolean
   // OS & Workspace Autonomy modules
-  enableCodeInterpreter: boolean
   enableHeadlessBrowser: boolean
   enableGitWatcher: boolean
   enableFolderOrganizer: boolean
@@ -86,16 +85,6 @@ export interface SemanticMemoryItem {
   tokens: string[]
   createdAt: number
   updatedAt: number
-}
-
-export interface CodeExecutionResult {
-  success: boolean
-  language: 'python' | 'javascript' | 'bash'
-  stdout: string
-  stderr: string
-  executionTimeMs: number
-  generatedFiles: string[]
-  error?: string
 }
 
 export interface BrowserScrapeResult {

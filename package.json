@@ -4,6 +4,10 @@
   "description": "Jasper - Interactive 3D Voice Assistant with Three.js and Gemini Live",
   "author": "Jasper Team",
   "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -13,6 +17,12 @@
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "test": "node scripts/run-tests.mjs",
+    "verify": "npm run typecheck && npm test && npm run build",
+    "package:dir": "electron-builder --dir --win --x64",
+    "smoke:packaged": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-packaged.ps1",
+    "audit:runtime": "npm audit --omit=dev --audit-level=high",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "sbom:runtime": "npm sbom --omit=dev --sbom-format cyclonedx --sbom-type application",
     "capture:showcase": "node scripts/capture-showcase.cjs",
     "setup:assets": "node scripts/setup-assets.mjs",
     "postinstall": "node scripts/setup-assets.mjs"
@@ -43,5 +53,10 @@
     "electron-vite": "^5.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.4.3"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
   }
 }

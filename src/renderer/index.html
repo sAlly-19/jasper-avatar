@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https: wss: data: blob: ws://localhost:* ws://127.0.0.1:*;" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com wss://generativelanguage.googleapis.com https://fonts.googleapis.com https://fonts.gstatic.com data: blob: ws://localhost:* ws://127.0.0.1:*; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none';" />
     <title>Jasper AI - Voice Assistant</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -647,23 +647,6 @@
                 </div>
               </div>
 
-              <!-- 9. Code Interpreter -->
-              <div class="settings-card">
-                <div class="hud-switch-item">
-                  <div class="hud-switch-text">
-                    <div class="hud-switch-title-row">
-                      <label class="hud-switch-title" for="check-code-interpreter">9. Interpretador de Código Sandboxed Local</label>
-                      <button type="button" class="btn-module-info" data-module="code-interpreter" title="Saiba como este módulo funciona">!</button>
-                    </div>
-                    <label class="hud-switch-desc" for="check-code-interpreter">Permite ao Jasper escrever e rodar scripts Python e Node.js locais de forma segura para processar dados e gerar arquivos.</label>
-                  </div>
-                  <label class="hud-toggle" for="check-code-interpreter">
-                    <input type="checkbox" id="check-code-interpreter" checked />
-                    <span class="hud-toggle-slider"></span>
-                  </label>
-                </div>
-              </div>
-
               <!-- 10. Headless Browser -->
               <div class="settings-card">
                 <div class="hud-switch-item">
@@ -1084,9 +1067,9 @@
                 </div>
 
                 <div class="form-group" style="margin-top: 14px;">
-                  <label class="form-label" for="tab-license-key">CHAVE DE ATIVAÇÃO (JASPER-LT):</label>
+                  <label class="form-label" for="tab-license-key">CHAVE DE ATIVAÇÃO JASPER:</label>
                   <div style="display: flex; gap: 8px; margin-top: 4px;">
-                    <input type="text" id="tab-license-key" class="license-input" placeholder="JASPER-LT-XXXX-XXXX-XXXX" style="flex: 1;" />
+                    <input type="text" id="tab-license-key" class="license-input" placeholder="JASPER-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XX" style="flex: 1;" />
                     <button type="button" id="tab-btn-activate-key" class="btn-primary" style="white-space: nowrap; padding: 0 16px;">
                       Ativar Chave
                     </button>
@@ -1224,12 +1207,12 @@
 
               <!-- License Key Input -->
               <div class="form-group" style="margin-bottom: 16px;">
-                <label class="license-input-label" for="input-license-key">INFORME SUA CHAVE DE ATIVAÇÃO (JASPER-LT):</label>
+                <label class="license-input-label" for="input-license-key">INFORME SUA CHAVE DE ATIVAÇÃO JASPER:</label>
                 <input
                   type="text"
                   id="input-license-key"
                   class="license-input"
-                  placeholder="JASPER-LT-XXXX-XXXX-XXXX"
+                  placeholder="JASPER-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XX"
                   autocomplete="off"
                   spellcheck="false"
                 />

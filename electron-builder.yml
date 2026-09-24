@@ -8,6 +8,14 @@ directories:
 files:
   - out/**/*
   - package.json
+  - "!**/node_modules/**/*.map"
+  - "!**/node_modules/**/{test,tests,__tests__}/**"
+
+extraResources:
+  - from: src/main/autonomous/scripts
+    to: scripts
+    filter:
+      - "*.ps1"
 
 win:
   target:
@@ -29,4 +37,13 @@ nsis:
 
 portable:
   artifactName: ${productName}-${version}-Portable.${ext}
+
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
 

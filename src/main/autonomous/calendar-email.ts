@@ -2,8 +2,25 @@ import { app } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import tls from 'tls'
+import { randomUUID } from 'crypto'
 import { configStore } from '../config/config-store'
 import type { CalendarEvent, EmailSummary, AutonomyNotification } from '@shared'
+import { atomicWriteJsonSync, readJsonFileSync } from '../utils/atomic-json'
+
+const CALENDAR_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+
+function escapeIcsText(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\r?\n/g, '\\n')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+}
+
+function quoteImapValue(value: string): string {
+  if (/\r|\n/.test(value)) throw new Error('Credencial IMAP inválida.')
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
 
 export class CalendarEmailService {
   private enabled: boolean = true
@@ -39,9 +56,11 @@ export class CalendarEmailService {
   private loadEvents(): void {
     try {
       if (fs.existsSync(this.calendarFile)) {
-        const raw = fs.readFileSync(this.calendarFile, 'utf-8')
-        const arr: CalendarEvent[] = JSON.parse(raw)
-        arr.forEach((e) => this.events.set(e.id, e))
+        const arr = readJsonFileSync<CalendarEvent[]>(this.calendarFile)
+        const cutoff = Date.now() - CALENDAR_RETENTION_MS
+        const retained = Array.isArray(arr) ? arr.filter((event) => event.endDateTime >= cutoff) : []
+        retained.forEach((event) => this.events.set(event.id, event))
+        if (retained.length !== arr.length) this.saveEvents()
       }
     } catch (err) {
       console.warn('[CalendarEmail] Error loading events from disk:', err)
@@ -51,7 +70,7 @@ export class CalendarEmailService {
   private saveEvents(): void {
     try {
       const arr = Array.from(this.events.values())
-      fs.writeFileSync(this.calendarFile, JSON.stringify(arr, null, 2), 'utf-8')
+      atomicWriteJsonSync(this.calendarFile, arr)
     } catch (err) {
       console.warn('[CalendarEmail] Error saving events to disk:', err)
     }
@@ -69,7 +88,7 @@ export class CalendarEmailService {
     const endMs = startMs + Math.max(1, durationMinutes) * 60 * 1000
 
     const event: CalendarEvent = {
-      id: `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: `evt-${randomUUID()}`,
       title: title.trim(),
       description: description?.trim(),
       startDateTime: startMs,
@@ -120,9 +139,9 @@ export class CalendarEmailService {
         `DTSTAMP:${formatIcsDate(Date.now())}`,
         `DTSTART:${formatIcsDate(event.startDateTime)}`,
         `DTEND:${formatIcsDate(event.endDateTime)}`,
-        `SUMMARY:${event.title}`,
-        event.description ? `DESCRIPTION:${event.description}` : '',
-        event.location ? `LOCATION:${event.location}` : '',
+        `SUMMARY:${escapeIcsText(event.title)}`,
+        event.description ? `DESCRIPTION:${escapeIcsText(event.description)}` : '',
+        event.location ? `LOCATION:${escapeIcsText(event.location)}` : '',
         'END:VEVENT',
         'END:VCALENDAR'
       ]
@@ -130,7 +149,7 @@ export class CalendarEmailService {
         .join('\r\n')
 
       const icsPath = join(calDir, `${event.id}.ics`)
-      fs.writeFileSync(icsPath, icsContent, 'utf-8')
+      fs.writeFileSync(icsPath, icsContent, { encoding: 'utf-8', mode: 0o600 })
     } catch (err) {
       console.warn('[CalendarEmail] Error exporting .ics file:', err)
     }
@@ -230,7 +249,7 @@ export class CalendarEmailService {
           rejectUnauthorized: true
         },
         () => {
-          console.log(`[CalendarEmail] Conexão TLS estabelecida com ${host}:${port}`)
+          console.log('[CalendarEmail] Conexão TLS estabelecida.')
         }
       )
 
@@ -265,12 +284,12 @@ export class CalendarEmailService {
         for (const line of lines) {
           if (state === 'GREETING' && line.startsWith('* OK')) {
             state = 'LOGIN'
-            sendCmd(`LOGIN "${user.replace(/"/g, '\\"')}" "${pass.replace(/"/g, '\\"')}"`)
+            sendCmd(`LOGIN "${quoteImapValue(user)}" "${quoteImapValue(pass)}"`)
           } else if (state === 'LOGIN' && line.startsWith(`${currentTag} OK`)) {
             state = 'SELECT'
             sendCmd(`SELECT INBOX`)
           } else if (state === 'LOGIN' && line.startsWith(`${currentTag} NO`)) {
-            console.warn('[CalendarEmail] Falha de autenticação IMAP:', line)
+            console.warn('[CalendarEmail] Falha de autenticação IMAP.')
             finish()
           } else if (state === 'SELECT' && line.startsWith(`${currentTag} OK`)) {
             state = 'SEARCH'

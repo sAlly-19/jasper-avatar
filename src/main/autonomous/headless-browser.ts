@@ -1,9 +1,38 @@
 import { BrowserWindow } from 'electron'
+import { randomUUID } from 'crypto'
 import type { BrowserScrapeResult } from '@shared'
 import { toolPolicyEngine } from './policy-engine'
+import { resolveAndCheckSSRF } from './webhook-manager'
+import { securityBroker } from '../services/security-broker'
+
+const CREDENTIAL_SELECTOR_PATTERN = /(?:password|passwd|senha|pin|token|secret|credential|api[ _-]?key)/i
 
 export class HeadlessBrowser {
   private enabled: boolean = true
+
+  private async validateRemoteUrl(targetUrl: string): Promise<{ allowed: boolean; reason?: string }> {
+    const policy = toolPolicyEngine.validateBrowserUrl(targetUrl)
+    if (!policy.allowed) return { allowed: false, reason: policy.reason }
+
+    try {
+      const parsed = new URL(targetUrl)
+      const dnsCheck = await resolveAndCheckSSRF(parsed.hostname)
+      return dnsCheck.isSafe ? { allowed: true } : { allowed: false, reason: dnsCheck.reason }
+    } catch {
+      return { allowed: false, reason: 'URL inválida.' }
+    }
+  }
+
+  private attachRequestGuard(win: BrowserWindow): void {
+    win.webContents.session.webRequest.onBeforeRequest(
+      { urls: ['http://*/*', 'https://*/*'] },
+      (details, callback) => {
+        this.validateRemoteUrl(details.url)
+          .then((result) => callback({ cancel: !result.allowed }))
+          .catch(() => callback({ cancel: true }))
+      }
+    )
+  }
 
   public setEnabled(enabled: boolean): void {
     this.enabled = enabled
@@ -37,7 +66,7 @@ export class HeadlessBrowser {
     }
 
     // Zero-Trust URL validation (SSRF / intranet blocking)
-    const urlPolicy = toolPolicyEngine.validateBrowserUrl(formattedUrl)
+    const urlPolicy = await this.validateRemoteUrl(formattedUrl)
     if (!urlPolicy.allowed) {
       return {
         success: false,
@@ -73,11 +102,13 @@ export class HeadlessBrowser {
           sandbox: true,
           javascript: true,
           contextIsolation: true,
-          webSecurity: true
+          webSecurity: true,
+          partition: `jasper-headless-${randomUUID()}`
         }
       })
 
       win.webContents.setAudioMuted(true)
+      this.attachRequestGuard(win)
 
       const onAbort = (): void => {
         if (win && !win.isDestroyed()) {
@@ -117,6 +148,13 @@ export class HeadlessBrowser {
 
       let screenshotBase64: string | undefined
       if (extractType === 'screenshot') {
+        const approved = await securityBroker.confirmOperation({
+          title: 'Autorizar captura de pagina',
+          message: `Capturar uma imagem da pagina ${new URL(formattedUrl).hostname}?`,
+          detail: `Endereco: ${formattedUrl}. A captura pode conter informacoes visiveis na pagina.`,
+          confirmLabel: 'Capturar pagina'
+        })
+        if (!approved) throw new Error('Captura de pagina cancelada pelo usuario.')
         const image = await win.webContents.capturePage()
         screenshotBase64 = image.toDataURL()
       }
@@ -218,11 +256,23 @@ export class HeadlessBrowser {
     }
 
     let formattedUrl = targetUrl.trim()
+    if (!formattedUrl || formattedUrl.length > 2048 || formattedUrl.includes('\0')) {
+      return { success: false, url: formattedUrl, title: '', message: 'URL vazia ou invalida.' }
+    }
+    if (selector && (selector.length > 1024 || selector.includes('\0'))) {
+      return { success: false, url: formattedUrl, title: '', message: 'Seletor CSS invalido ou acima do limite permitido.' }
+    }
+    if (value !== undefined && (value.length > 10000 || value.includes('\0'))) {
+      return { success: false, url: formattedUrl, title: '', message: 'Valor acima do limite permitido.' }
+    }
+    if (action === 'fill' && selector && CREDENTIAL_SELECTOR_PATTERN.test(selector)) {
+      return { success: false, url: formattedUrl, title: '', message: 'Preenchimento de campos de senha, token ou credenciais e bloqueado.' }
+    }
     if (!/^https?:\/\//i.test(formattedUrl)) {
       formattedUrl = `https://${formattedUrl}`
     }
 
-    const urlPolicy = toolPolicyEngine.validateBrowserUrl(formattedUrl)
+    const urlPolicy = await this.validateRemoteUrl(formattedUrl)
     if (!urlPolicy.allowed) {
       return {
         success: false,
@@ -241,12 +291,25 @@ export class HeadlessBrowser {
         webPreferences: {
           sandbox: true,
           javascript: true,
-          contextIsolation: true
+          contextIsolation: true,
+          webSecurity: true,
+          partition: `jasper-headless-${randomUUID()}`
         }
       })
 
       win.webContents.setAudioMuted(true)
-      await win.loadURL(formattedUrl, { timeout: 20000 })
+      this.attachRequestGuard(win)
+      let navigationTimer: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([
+          win.loadURL(formattedUrl),
+          new Promise<never>((_, reject) => {
+            navigationTimer = setTimeout(() => reject(new Error('Tempo limite de navegação excedido.')), 20000)
+          })
+        ])
+      } finally {
+        if (navigationTimer) clearTimeout(navigationTimer)
+      }
       await new Promise((r) => setTimeout(r, 1500))
 
       const title = win.webContents.getTitle() || ''
@@ -254,6 +317,14 @@ export class HeadlessBrowser {
       switch (action) {
         case 'click': {
           if (!selector) return { success: false, url: formattedUrl, title, message: 'Seletor CSS obrigatório para ação click.' }
+          const approved = await securityBroker.confirmOperation({
+            title: 'Autorizar clique em pagina web',
+            message: `Permitir um clique em ${new URL(formattedUrl).hostname}?`,
+            detail: `Seletor: ${selector}. Confirme somente se esta acao corresponde ao que voce solicitou.`,
+            confirmLabel: 'Executar clique'
+          })
+          if (!approved) return { success: false, url: formattedUrl, title, message: 'Clique cancelado pelo usuario.' }
+
           const clickScript = `
             (() => {
               const el = document.querySelector(${JSON.stringify(selector)});
@@ -279,6 +350,36 @@ export class HeadlessBrowser {
           if (!selector || value === undefined) {
             return { success: false, url: formattedUrl, title, message: 'Seletor e valor são obrigatórios para ação fill.' }
           }
+          const inspectFieldScript = `
+            (() => {
+              const el = document.querySelector(${JSON.stringify(selector)});
+              if (!el) return { found: false, credentialRisk: false };
+              const metadata = [
+                el.getAttribute('type'), el.getAttribute('autocomplete'), el.getAttribute('name'),
+                el.getAttribute('id'), el.getAttribute('aria-label'), el.getAttribute('placeholder')
+              ].filter(Boolean).join(' ');
+              return {
+                found: true,
+                credentialRisk: el.matches('input[type="password"]') ||
+                  /(?:password|passwd|senha|pin|token|secret|credential|api[ _-]?key)/i.test(metadata)
+              };
+            })()
+          `
+          const field = await win.webContents.executeJavaScript(inspectFieldScript)
+          if (!field?.found) {
+            return { success: false, url: formattedUrl, title, message: `Campo "${selector}" nao encontrado na pagina.` }
+          }
+          if (field.credentialRisk) {
+            return { success: false, url: formattedUrl, title, message: 'Preenchimento de campos de senha, token ou credenciais e bloqueado.' }
+          }
+          const approved = await securityBroker.confirmOperation({
+            title: 'Autorizar preenchimento em pagina web',
+            message: `Permitir o preenchimento de um campo em ${new URL(formattedUrl).hostname}?`,
+            detail: `Seletor: ${selector}. O conteudo nao e exibido nesta confirmacao nem no log.`,
+            confirmLabel: 'Preencher campo'
+          })
+          if (!approved) return { success: false, url: formattedUrl, title, message: 'Preenchimento cancelado pelo usuario.' }
+
           const fillScript = `
             (() => {
               const el = document.querySelector(${JSON.stringify(selector)});
@@ -297,7 +398,7 @@ export class HeadlessBrowser {
             success: true,
             url: formattedUrl,
             title,
-            message: `Campo "${selector}" preenchido com "${value}".`
+            message: `Campo "${selector}" preenchido com sucesso.`
           }
         }
 
@@ -328,6 +429,13 @@ export class HeadlessBrowser {
         }
 
         case 'screenshot': {
+          const approved = await securityBroker.confirmOperation({
+            title: 'Autorizar captura de pagina',
+            message: `Capturar uma imagem da pagina ${new URL(formattedUrl).hostname}?`,
+            detail: `Endereco: ${formattedUrl}. A captura pode conter informacoes visiveis na pagina.`,
+            confirmLabel: 'Capturar pagina'
+          })
+          if (!approved) return { success: false, url: formattedUrl, title, message: 'Captura cancelada pelo usuario.' }
           const image = await win.webContents.capturePage()
           return {
             success: true,

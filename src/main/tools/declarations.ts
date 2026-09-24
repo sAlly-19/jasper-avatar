@@ -30,10 +30,10 @@ export const SYSTEM_FUNCTION_DECLARATIONS = [
     parameters: {
       type: 'OBJECT',
       properties: {
-        programName: { type: 'STRING', description: 'Nome do programa ou processo a fechar (ex: notepad, chrome, spotify)' },
+        processId: { type: 'NUMBER', description: 'PID numérico obtido por list_processes' },
         force: { type: 'BOOLEAN', description: 'Forçar o encerramento imediato (padrão: true)' }
       },
-      required: ['programName']
+      required: ['processId']
     }
   },
   {
@@ -408,18 +408,6 @@ export const AUTONOMY_FUNCTION_DECLARATIONS = [
     }
   },
   {
-    name: 'execute_code',
-    description: 'Escreve e executa código Python ou Node.js em ambiente isolado (sandbox local) para calcular dados, manipular arquivos, gerar relatórios ou processar lógicas.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        language: { type: 'STRING', description: 'Linguagem do script: "python" ou "javascript"' },
-        code: { type: 'STRING', description: 'Código fonte completo a ser executado' }
-      },
-      required: ['language', 'code']
-    }
-  },
-  {
     name: 'browse_page',
     description: 'Abre uma página web em segundo plano através de um navegador headless invisível, lê e mastiga seu conteúdo textual ou captura a tela.',
     parameters: {
@@ -576,7 +564,6 @@ export function getActiveAutonomyDeclarations(cfg: Record<string, any>): any[] {
     if (decl.name === 'get_daily_briefing' && cfg.enableDailyBriefing === false) continue
     if (decl.name === 'query_semantic_memory' && cfg.enableSemanticMemory === false) continue
     if ((decl.name === 'query_knowledge_graph' || decl.name === 'add_knowledge_relation') && cfg.enableKnowledgeGraph === false) continue
-    if (decl.name === 'execute_code' && !cfg.enableCodeInterpreter) continue
     if (decl.name === 'browse_page' && cfg.enableHeadlessBrowser === false) continue
     if (decl.name.startsWith('git_') && cfg.enableGitWatcher === false) continue
     if ((decl.name === 'scan_duplicates_and_old_files' || decl.name === 'organize_directory') && cfg.enableFolderOrganizer === false) continue

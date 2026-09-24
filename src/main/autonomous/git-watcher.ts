@@ -177,14 +177,16 @@ export class GitWatcher {
     return { success: true, output: commitRes.stdout }
   }
 
-  public async runTests(repoPath: string = this.defaultRepoPath, customCommand?: string, signal?: AbortSignal): Promise<{ success: boolean; output: string }> {
+  public async runTests(repoPath: string = this.defaultRepoPath, signal?: AbortSignal): Promise<{ success: boolean; output: string }> {
     return new Promise((resolve) => {
       const packageJsonPath = join(repoPath, 'package.json')
       const isNodeProject = fs.existsSync(packageJsonPath)
-      const command = customCommand || (isNodeProject ? 'npm' : 'pytest')
-      const args = customCommand ? [] : isNodeProject ? ['test'] : []
+      const command = isNodeProject
+        ? (process.platform === 'win32' ? 'npm.cmd' : 'npm')
+        : (process.platform === 'win32' ? 'pytest.exe' : 'pytest')
+      const args = isNodeProject ? ['test'] : []
 
-      execFile(command, args, { cwd: repoPath, timeout: 60000, signal, windowsHide: true, shell: process.platform === 'win32' }, (err, stdout, stderr) => {
+      execFile(command, args, { cwd: repoPath, timeout: 60000, signal, windowsHide: true, shell: false }, (err, stdout, stderr) => {
         const out = (stdout ? stdout.toString() : '') + (stderr ? '\n' + stderr.toString() : '')
         resolve({
           success: !err,

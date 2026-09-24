@@ -8,11 +8,17 @@ import os from 'os'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
 
-// Setup temporary test directory for userData
-const tempUserData = path.join(os.tmpdir(), 'jasper-test-userdata')
-if (!fs.existsSync(tempUserData)) {
-  fs.mkdirSync(tempUserData, { recursive: true })
+// Keep generated bundles and runtime data out of the repository.
+const tempTestRoot = path.join(os.tmpdir(), `jasper-tests-${process.pid}-${Date.now()}`)
+const tempUserData = path.join(tempTestRoot, 'user-data')
+const resolvedTempRoot = path.resolve(os.tmpdir())
+const resolvedTestRoot = path.resolve(tempTestRoot)
+if (!resolvedTestRoot.startsWith(`${resolvedTempRoot}${path.sep}`)) {
+  throw new Error('Diretório temporário de testes fora da pasta temporária do sistema.')
 }
+fs.mkdirSync(resolvedTestRoot, { recursive: true })
+fs.mkdirSync(tempUserData, { recursive: true })
+fs.symlinkSync(path.join(rootDir, 'node_modules'), path.join(tempTestRoot, 'node_modules'), 'junction')
 
 // Create a real mock shim for Electron APIs so production classes run cleanly under Node.js test runner
 const electronMockShim = `
@@ -38,15 +44,25 @@ export const clipboard = {
   writeText: () => Promise.resolve()
 };
 
+export const nativeImage = {
+  createFromPath: () => ({
+    isEmpty: () => true,
+    getSize: () => ({ width: 0, height: 0 }),
+    toBitmap: () => Buffer.alloc(0)
+  })
+};
+
 export const BrowserWindow = class {
   constructor() {}
   loadURL() { return Promise.resolve(); }
   webContents = {
+    session: { webRequest: { onBeforeRequest(_filter, _handler) {} } },
     setAudioMuted() {},
     getTitle() { return 'Página Corporativa Jasper'; },
     capturePage() { return Promise.resolve({ toDataURL: () => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' }); },
     executeJavaScript(script) {
       if (typeof script === 'string' && script.includes('.click()')) return Promise.resolve({ found: true });
+      if (typeof script === 'string' && script.includes('credentialRisk')) return Promise.resolve({ found: true, credentialRisk: false });
       if (typeof script === 'string' && script.includes('el.value =')) return Promise.resolve({ found: true });
       if (typeof script === 'string' && (script.includes('extract_table') || script.includes('table'))) {
         return Promise.resolve({ found: true, headers: ['Plano', 'Valor'], rows: [['Jasper Pro', 'R$ 197']] });
@@ -76,10 +92,26 @@ export const desktopCapturer = {
   ])
 };
 
-export default { app, safeStorage, clipboard, BrowserWindow, shell, desktopCapturer };
+export const dialog = {
+  showMessageBox: () => Promise.resolve({ response: 1, checkboxChecked: false }),
+  showOpenDialog: () => Promise.resolve({ canceled: true, filePaths: [] })
+};
+
+export const session = {
+  defaultSession: {
+    setPermissionRequestHandler() {},
+    setPermissionCheckHandler() {}
+  }
+};
+
+export const screen = {
+  getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } })
+};
+
+export default { app, safeStorage, clipboard, nativeImage, BrowserWindow, shell, desktopCapturer, dialog, session, screen };
 `
 
-const mockPath = path.join(rootDir, 'test', '_electron-mock.mjs')
+const mockPath = path.join(tempTestRoot, '_electron-mock.mjs')
 fs.writeFileSync(mockPath, electronMockShim, 'utf-8')
 
 // Bundle tests with esbuild resolving real TypeScript classes and @shared aliases
@@ -96,7 +128,7 @@ const testFiles = [
 for (const tf of testFiles) {
   esbuild.buildSync({
     entryPoints: [path.join(rootDir, 'test', tf.in)],
-    outfile: path.join(rootDir, 'test', tf.out),
+    outfile: path.join(tempTestRoot, tf.out),
     bundle: true,
     platform: 'node',
     format: 'esm',
@@ -122,17 +154,16 @@ for (const tf of testFiles) {
 }
 
 console.log('[run-tests] Executando suíte de testes de integração real...')
-const outFiles = testFiles.map((tf) => path.join('test', tf.out))
-const res = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...outFiles], {
+const outFiles = testFiles.map((tf) => path.join(tempTestRoot, tf.out))
+const res = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-timeout=60000', '--test-concurrency=1', ...outFiles], {
   cwd: rootDir,
-  stdio: 'inherit'
+  stdio: 'inherit',
+  timeout: 180000
 })
 
-// Cleanup mock file
+// Cleanup all generated test artifacts.
 try {
-  if (fs.existsSync(mockPath)) {
-    fs.unlinkSync(mockPath)
-  }
+  fs.rmSync(resolvedTestRoot, { recursive: true, force: true })
 } catch {}
 
 process.exit(res.status ?? 0)

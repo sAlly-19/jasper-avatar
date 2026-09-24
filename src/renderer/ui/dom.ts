@@ -68,7 +68,6 @@ export const DOM = {
   checkSystemHealth: document.getElementById('check-system-health') as HTMLInputElement | null,
   checkSemanticMemory: document.getElementById('check-semantic-memory') as HTMLInputElement | null,
   checkKnowledgeGraph: document.getElementById('check-knowledge-graph') as HTMLInputElement | null,
-  checkCodeInterpreter: document.getElementById('check-code-interpreter') as HTMLInputElement | null,
   checkHeadlessBrowser: document.getElementById('check-headless-browser') as HTMLInputElement | null,
   checkGitWatcher: document.getElementById('check-git-watcher') as HTMLInputElement | null,
   checkFolderOrganizer: document.getElementById('check-folder-organizer') as HTMLInputElement | null,

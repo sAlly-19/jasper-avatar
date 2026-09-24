@@ -4,23 +4,8 @@ import {
   type UpdateConfigPayload,
   type ConfigSummary,
   type JasperMemory,
-  type SystemHealthData,
-  type ScheduledTask,
-  type KnowledgeGraphData,
   type AutonomyNotification,
-  type CodeExecutionResult,
-  type BrowserScrapeResult,
-  type GitStatusResult,
-  type FolderScanResult,
-  type FolderOrganizeResult,
-  type SubagentTask,
-  type SubagentRole,
-  type CalendarEvent,
-  type EmailSummary,
-  type WebhookConfig,
   type WebhookTriggerResult,
-  type SmartHomeEntity,
-  type SmartHomeActionResult,
   type LicenseInfo,
   type LicenseValidationResult
 } from '@shared'
@@ -29,9 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Audio & Text streaming
   sendAudioChunk: (chunk: ArrayBuffer): void => {
     ipcRenderer.send(IPC_CHANNELS.AUDIO_CHUNK, chunk)
-  },
-  sendAudioStreamEnd: (): void => {
-    ipcRenderer.send(IPC_CHANNELS.AUDIO_STREAM_END)
   },
   sendTextMessage: (text: string): void => {
     ipcRenderer.send(IPC_CHANNELS.CHAT_SEND, text)
@@ -133,75 +115,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Autonomy & Proactive Services
-  getSystemHealth: (): Promise<SystemHealthData> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GET_SYSTEM_HEALTH)
-  },
-  getSchedules: (): Promise<ScheduledTask[]> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GET_SCHEDULES)
-  },
-  addSchedule: (title: string, minutesFromNow: number, recurrence?: 'once' | 'daily' | 'hourly'): Promise<ScheduledTask> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_ADD_SCHEDULE, title, minutesFromNow, recurrence)
-  },
-  removeSchedule: (id: string): Promise<boolean> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_REMOVE_SCHEDULE, id)
-  },
-  captureScreen: (): Promise<{ success: boolean; base64Image?: string; error?: string }> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_CAPTURE_SCREEN)
-  },
-  getActiveWindow: (): Promise<{ processName: string; windowTitle: string }> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GET_ACTIVE_WINDOW)
-  },
-  getKnowledgeGraph: (): Promise<KnowledgeGraphData> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GET_KNOWLEDGE_GRAPH)
-  },
-  getBriefing: (): Promise<any> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GET_BRIEFING)
-  },
-  executeCode: (language: 'python' | 'javascript', code: string, timeoutMs?: number): Promise<CodeExecutionResult> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_EXECUTE_CODE, language, code, timeoutMs)
-  },
-  browsePage: (url: string, options?: any): Promise<BrowserScrapeResult> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_BROWSE_PAGE, url, options)
-  },
-  gitCheck: (repoPath?: string): Promise<GitStatusResult> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GIT_CHECK, repoPath)
-  },
-  gitSuggestCommit: (repoPath?: string): Promise<{ suggestion: string; diffSummary: string; branch: string }> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GIT_SUGGEST_COMMIT, repoPath)
-  },
-  scanFolder: (target?: string): Promise<FolderScanResult> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_SCAN_FOLDER, target)
-  },
-  organizeFolder: (target?: string, dryRun?: boolean): Promise<FolderOrganizeResult> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_ORGANIZE_FOLDER, target, dryRun)
-  },
-  spawnSubagent: (role: SubagentRole, task: string): Promise<SubagentTask> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_SPAWN_SUBAGENT, role, task)
-  },
-  getSubagentTasks: (): Promise<SubagentTask[]> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_GET_SUBAGENTS)
-  },
-  addCalendarEvent: (title: string, startDateTime: any, durationMinutes?: number, description?: string, location?: string): Promise<CalendarEvent> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_CALENDAR_ADD_EVENT, title, startDateTime, durationMinutes, description, location)
-  },
-  getCalendarEvents: (withinHours?: number): Promise<CalendarEvent[]> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_CALENDAR_GET_EVENTS, withinHours)
-  },
-  checkEmails: (options?: any): Promise<EmailSummary[]> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_EMAIL_CHECK, options)
-  },
-  triggerWebhook: (nameOrUrl: string, payload?: any, method?: any): Promise<WebhookTriggerResult> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_WEBHOOK_TRIGGER, nameOrUrl, payload, method)
-  },
-  listWebhooks: (): Promise<WebhookConfig[]> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_WEBHOOK_LIST)
-  },
-  getSmartHomeDevices: (domain?: string): Promise<SmartHomeEntity[]> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_SMART_HOME_GET_DEVICES, domain)
-  },
-  executeSmartHome: (domain: string, service: string, entityId: string, serviceData?: any): Promise<SmartHomeActionResult> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_SMART_HOME_EXECUTE, domain, service, entityId, serviceData)
-  },
   confirmReflexionAction: (confirmationId: string): Promise<boolean> => {
     return ipcRenderer.invoke(IPC_CHANNELS.AUTONOMY_REFLEXION_CONFIRMATION, confirmationId)
   },

@@ -1,7 +1,9 @@
 import { app } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
+import { randomUUID } from 'crypto'
 import type { SemanticMemoryItem } from '@shared'
+import { atomicWriteJsonSync, readJsonFileSync } from '../utils/atomic-json'
 
 const STOPWORDS = new Set([
   'a', 'o', 'as', 'os', 'um', 'uma', 'uns', 'umas', 'de', 'do', 'da', 'dos', 'das',
@@ -10,6 +12,7 @@ const STOPWORDS = new Set([
   'este', 'esta', 'esse', 'essa', 'aquele', 'aquela', 'meu', 'minha', 'seu', 'sua',
   'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'with', 'and', 'or', 'is', 'are'
 ])
+const MEMORY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 export class SemanticMemoryService {
   private isEnabled: boolean = true
@@ -36,7 +39,11 @@ export class SemanticMemoryService {
     try {
       const p = this.getFilePath()
       if (fs.existsSync(p)) {
-        this.memories = JSON.parse(fs.readFileSync(p, 'utf-8'))
+        const parsed = readJsonFileSync<unknown>(p)
+        const allMemories: SemanticMemoryItem[] = Array.isArray(parsed) ? parsed : []
+        const cutoff = Date.now() - MEMORY_RETENTION_MS
+        this.memories = allMemories.filter((memory) => Number.isFinite(memory.updatedAt) && memory.updatedAt >= cutoff)
+        if (this.memories.length !== allMemories.length) this.saveMemories()
       }
     } catch (err) {
       console.warn('[SemanticMemory] Error loading memory:', err)
@@ -47,7 +54,7 @@ export class SemanticMemoryService {
   private saveMemories(): void {
     try {
       const p = this.getFilePath()
-      fs.writeFileSync(p, JSON.stringify(this.memories, null, 2), 'utf-8')
+      atomicWriteJsonSync(p, this.memories)
     } catch (err) {
       console.warn('[SemanticMemory] Error saving memory:', err)
     }
@@ -74,7 +81,7 @@ export class SemanticMemoryService {
     }
 
     const item: SemanticMemoryItem = {
-      id: `mem-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: `mem-${randomUUID()}`,
       content: content.trim(),
       category,
       tokens,
@@ -83,7 +90,7 @@ export class SemanticMemoryService {
     }
     this.memories.push(item)
     this.saveMemories()
-    console.log(`[SemanticMemory] Added memory: "${content.slice(0, 50)}..."`)
+    console.log('[SemanticMemory] Memory added.')
     return item
   }
 

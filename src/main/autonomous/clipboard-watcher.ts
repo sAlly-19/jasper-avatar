@@ -12,10 +12,14 @@ export interface ClipboardAnalysis {
 
 export function redactSecrets(text: string): string {
   return text
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[REDACTED_JWT]')
     .replace(/\bAIzaSy[A-Za-z0-9_-]{20,}\b/g, '[REDACTED_API_KEY]')
     .replace(/\bsk-[A-Za-z0-9_-]{20,}\b/g, '[REDACTED_SECRET_KEY]')
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '[REDACTED_GITHUB_TOKEN]')
+    .replace(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '[REDACTED_AWS_ACCESS_KEY]')
     .replace(/\bBearer\s+[A-Za-z0-9_.-]{20,}\b/gi, 'Bearer [REDACTED_TOKEN]')
-    .replace(/\bpassword\s*[:=]\s*["'][^"']+["']/gi, 'password: "[REDACTED]"')
+    .replace(/\b(password|secret|token|api[_-]?key)\s*[:=]\s*(["'])[^"'\r\n]+\2/gi, '$1: "[REDACTED]"')
 }
 
 export class ClipboardWatcherService {

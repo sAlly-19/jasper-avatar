@@ -3,6 +3,7 @@ import path from 'path'
 import mammoth from 'mammoth'
 import { createRequire } from 'module'
 import { redactSecrets } from './clipboard-watcher'
+import { securityBroker } from '../services/security-broker'
 
 export interface FileSummaryResult {
   success: boolean
@@ -43,7 +44,23 @@ export class FileSummarizerService {
    * Reads and extracts raw text from a local file (.pdf, .docx, .txt, .md, .csv, .json, etc.)
    */
   public async readFileContent(filePath: string): Promise<FileSummaryResult> {
-    const cleanPath = path.resolve(filePath.trim())
+    const pathDecision = securityBroker.resolveUserPath(filePath)
+    const cleanPath = pathDecision.resolvedPath || path.resolve(filePath.trim())
+
+    if (!pathDecision.allowed || !pathDecision.resolvedPath) {
+      return {
+        success: false,
+        filePath: cleanPath,
+        fileName: path.basename(cleanPath),
+        extension: path.extname(cleanPath),
+        fileSizeBytes: 0,
+        totalLines: 0,
+        characterCount: 0,
+        contentPreview: '',
+        extractedText: '',
+        error: pathDecision.reason || 'Acesso ao arquivo não autorizado.'
+      }
+    }
 
     try {
       const stats = await fs.stat(cleanPath)

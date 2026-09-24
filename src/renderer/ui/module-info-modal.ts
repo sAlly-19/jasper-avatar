@@ -132,21 +132,6 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
     badgeText: 'Navegação por Nós • Persistência Local'
   },
 
-  'code-interpreter': {
-    icon: SVG_ICONS.terminal,
-    title: '9. Interpretador de Código Sandboxed Local',
-    category: 'Automação & Processamento de Dados',
-    overview: 'Capacidade de escrever e rodar scripts Python e JavaScript em uma área isolada do computador para manipular planilhas, gerar gráficos, calcular equações ou processar dados complexos.',
-    howItWorks: 'Gera scripts temporários em uma pasta sandbox segura (%APPDATA%/jasper-avatar/sandbox/). Executa os scripts com limite de tempo (timeout de 30s) e monitora arquivos recém-criados para avisar você.',
-    examples: [
-      '"Jasper, faça um script em Python para calcular a média de uma lista de valores e mostre o resultado."',
-      '"Crie um gráfico de barras com números aleatórios e salve a imagem."',
-      '"Escreva um script para converter uma tabela de dados em CSV."'
-    ],
-    requirements: 'Python 3.9+ instalado e adicionado ao PATH (para scripts .py) ou Node.js (para scripts .js).',
-    badgeText: 'Sandbox Isolado • Timeout de Segurança'
-  },
-
   'headless-browser': {
     icon: SVG_ICONS.globe,
     title: '10. Navegador Headless Invisível (Chromium Worker)',
@@ -196,11 +181,11 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
     icon: SVG_ICONS.users,
     title: '13. Orquestrador de Subagentes Paralelos',
     category: 'Arquitetura Multi-Agente',
-    overview: 'Permite ao assistente instanciar "subagentes" em segundo plano para realizar tarefas pesadas e demoradas (pesquisa web, execução de testes, análise de hardware) sem congelar a interface ou travar a conversa de voz.',
-    howItWorks: 'Cria tarefas assíncronas dedicadas com papéis especializados (pesquisador, programador, testador, analista). Ao terminar a tarefa, o subagente notifica o HUD e disponibiliza o resultado consolidado.',
+    overview: 'Executa rotinas locais assíncronas com papéis predefinidos sem bloquear a conversa de voz. Não cria modelos de IA independentes nem executa código arbitrário.',
+    howItWorks: 'Mantém uma fila de tarefas determinísticas para pesquisa permitida, diagnóstico e análise. Ao terminar, a rotina notifica o HUD e disponibiliza o resultado.',
     examples: [
       '"Jasper, coloque um subagente para pesquisar as novidades do Electron 33 enquanto conversamos."',
-      '"Mande um subagente rodar os testes do projeto em segundo plano."',
+      '"Mande uma rotina verificar o estado do projeto em segundo plano."',
       '"Quais subagentes estão trabalhando neste momento?"'
     ],
     requirements: 'Nenhum software externo.',
@@ -255,23 +240,23 @@ export const MODULE_INFO_DATA: Record<string, ModuleInfo> = {
     icon: SVG_ICONS.home,
     title: '17. Controle de Casa Inteligente (Home Assistant)',
     category: 'Internet das Coisas (IoT)',
-    overview: 'Permite controlar iluminação, ar-condicionado, tomadas e persianas por comando de voz direto através da API oficial do Home Assistant (a maior plataforma open-source de automação residencial).',
-    howItWorks: 'Conecta-se à API REST local do Home Assistant via rede Wi-Fi/Ethernet. Caso não haja um servidor Home Assistant configurado, opera em modo simulado inteligente para demonstração imediata.',
+    overview: 'Permite controlar iluminação, ar-condicionado, tomadas, ventiladores e mídia por comando de voz através da API oficial do Home Assistant.',
+    howItWorks: 'Conecta-se à API REST configurada, aplica uma allowlist de domínios e serviços e pede confirmação para cada comando. Sem URL e token válidos, nenhum comando é executado.',
     examples: [
       '"Jasper, apague a luz do escritório."',
       '"Ligue o ar condicionado em 22 graus no modo refrigeração."',
       '"Desligue a tomada do computador."'
     ],
-    requirements: 'Servidor Home Assistant local (opcional; sem ele, opera em modo simulado contextual).',
-    badgeText: 'Home Assistant REST API • Modo Simulado'
+    requirements: 'Servidor Home Assistant e token de acesso de longa duração.',
+    badgeText: 'Home Assistant REST API • Confirmação por Operação'
   },
 
   'system-tools': {
     icon: SVG_ICONS.sliders,
     title: 'Ações de Sistema & Utilitários Locais',
     category: 'Ferramentas de Sistema',
-    overview: 'Permite ao assistente interagir com aplicativos e utilitários instalados no seu computador, como calculadora, bloco de notas, terminal e organizador de pastas.',
-    howItWorks: 'Dispara executáveis nativos permitidos (calc.exe, notepad.exe, code.cmd, explorer.exe) e realiza cálculos numéricos por meio de um avaliador matemático local.',
+    overview: 'Permite ao assistente interagir com aplicativos e utilitários aprovados, como calculadora, bloco de notas e organizador de pastas. Interpretadores de comando são bloqueados.',
+    howItWorks: 'Dispara executáveis sem shell após confirmação e realiza cálculos por meio de um avaliador matemático dedicado.',
     examples: [
       '"Jasper, abra a calculadora."',
       '"Abra o VS Code para mim."',

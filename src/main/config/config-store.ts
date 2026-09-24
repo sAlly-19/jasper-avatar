@@ -53,8 +53,9 @@ function atomicWriteFileSync(filePath: string, data: string): void {
     try {
       fs.copyFileSync(tmpPath, filePath)
       fs.unlinkSync(tmpPath)
-    } catch {
-      fs.writeFileSync(filePath, data, 'utf-8')
+    } catch (fallbackError) {
+      try { fs.unlinkSync(tmpPath) } catch {}
+      throw fallbackError
     }
   }
 }
@@ -80,7 +81,6 @@ class ConfigStore {
     enableSystemHealth: true,
     enableSemanticMemory: true,
     enableKnowledgeGraph: true,
-    enableCodeInterpreter: false, // Security: Disabled by default
     enableHeadlessBrowser: true,
     enableGitWatcher: true,
     enableFolderOrganizer: true,
@@ -119,7 +119,7 @@ class ConfigStore {
   private loadEnvDefaults(): void {
     this.config.apiKey = process.env.GOOGLE_API_KEY || ''
     this.config.voiceName = process.env.GEMINI_VOICE || 'Charon'
-    this.config.model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-latest'
+    this.config.model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-live-preview'
     this.config.agentName = process.env.AGENT_NAME || 'Jasper'
     this.config.hassUrl = process.env.HASS_URL || 'http://homeassistant.local:8123'
     this.config.hassToken = process.env.HASS_TOKEN || ''
@@ -164,7 +164,6 @@ class ConfigStore {
         if (data.enableSystemHealth !== undefined) this.config.enableSystemHealth = data.enableSystemHealth
         if (data.enableSemanticMemory !== undefined) this.config.enableSemanticMemory = data.enableSemanticMemory
         if (data.enableKnowledgeGraph !== undefined) this.config.enableKnowledgeGraph = data.enableKnowledgeGraph
-        if (data.enableCodeInterpreter !== undefined) this.config.enableCodeInterpreter = data.enableCodeInterpreter
         if (data.enableHeadlessBrowser !== undefined) this.config.enableHeadlessBrowser = data.enableHeadlessBrowser
         if (data.enableGitWatcher !== undefined) this.config.enableGitWatcher = data.enableGitWatcher
         if (data.enableFolderOrganizer !== undefined) this.config.enableFolderOrganizer = data.enableFolderOrganizer
@@ -197,11 +196,15 @@ class ConfigStore {
         // License fields
         if (data.licenseKey !== undefined) this.config.licenseKey = decryptSecret(data.licenseKey)
         if (data.licenseStatus !== undefined) this.config.licenseStatus = data.licenseStatus
-        if (data.licenseClientName !== undefined) this.config.licenseClientName = data.licenseClientName
-        if (data.licenseClientEmail !== undefined) this.config.licenseClientEmail = data.licenseClientEmail
         if (data.licenseMachineId !== undefined) this.config.licenseMachineId = data.licenseMachineId
         if (data.licenseActivatedAt !== undefined) this.config.licenseActivatedAt = data.licenseActivatedAt
         if (data.licenseLastCheckedAt !== undefined) this.config.licenseLastCheckedAt = data.licenseLastCheckedAt
+        if (data.licenseInstallationId !== undefined) this.config.licenseInstallationId = data.licenseInstallationId
+        if (data.licenseDeviceId !== undefined) this.config.licenseDeviceId = data.licenseDeviceId
+        if (data.licenseDeviceSecret !== undefined) this.config.licenseDeviceSecret = decryptSecret(data.licenseDeviceSecret)
+        if (data.licenseLeaseToken !== undefined) this.config.licenseLeaseToken = data.licenseLeaseToken
+        if (data.licenseLeaseExpiresAt !== undefined) this.config.licenseLeaseExpiresAt = data.licenseLeaseExpiresAt
+        if (data.licensePublicJwk !== undefined) this.config.licensePublicJwk = data.licensePublicJwk
 
         console.log('[ConfigStore] Loaded settings from userData/jasper-config.json')
       }
@@ -220,13 +223,15 @@ class ConfigStore {
         apiKey: encryptSecret(this.config.apiKey),
         hassToken: encryptSecret(this.config.hassToken || ''),
         emailPassword: encryptSecret(this.config.emailPassword || ''),
-        licenseKey: encryptSecret(this.config.licenseKey || '')
+        licenseKey: encryptSecret(this.config.licenseKey || ''),
+        licenseDeviceSecret: encryptSecret(this.config.licenseDeviceSecret || '')
       }
       const content = JSON.stringify(dataToPersist, null, 2)
       atomicWriteFileSync(cfgPath, content)
-      console.log('[ConfigStore] Saved configuration successfully to', cfgPath)
+      console.log('[ConfigStore] Saved configuration successfully.')
     } catch (err) {
-      console.warn('[ConfigStore] Error saving config to userData:', err)
+      console.error('[ConfigStore] Error saving config to userData:', err)
+      throw new Error('Não foi possível persistir a configuração local.')
     }
   }
 
@@ -235,6 +240,7 @@ class ConfigStore {
   }
 
   public updateConfig(payload: UpdateConfigPayload): JasperConfig {
+    const previous = { ...this.config }
     if (payload.apiKey !== undefined) this.config.apiKey = payload.apiKey.trim()
     if (payload.voiceName !== undefined) this.config.voiceName = payload.voiceName.trim()
     if (payload.model !== undefined) this.config.model = payload.model.trim()
@@ -253,7 +259,6 @@ class ConfigStore {
     if (payload.enableSystemHealth !== undefined) this.config.enableSystemHealth = payload.enableSystemHealth
     if (payload.enableSemanticMemory !== undefined) this.config.enableSemanticMemory = payload.enableSemanticMemory
     if (payload.enableKnowledgeGraph !== undefined) this.config.enableKnowledgeGraph = payload.enableKnowledgeGraph
-    if (payload.enableCodeInterpreter !== undefined) this.config.enableCodeInterpreter = payload.enableCodeInterpreter
     if (payload.enableHeadlessBrowser !== undefined) this.config.enableHeadlessBrowser = payload.enableHeadlessBrowser
     if (payload.enableGitWatcher !== undefined) this.config.enableGitWatcher = payload.enableGitWatcher
     if (payload.enableFolderOrganizer !== undefined) this.config.enableFolderOrganizer = payload.enableFolderOrganizer
@@ -286,13 +291,22 @@ class ConfigStore {
     // License fields
     if (payload.licenseKey !== undefined) this.config.licenseKey = payload.licenseKey.trim()
     if (payload.licenseStatus !== undefined) this.config.licenseStatus = payload.licenseStatus
-    if (payload.licenseClientName !== undefined) this.config.licenseClientName = payload.licenseClientName.trim()
-    if (payload.licenseClientEmail !== undefined) this.config.licenseClientEmail = payload.licenseClientEmail.trim()
     if (payload.licenseMachineId !== undefined) this.config.licenseMachineId = payload.licenseMachineId.trim()
     if (payload.licenseActivatedAt !== undefined) this.config.licenseActivatedAt = payload.licenseActivatedAt
     if (payload.licenseLastCheckedAt !== undefined) this.config.licenseLastCheckedAt = payload.licenseLastCheckedAt
+    if (payload.licenseInstallationId !== undefined) this.config.licenseInstallationId = payload.licenseInstallationId.trim()
+    if (payload.licenseDeviceId !== undefined) this.config.licenseDeviceId = payload.licenseDeviceId.trim()
+    if (payload.licenseDeviceSecret !== undefined) this.config.licenseDeviceSecret = payload.licenseDeviceSecret.trim()
+    if (payload.licenseLeaseToken !== undefined) this.config.licenseLeaseToken = payload.licenseLeaseToken.trim()
+    if (payload.licenseLeaseExpiresAt !== undefined) this.config.licenseLeaseExpiresAt = payload.licenseLeaseExpiresAt
+    if (payload.licensePublicJwk !== undefined) this.config.licensePublicJwk = payload.licensePublicJwk
 
-    this.savePersistedConfig()
+    try {
+      this.savePersistedConfig()
+    } catch (error) {
+      this.config = previous
+      throw error
+    }
     return this.getConfig()
   }
 
@@ -320,7 +334,6 @@ class ConfigStore {
       enableSystemHealth: this.config.enableSystemHealth,
       enableSemanticMemory: this.config.enableSemanticMemory,
       enableKnowledgeGraph: this.config.enableKnowledgeGraph,
-      enableCodeInterpreter: this.config.enableCodeInterpreter,
       enableHeadlessBrowser: this.config.enableHeadlessBrowser,
       enableGitWatcher: this.config.enableGitWatcher,
       enableFolderOrganizer: this.config.enableFolderOrganizer,
@@ -355,7 +368,6 @@ class ConfigStore {
         ? `${this.config.licenseKey.slice(0, 10)}...${this.config.licenseKey.slice(-4)}`
         : undefined,
       licenseStatus: this.config.licenseStatus || 'unlicensed',
-      licenseClientName: this.config.licenseClientName,
       licenseMachineId: this.config.licenseMachineId,
       hwid: hw.machineId
     }

@@ -1,7 +1,5 @@
 import { execFile } from 'child_process'
-import { join } from 'path'
-import { app } from 'electron'
-import fs from 'fs'
+import { resolvePowerShellScript } from './script-path'
 
 export class MediaControllerService {
   private isEnabled: boolean = true
@@ -15,19 +13,7 @@ export class MediaControllerService {
   }
 
   private getScriptPath(): string {
-    try {
-      const srcPath = join(app.getAppPath(), 'src', 'main', 'autonomous', 'scripts', 'media-control.ps1')
-      if (fs.existsSync(srcPath)) return srcPath
-    } catch {}
-
-    try {
-      if (typeof __dirname !== 'undefined') {
-        const devPath = join(__dirname, 'scripts', 'media-control.ps1')
-        if (fs.existsSync(devPath)) return devPath
-      }
-    } catch {}
-
-    return join(process.cwd(), 'src', 'main', 'autonomous', 'scripts', 'media-control.ps1')
+    return resolvePowerShellScript('media-control.ps1')
   }
 
   private async executeAction(action: string, value: number = 0): Promise<{ success: boolean; message: string }> {

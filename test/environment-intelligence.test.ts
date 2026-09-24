@@ -60,6 +60,14 @@ test('Parte 3: Inteligência de Ambiente, OCR, Headless Web & Modos Foco/Apresen
     assert.ok(res.message.includes('ZERO-TRUST') || res.message.includes('BLOQUEIO'))
   })
 
+  await t.test('HeadlessBrowser: bloqueia preenchimento de credenciais e nao ecoa o segredo', async () => {
+    const secret = 'senha-super-secreta-123'
+    const res = await headlessBrowser.executeAction('https://example.com', 'fill', 'input[type="password"]', secret)
+    assert.equal(res.success, false)
+    assert.match(res.message, /senha|credenciais/i)
+    assert.equal(res.message.includes(secret), false)
+  })
+
   await t.test('PresentationModeService: ativação e desativação manual', () => {
     let notifiedState = false
     presentationMode.setOnStateChange((st) => {
@@ -113,7 +121,7 @@ test('Parte 3: Inteligência de Ambiente, OCR, Headless Web & Modos Foco/Apresen
   await t.test('executeSystemTool: despacho das ferramentas da Parte 3', async () => {
     // 1. web_automate
     const webRes = await executeSystemTool('web_automate', {
-      url: 'https://exemplo.com.br',
+      url: 'https://example.com',
       action: 'extract_table',
       selector: 'table'
     })

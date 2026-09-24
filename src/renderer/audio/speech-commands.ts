@@ -53,7 +53,7 @@ export class SpeechCommandsWakeWord {
       this.options.wakeWords = [agentName.toLowerCase().trim()]
     }
 
-    console.log(`[SpeechCommands] Inicializando motor para "${this.options.agentName}"...`)
+    console.log('[SpeechCommands] Inicializando motor.')
 
     // Initialize TensorFlow.js backend (WebGL or CPU)
     await tf.ready()
@@ -76,16 +76,16 @@ export class SpeechCommandsWakeWord {
       if (labels.includes('_other_') && labels.length >= 3) {
         this.isCustomModelTrained = true
         this.isLegacyTwoClassModel = false
-        console.log(`[SpeechCommands] [OK] Modelo personalizado 3-classes "${modelKey}" carregado do IndexedDB:`, labels)
+        console.log(`[SpeechCommands] Modelo personalizado de ${labels.length} classes carregado do IndexedDB.`)
       } else {
         this.isCustomModelTrained = false
         this.isLegacyTwoClassModel = true
-        console.warn(`[SpeechCommands] [AVISO] Modelo salvo "${modelKey}" possui apenas 2 classes (sem '_other_'). Calibração necessária para evitar falsos positivos.`, labels)
+        console.warn('[SpeechCommands] Modelo salvo possui apenas 2 classes. Calibração necessária para evitar falsos positivos.')
       }
     } catch {
       this.isCustomModelTrained = false
       this.isLegacyTwoClassModel = false
-      console.log(`[SpeechCommands] Nenhum modelo personalizado salvo ainda para "${this.options.agentName}".`)
+      console.log('[SpeechCommands] Nenhum modelo personalizado salvo ainda.')
     }
   }
 
@@ -182,7 +182,7 @@ export class SpeechCommandsWakeWord {
       )
 
       this.isListening = true
-      console.log(`[SpeechCommands] Escuta ativa por voz para "${this.options.agentName}".`)
+      console.log('[SpeechCommands] Escuta ativa por voz.')
     } catch (err: any) {
       console.error('[SpeechCommands] Erro ao iniciar listen():', err)
       this.onError?.(err)
@@ -255,11 +255,11 @@ export class SpeechCommandsWakeWord {
     // Ensure audio devices are released cleanly
     await new Promise((resolve) => setTimeout(resolve, 200))
 
-    console.log(`[SpeechCommands] Gravando amostra de 1 segundo para: "${word}"...`)
+    console.log('[SpeechCommands] Gravando amostra de 1 segundo.')
     await this.transferRecognizer.collectExample(word)
     const counts = this.transferRecognizer.countExamples()
     const count = counts[word] || 0
-    console.log(`[SpeechCommands] Amostra capturada para "${word}". Total: ${count}`)
+    console.log(`[SpeechCommands] Amostra capturada. Total: ${count}`)
 
     if (wasListening && this.isCustomModelTrained) {
       await this.start()
@@ -286,7 +286,7 @@ export class SpeechCommandsWakeWord {
     await this.stop()
     await new Promise((resolve) => setTimeout(resolve, 150))
 
-    console.log(`[SpeechCommands] Treinando modelo neural transfer learning para "${this.options.agentName}" (3 classes: ${nameKey}, _background_noise_, _other_)...`)
+    console.log('[SpeechCommands] Treinando modelo neural com 3 classes.')
 
     // Reset previous transfer model instances to avoid TypeError: Cannot set property 'trainable' of undefined
     const tr = this.transferRecognizer as any
@@ -314,7 +314,7 @@ export class SpeechCommandsWakeWord {
     await this.transferRecognizer.save()
     this.isCustomModelTrained = true
     this.isLegacyTwoClassModel = false
-    console.log(`[SpeechCommands] [OK] Modelo personalizado robusto "${this.getModelName()}" salvo no IndexedDB!`)
+    console.log('[SpeechCommands] Modelo personalizado salvo no IndexedDB.')
 
     await this.start()
   }
@@ -344,7 +344,7 @@ export class SpeechCommandsWakeWord {
       await speechCommands.deleteSavedTransferModel(modelKey)
     } catch {}
 
-    console.log(`[SpeechCommands] Modelo personalizado "${modelKey}" resetado.`)
+    console.log('[SpeechCommands] Modelo personalizado resetado.')
 
     if (wasListening && this.isCustomModelTrained) {
       await this.start()

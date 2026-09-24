@@ -1,4 +1,23 @@
-import { shell } from 'electron'
+import { dialog, shell } from 'electron'
+import { getMainWindow } from '../windows/main-window'
+
+async function confirmAndOpen(url: string, detail: string): Promise<boolean> {
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return false
+  const result = await dialog.showMessageBox(win, {
+    type: 'question',
+    title: 'Abrir aplicativo externo',
+    message: 'O Jasper solicitou a abertura de um destino externo.',
+    detail,
+    buttons: ['Cancelar', 'Abrir'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true
+  })
+  if (result.response !== 1) return false
+  await shell.openExternal(url)
+  return true
+}
 
 /**
  * Executes media & web tools (search, music playback, opening links)
@@ -8,8 +27,8 @@ export async function executeMediaTool(name: string, args: Record<string, any>):
     case 'search_web': {
       const query = args.query || ''
       const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
-      await shell.openExternal(url)
-      return `Realizei a pesquisa no Google por: "${query}" e abri o navegador.`
+      const opened = await confirmAndOpen(url, `Pesquisa no Google: ${String(query).slice(0, 200)}`)
+      return opened ? 'Pesquisa aberta no navegador após sua confirmação.' : 'A abertura da pesquisa foi cancelada.'
     }
 
     case 'open_link': {
@@ -17,8 +36,17 @@ export async function executeMediaTool(name: string, args: Record<string, any>):
       if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
         targetUrl = `https://${targetUrl}`
       }
-      await shell.openExternal(targetUrl)
-      return `Abri o link ${targetUrl} no navegador.`
+      let parsed: URL
+      try {
+        parsed = new URL(targetUrl)
+      } catch {
+        return 'O link informado é inválido.'
+      }
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || targetUrl.length > 2048) {
+        return 'O link foi bloqueado: apenas URLs HTTPS sem credenciais são permitidas.'
+      }
+      const opened = await confirmAndOpen(parsed.toString(), `Site: ${parsed.hostname}`)
+      return opened ? 'Link aberto no navegador após sua confirmação.' : 'A abertura do link foi cancelada.'
     }
 
     case 'play_music': {
@@ -27,17 +55,17 @@ export async function executeMediaTool(name: string, args: Record<string, any>):
 
       if (platform === 'youtube') {
         const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
-        await shell.openExternal(url)
-        return `Buscando e tocando "${query}" no YouTube.`
+        const opened = await confirmAndOpen(url, `Pesquisa no YouTube: ${String(query).slice(0, 200)}`)
+        return opened ? 'Pesquisa musical aberta no YouTube.' : 'A abertura do YouTube foi cancelada.'
       } else {
         const spotifyUri = `spotify:search:${encodeURIComponent(query)}`
         try {
-          await shell.openExternal(spotifyUri)
-          return `Abrindo e tocando "${query}" no Spotify.`
+          const opened = await confirmAndOpen(spotifyUri, `Pesquisa no Spotify: ${String(query).slice(0, 200)}`)
+          return opened ? 'Pesquisa musical aberta no Spotify.' : 'A abertura do Spotify foi cancelada.'
         } catch {
           const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
-          await shell.openExternal(ytUrl)
-          return `Tocando "${query}" no YouTube.`
+          const opened = await confirmAndOpen(ytUrl, `Pesquisa no YouTube: ${String(query).slice(0, 200)}`)
+          return opened ? 'Pesquisa musical aberta no YouTube.' : 'A abertura do YouTube foi cancelada.'
         }
       }
     }

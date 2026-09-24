@@ -8,26 +8,6 @@ export interface PolicyCheckResult {
   requiresConfirmation?: boolean
 }
 
-// Static AST / Regex banned patterns for Code Interpreter
-const BANNED_PYTHON_PATTERNS: { pattern: RegExp; description: string }[] = [
-  { pattern: /\b(subprocess|ctypes|pty|socket)\b/i, description: 'Módulos de baixo nível de rede ou criação de subprocessos' },
-  { pattern: /\bos\.(system|popen|spawn|fork|exec|kill)\b/i, description: 'Chamadas diretas de execução de comandos do sistema operacional (os.*)' },
-  { pattern: /\bshutil\.(rmtree|move)\b/i, description: 'Exclusão ou movimentação de diretórios inteiros via shutil' },
-  { pattern: /\b(eval|exec)\s*\(/i, description: 'Execução dinâmica de strings arbitrárias (eval/exec)' },
-  { pattern: /__import__\s*\(/i, description: 'Importação dinâmica obscura (__import__)' },
-  { pattern: /\bos\.(remove|unlink)\b/i, description: 'Exclusão direta de arquivos fora de controle' },
-  { pattern: /\b(\.\.[/\\]|[A-Za-z]:[/\\](windows|winnt|system32|program files))/i, description: 'Tentativa de escape do diretório sandbox ou acesso a pastas do sistema' }
-]
-
-const BANNED_NODE_PATTERNS: { pattern: RegExp; description: string }[] = [
-  { pattern: /\b(child_process|worker_threads|cluster)\b/i, description: 'Criação de novos processos filhos ou threads em Node.js' },
-  { pattern: /\b(eval|Function)\s*\(/i, description: 'Geração e execução dinâmica de código a partir de strings' },
-  { pattern: /\bprocess\.(exit|kill|abort)\b/i, description: 'Interrupção forçada do processo hospedeiro' },
-  { pattern: /\bfs\.(rmSync|rmdirSync|unlinkSync)\b/i, description: 'Exclusão síncrona não contida de arquivos do sistema' },
-  { pattern: /\b(net|dgram)\b/i, description: 'Criação de sockets TCP/UDP de baixo nível' },
-  { pattern: /\b(\.\.[/\\]|[A-Za-z]:[/\\](windows|winnt|system32|program files))/i, description: 'Tentativa de escape de diretório ou acesso ao sistema Windows' }
-]
-
 const SYSTEM_PATH_BLACKLIST = [
   /[/\\]windows([/\\]|$)/i,
   /[/\\]system32([/\\]|$)/i,
@@ -40,39 +20,6 @@ const SYSTEM_PATH_BLACKLIST = [
 const SAFE_SMART_HOME_DOMAINS = new Set(['light', 'switch', 'climate'])
 
 export class ToolPolicyEngine {
-  /**
-   * Static scan for arbitrary code execution in CodeInterpreter.
-   */
-  public validateCode(language: 'python' | 'javascript' | 'bash', code: string): PolicyCheckResult {
-    if (language === 'bash') {
-      return {
-        allowed: false,
-        riskLevel: 'CRITICAL',
-        reason: 'Execução direta de shell/bash arbitrário é estritamente bloqueada pelo Zero-Trust Policy Engine.',
-        requiresConfirmation: true
-      }
-    }
-
-    const patterns = language === 'python' ? BANNED_PYTHON_PATTERNS : BANNED_NODE_PATTERNS
-
-    for (const { pattern, description } of patterns) {
-      if (pattern.test(code)) {
-        return {
-          allowed: false,
-          riskLevel: 'HIGH',
-          reason: `Padrão de código perigoso detectado: ${description}.`,
-          requiresConfirmation: true
-        }
-      }
-    }
-
-    return {
-      allowed: true,
-      riskLevel: 'SAFE',
-      requiresConfirmation: false
-    }
-  }
-
   /**
    * Validates if a file or directory path is safe and contained.
    */

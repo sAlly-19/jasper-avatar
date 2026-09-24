@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import crypto from 'crypto'
 import os from 'os'
 
@@ -38,7 +38,7 @@ export function getHardwareInfo(): HardwareInfo {
       `.trim()
 
       const encoded = Buffer.from(psScript, 'utf16le').toString('base64')
-      const output = execSync(`powershell.exe -NoProfile -NonInteractive -EncodedCommand ${encoded}`, {
+      const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
         timeout: 4000,
         encoding: 'utf-8',
         windowsHide: true,
@@ -51,7 +51,7 @@ export function getHardwareInfo(): HardwareInfo {
     } catch {
       // Fallback secundário no Windows
       try {
-        const wmicUuid = execSync('wmic csproduct get uuid', { timeout: 2500, encoding: 'utf-8', windowsHide: true })
+        const wmicUuid = execFileSync('wmic.exe', ['csproduct', 'get', 'uuid'], { timeout: 2500, encoding: 'utf-8', windowsHide: true })
           .replace('UUID', '')
           .trim()
         if (wmicUuid) rawParts.push(wmicUuid)
@@ -59,10 +59,11 @@ export function getHardwareInfo(): HardwareInfo {
     }
   } else if (platform === 'darwin') {
     try {
-      const macSerial = execSync("ioreg -rd1 -c IOPlatformExpertDevice | grep -E '(IOPlatformSerialNumber)'", {
+      const ioregOutput = execFileSync('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'], {
         timeout: 2000,
         encoding: 'utf-8'
       }).trim()
+      const macSerial = ioregOutput.match(/"IOPlatformSerialNumber"\s*=\s*"([^"]+)"/)?.[1] || ''
       if (macSerial) rawParts.push(macSerial)
     } catch {}
   } else {

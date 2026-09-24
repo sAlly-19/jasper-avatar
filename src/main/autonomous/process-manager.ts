@@ -1,8 +1,7 @@
 import { spawn, execFile } from 'child_process'
-import { join } from 'path'
-import { app } from 'electron'
-import fs from 'fs'
 import { toolPolicyEngine } from './policy-engine'
+import { resolvePowerShellScript } from './script-path'
+import { securityBroker } from '../services/security-broker'
 
 export interface ProgramSearchResult {
   name: string
@@ -38,8 +37,19 @@ const PROTECTED_PROCESSES = new Set([
   'electron'
 ])
 
+const BLOCKED_INTERPRETERS = new Set([
+  'cmd', 'powershell', 'pwsh', 'wscript', 'cscript', 'mshta', 'rundll32', 'regsvr32',
+  'wt', 'terminal', 'windows terminal'
+])
+
+function isBlockedInterpreter(target: string): boolean {
+  const fileName = target.split(/[\\/]/).pop()?.replace(/\.(exe|com)$/i, '').trim().toLowerCase() || ''
+  return BLOCKED_INTERPRETERS.has(fileName)
+}
+
 export class ProcessManagerService {
   private isEnabled: boolean = true
+  private launchedPids = new Set<number>()
 
   public setEnabled(enabled: boolean): void {
     this.isEnabled = enabled
@@ -50,19 +60,7 @@ export class ProcessManagerService {
   }
 
   private getScriptPath(scriptName: string): string {
-    try {
-      const srcPath = join(app.getAppPath(), 'src', 'main', 'autonomous', 'scripts', scriptName)
-      if (fs.existsSync(srcPath)) return srcPath
-    } catch {}
-
-    try {
-      if (typeof __dirname !== 'undefined') {
-        const devPath = join(__dirname, 'scripts', scriptName)
-        if (fs.existsSync(devPath)) return devPath
-      }
-    } catch {}
-
-    return join(process.cwd(), 'src', 'main', 'autonomous', 'scripts', scriptName)
+    return resolvePowerShellScript(scriptName)
   }
 
   /**
@@ -112,10 +110,26 @@ export class ProcessManagerService {
 
     const trimmed = target.trim()
 
+    if (isBlockedInterpreter(trimmed)) {
+      return { success: false, message: 'Interpretadores de comando nao podem ser abertos pelo assistente.' }
+    }
+
     // 1. Security validation: prevent command chaining / malicious injection
-    if (/[;&|`$><]/.test(trimmed)) {
+    if (/[;&|`$><\r\n\0]/.test(trimmed) || trimmed.length > 512) {
       return { success: false, message: 'Entrada contém caracteres inválidos de injeção de comando.' }
     }
+
+    if (args.some((arg) => typeof arg !== 'string' || arg.length > 2048 || /[\r\n\0]/.test(arg))) {
+      return { success: false, message: 'Um ou mais argumentos do programa são inválidos.' }
+    }
+
+    const approved = await securityBroker.confirmOperation({
+      title: 'Autorizar abertura de programa',
+      message: `Permitir que o Jasper abra "${trimmed.slice(0, 160)}"?`,
+      detail: 'O programa será iniciado como um processo separado, sem shell e sem comandos concatenados.',
+      confirmLabel: 'Abrir programa'
+    })
+    if (!approved) return { success: false, message: 'Abertura de programa cancelada pelo usuário.' }
 
     // 2. Check if target is a known app ID or needs fuzzy search
     let launchTarget = trimmed
@@ -138,6 +152,10 @@ export class ProcessManagerService {
       }
     }
 
+    if (isBlockedInterpreter(launchTarget)) {
+      return { success: false, message: 'Interpretadores de comando nao podem ser abertos pelo assistente.' }
+    }
+
     return new Promise((resolve) => {
       try {
         if (isAppId) {
@@ -149,12 +167,20 @@ export class ProcessManagerService {
           child.unref()
           resolve({ success: true, message: `Aplicativo "${trimmed}" iniciado com sucesso via shell:AppsFolder.` })
         } else {
-          // Standard Win32 or Shell executable
-          const child = spawn(launchTarget, args, {
+          const isExecutable = /\.(exe|com)$/i.test(launchTarget)
+          const executable = isExecutable ? launchTarget : 'explorer.exe'
+          const executableArgs = isExecutable ? args : [launchTarget]
+          const child = spawn(executable, executableArgs, {
             detached: true,
             stdio: 'ignore',
-            shell: true
+            shell: false,
+            windowsHide: true
           })
+
+          if (child.pid) {
+            this.launchedPids.add(child.pid)
+            child.once('exit', () => this.launchedPids.delete(child.pid!))
+          }
 
           let resolved = false
           child.on('error', (err) => {
@@ -181,12 +207,17 @@ export class ProcessManagerService {
   /**
    * Terminate a program/process safely
    */
-  public async terminateProgram(target: string, force: boolean = true): Promise<{ success: boolean; message: string }> {
-    if (!target || !target.trim()) {
+  public async terminateProgram(target: string | number, force: boolean = true): Promise<{ success: boolean; message: string }> {
+    const rawTarget = String(target ?? '').trim()
+    if (!rawTarget) {
       return { success: false, message: 'Nome do processo não informado.' }
     }
 
-    const cleanTarget = target.trim().replace(/\.exe$/i, '').toLowerCase()
+    const cleanTarget = rawTarget.replace(/\.exe$/i, '').toLowerCase()
+
+    if (!/^[a-z0-9][a-z0-9._ -]{0,127}$/i.test(cleanTarget)) {
+      return { success: false, message: 'Nome de processo inválido.' }
+    }
 
     // Safety guard against killing critical Windows or Jasper processes
     if (PROTECTED_PROCESSES.has(cleanTarget)) {
@@ -196,24 +227,40 @@ export class ProcessManagerService {
       }
     }
 
-    const exeTarget = `${cleanTarget}.exe`
+    if (!/^\d{1,10}$/.test(rawTarget)) {
+      return { success: false, message: 'Encerramento por nome foi desativado. Informe o PID numérico exibido por list_processes.' }
+    }
+    const pid = Number(rawTarget)
+    if (!Number.isSafeInteger(pid) || pid <= 4 || pid === process.pid) {
+      return { success: false, message: 'PID inválido ou protegido.' }
+    }
+
+    if (!this.launchedPids.has(pid)) {
+      const approved = await securityBroker.confirmOperation({
+        title: 'Autorizar encerramento de processo',
+        message: `Encerrar o processo externo PID ${pid}?`,
+        detail: 'Este processo não foi iniciado pelo Jasper. Salve seu trabalho antes de autorizar.',
+        confirmLabel: 'Encerrar processo'
+      })
+      if (!approved) return { success: false, message: 'Encerramento cancelado pelo usuário.' }
+    }
 
     return new Promise((resolve) => {
-      // Use taskkill for reliable Windows termination
-      const flag = force ? '/F' : ''
-      const cmd = `taskkill /IM "${exeTarget}" ${flag}`
+      const taskkillArgs = ['/PID', String(pid)]
+      if (force) taskkillArgs.push('/F')
 
-      execFile('cmd.exe', ['/c', cmd], { timeout: 5000, windowsHide: true }, (error, stdout, stderr) => {
+      execFile('taskkill.exe', taskkillArgs, { timeout: 5000, windowsHide: true }, (error, stdout, stderr) => {
         if (error) {
           // Check if process was simply not found
           if (stderr.includes('não encontrado') || stderr.includes('not found')) {
-            resolve({ success: false, message: `Nenhum processo em execução encontrado com o nome "${cleanTarget}".` })
+            resolve({ success: false, message: `Nenhum processo em execução encontrado com o PID ${pid}.` })
           } else {
-            resolve({ success: false, message: `Erro ao encerrar processo "${cleanTarget}": ${stderr || error.message}` })
+            resolve({ success: false, message: `Erro ao encerrar o PID ${pid}: ${stderr || error.message}` })
           }
           return
         }
-        resolve({ success: true, message: `Processo "${cleanTarget}" encerrado com sucesso.` })
+        this.launchedPids.delete(pid)
+        resolve({ success: true, message: `Processo PID ${pid} encerrado com sucesso.` })
       })
     })
   }

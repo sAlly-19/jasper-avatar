@@ -1,0 +1,68 @@
+name: Desktop CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm run scan:secrets
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run audit:runtime
+      - run: npm run package:dir
+      - run: npm run smoke:packaged
+        env:
+          JASPER_SMOKE_ROOT: ${{ runner.temp }}
+      - name: Generate security metadata
+        shell: pwsh
+        run: |
+          npm sbom --omit=dev --sbom-format cyclonedx --sbom-type application | Out-File -FilePath "$env:RUNNER_TEMP/jasper-desktop-sbom.cdx.json" -Encoding utf8
+          npx --yes license-checker-rseidelsohn@5.0.1 --production --excludePrivatePackages --json --out "$env:RUNNER_TEMP/jasper-desktop-licenses.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: jasper-windows-smoke
+          path: ${{ runner.temp }}/jasper-packaged-smoke-ci/screenshots/app_screenshot.png
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: jasper-desktop-security-metadata
+          path: |
+            ${{ runner.temp }}/jasper-desktop-sbom.cdx.json
+            ${{ runner.temp }}/jasper-desktop-licenses.json
+          if-no-files-found: error
+          retention-days: 30
+
+  sast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install Semgrep CE
+        run: python3 -m pip install --disable-pip-version-check semgrep==1.178.0
+      - name: Run Semgrep CE
+        run: semgrep scan --config p/typescript --config p/javascript --error --metrics off --json --output semgrep-desktop.json --exclude node_modules --exclude out --exclude release .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: jasper-desktop-semgrep
+          path: semgrep-desktop.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,7 +1,5 @@
 import { execFile } from 'child_process'
-import { join } from 'path'
-import { app } from 'electron'
-import fs from 'fs'
+import { resolvePowerShellScript } from './script-path'
 
 export interface ActiveWindowInfo {
   processName: string
@@ -57,19 +55,7 @@ export class WindowTrackerService {
   }
 
   private getScriptPath(): string {
-    try {
-      const srcPath = join(app.getAppPath(), 'src', 'main', 'autonomous', 'scripts', 'get-active-window.ps1')
-      if (fs.existsSync(srcPath)) return srcPath
-    } catch {}
-
-    try {
-      if (typeof __dirname !== 'undefined') {
-        const devPath = join(__dirname, 'scripts', 'get-active-window.ps1')
-        if (fs.existsSync(devPath)) return devPath
-      }
-    } catch {}
-
-    return join(process.cwd(), 'src', 'main', 'autonomous', 'scripts', 'get-active-window.ps1')
+    return resolvePowerShellScript('get-active-window.ps1')
   }
 
   public async getActiveWindow(): Promise<ActiveWindowInfo> {

@@ -237,7 +237,7 @@ ${memoryContext}`
 
       // Check for errors from server
       if (message.error) {
-        console.error('[GeminiLive] Server error payload:', message.error)
+        console.error('[GeminiLive] Server returned an error response.')
         this.onStatus?.('error', message.error.message || 'Erro da API Gemini')
         return
       }
@@ -250,7 +250,7 @@ ${memoryContext}`
 
       // Check for Tool Calls from model
       if (message.toolCall && Array.isArray(message.toolCall.functionCalls)) {
-        console.log('[GeminiLive] Received toolCall request:', JSON.stringify(message.toolCall))
+        console.log(`[GeminiLive] Received ${message.toolCall.functionCalls.length} tool call(s).`)
         this.onStatus?.('speaking', 'Executando comando...')
 
         const functionResponses: any[] = []
@@ -284,7 +284,7 @@ ${memoryContext}`
         }
 
         this.ws?.send(JSON.stringify(toolResponsePayload))
-        console.log('[GeminiLive] Dispatched toolResponse:', JSON.stringify(toolResponsePayload))
+        console.log('[GeminiLive] Tool response dispatched.')
       }
 
       // 1. Server content response
@@ -390,7 +390,7 @@ ${memoryContext}`
         }
       }
       this.ws.send(JSON.stringify(message))
-      console.log('[GeminiLive] Sent text prompt:', text)
+      console.log(`[GeminiLive] Sent text prompt (${text.length} characters).`)
     } catch (err) {
       console.error('[GeminiLive] Error sending text prompt:', err)
     }

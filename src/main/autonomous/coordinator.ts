@@ -10,7 +10,6 @@ import { systemHealth } from './system-health'
 import { briefingService } from './briefing-service'
 import { semanticMemory } from './semantic-memory'
 import { knowledgeGraph } from './knowledge-graph'
-import { codeInterpreter } from './code-interpreter'
 import { headlessBrowser } from './headless-browser'
 import { gitWatcher } from './git-watcher'
 import { folderOrganizer } from './folder-organizer'
@@ -39,7 +38,7 @@ export class AutonomyCoordinator {
     // 2. Active Window Tracker
     windowTracker.setEnabled(cfg.enableWindowTracker !== false)
     windowTracker.setOnWindowChanged((win) => {
-      console.log(`[Autonomy] Active window changed: ${win.processName} - "${win.windowTitle}"`)
+      console.log('[Autonomy] Active process changed.')
     })
 
     // 3. Clipboard Watcher
@@ -69,10 +68,7 @@ export class AutonomyCoordinator {
     // 8. Knowledge Graph
     knowledgeGraph.setEnabled(cfg.enableKnowledgeGraph !== false)
 
-    // 9. Code Interpreter (Python & Node.js)
-    codeInterpreter.setEnabled(cfg.enableCodeInterpreter !== false)
-
-    // 10. Headless Browser (Electron Chromium Worker)
+    // 9. Headless Browser (Electron Chromium Worker)
     headlessBrowser.setEnabled(cfg.enableHeadlessBrowser !== false)
 
     // 11. Git Watcher & Commit Assistant
@@ -113,15 +109,15 @@ export class AutonomyCoordinator {
     smartHome.setConfig(cfg.hassUrl || '', cfg.hassToken || '')
 
     // 18. Process Manager, Media Controller & UI Automation
-    processManager.setEnabled(true)
-    mediaController.setEnabled(true)
-    uiAutomation.setEnabled(true)
+    processManager.setEnabled(cfg.enableProcessManager !== false)
+    mediaController.setEnabled(cfg.enableMediaController !== false)
+    uiAutomation.setEnabled(cfg.enableUiAutomation !== false)
 
     console.log('[AutonomyCoordinator] All autonomous services initialized successfully.')
   }
 
   public dispatchNotification(notif: AutonomyNotification): void {
-    console.log(`[Autonomy Notification] [${notif.type.toUpperCase()}] ${notif.title}: ${notif.message}`)
+    console.log(`[Autonomy Notification] Event dispatched: ${notif.type}`)
     safeSend(IPC_CHANNELS.AUTONOMY_NOTIFICATION, notif)
   }
 
@@ -135,7 +131,6 @@ export class AutonomyCoordinator {
     briefingService.setEnabled(cfg.enableDailyBriefing !== false)
     semanticMemory.setEnabled(cfg.enableSemanticMemory !== false)
     knowledgeGraph.setEnabled(cfg.enableKnowledgeGraph !== false)
-    codeInterpreter.setEnabled(cfg.enableCodeInterpreter !== false)
     headlessBrowser.setEnabled(cfg.enableHeadlessBrowser !== false)
     gitWatcher.setEnabled(cfg.enableGitWatcher !== false)
     if (cfg.gitRepoPath) {
@@ -148,6 +143,9 @@ export class AutonomyCoordinator {
     webhookManager.setEnabled(cfg.enableWebhooks !== false)
     smartHome.setEnabled(cfg.enableSmartHome !== false)
     smartHome.setConfig(cfg.hassUrl || '', cfg.hassToken || '')
+    processManager.setEnabled(cfg.enableProcessManager !== false)
+    mediaController.setEnabled(cfg.enableMediaController !== false)
+    uiAutomation.setEnabled(cfg.enableUiAutomation !== false)
   }
 
   public stopAll(): void {
