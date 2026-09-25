@@ -19,13 +19,15 @@ interface ApiErrorBody {
   error?: { code?: string; message?: string }
 }
 
+export const DEFAULT_LICENSE_API_URL = 'https://jasper-api-production.jasper-avatar.workers.dev'
+
 function decodeJsonSegment(segment: string): Record<string, any> {
   return JSON.parse(Buffer.from(segment, 'base64url').toString('utf-8'))
 }
 
 export class LicenseManager {
   private revocationListeners: Array<(result: LicenseValidationResult) => void> = []
-  private apiBaseUrl = (process.env.JASPER_API_URL || '').replace(/\/+$/, '')
+  private apiBaseUrl = (process.env.JASPER_API_URL || DEFAULT_LICENSE_API_URL).replace(/\/+$/, '')
 
   public setCustomBaseUrl(url: string | null): void {
     this.apiBaseUrl = (url || '').replace(/\/+$/, '')
