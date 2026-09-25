@@ -152,7 +152,8 @@ export class HeadlessBrowser {
           title: 'Autorizar captura de pagina',
           message: `Capturar uma imagem da pagina ${new URL(formattedUrl).hostname}?`,
           detail: `Endereco: ${formattedUrl}. A captura pode conter informacoes visiveis na pagina.`,
-          confirmLabel: 'Capturar pagina'
+          confirmLabel: 'Capturar pagina',
+          risk: 'mandatory'
         })
         if (!approved) throw new Error('Captura de pagina cancelada pelo usuario.')
         const image = await win.webContents.capturePage()
@@ -321,7 +322,8 @@ export class HeadlessBrowser {
             title: 'Autorizar clique em pagina web',
             message: `Permitir um clique em ${new URL(formattedUrl).hostname}?`,
             detail: `Seletor: ${selector}. Confirme somente se esta acao corresponde ao que voce solicitou.`,
-            confirmLabel: 'Executar clique'
+            confirmLabel: 'Executar clique',
+            risk: 'elevated'
           })
           if (!approved) return { success: false, url: formattedUrl, title, message: 'Clique cancelado pelo usuario.' }
 
@@ -376,7 +378,8 @@ export class HeadlessBrowser {
             title: 'Autorizar preenchimento em pagina web',
             message: `Permitir o preenchimento de um campo em ${new URL(formattedUrl).hostname}?`,
             detail: `Seletor: ${selector}. O conteudo nao e exibido nesta confirmacao nem no log.`,
-            confirmLabel: 'Preencher campo'
+            confirmLabel: 'Preencher campo',
+            risk: 'elevated'
           })
           if (!approved) return { success: false, url: formattedUrl, title, message: 'Preenchimento cancelado pelo usuario.' }
 
@@ -433,7 +436,8 @@ export class HeadlessBrowser {
             title: 'Autorizar captura de pagina',
             message: `Capturar uma imagem da pagina ${new URL(formattedUrl).hostname}?`,
             detail: `Endereco: ${formattedUrl}. A captura pode conter informacoes visiveis na pagina.`,
-            confirmLabel: 'Capturar pagina'
+            confirmLabel: 'Capturar pagina',
+            risk: 'mandatory'
           })
           if (!approved) return { success: false, url: formattedUrl, title, message: 'Captura cancelada pelo usuario.' }
           const image = await win.webContents.capturePage()

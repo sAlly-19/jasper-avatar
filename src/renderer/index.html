@@ -424,11 +424,8 @@
                   <div class="form-group flex-1">
                     <label for="select-model">Modelo Multimodal:</label>
                     <select id="select-model">
-                      <option value="gemini-3.1-flash-live-preview" selected>gemini-3.1-flash-live-preview (Gemini Live)</option>
-                      <option value="gemini-2.5-flash-native-audio-latest">gemini-2.5-flash-native-audio-latest</option>
-                      <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
-                      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                      <option value="gemini-2.0-flash-realtime-exp">gemini-2.0-flash-realtime-exp</option>
+                      <option value="gemini-3.8-live" selected>Gemini 3.8 Live (menor latência)</option>
+                      <option value="gemini-3.8-live-extended-thinking">Gemini 3.8 Live Extended Thinking</option>
                     </select>
                   </div>
                 </div>
@@ -437,6 +434,50 @@
 
             <!-- TAB 3: FERRAMENTAS -->
             <div id="tab-tools" class="settings-tab-pane">
+              <div class="settings-card confirmation-policy-card">
+                <div class="settings-card-header">
+                  <span class="card-icon">!</span>
+                  <div>
+                    <h4>Confirmações de ações</h4>
+                    <p>Escolha quanta autonomia o Jasper terá ao controlar o computador.</p>
+                  </div>
+                </div>
+                <div class="confirmation-mode-control" role="radiogroup" aria-label="Modo de confirmação">
+                  <label><input type="radio" name="confirmation-mode" value="strict" checked /><span>Estrito</span></label>
+                  <label><input type="radio" name="confirmation-mode" value="common" /><span>Ações comuns</span></label>
+                  <label class="danger"><input type="radio" name="confirmation-mode" value="all" /><span>Todas as ações</span></label>
+                </div>
+                <p class="confirmation-mode-help" id="confirmation-mode-help">Solicita confirmação antes de qualquer ação com efeito no computador.</p>
+                <div class="mandatory-actions-note">
+                  <strong>Sempre exigem confirmação:</strong>
+                  capturas de tela e OCR, credenciais, pagamentos, instalação e atualização de programas,
+                  exclusão permanente, processos críticos, licenças e dispositivos de segurança física.
+                </div>
+              </div>
+
+              <div class="settings-card update-settings-card">
+                <div class="settings-card-header">
+                  <span class="card-icon">&#8635;</span>
+                  <div>
+                    <h4>Atualizações</h4>
+                    <p>Verifique e instale novas versões do Jasper.</p>
+                  </div>
+                </div>
+                <label class="toggle-row">
+                  <span>
+                    <strong>Verificar diariamente</strong>
+                    <small>Apenas verifica. O download e a instalação exigem sua ação.</small>
+                  </span>
+                  <input id="check-updates-daily" type="checkbox" checked />
+                </label>
+                <div class="update-actions">
+                  <button id="btn-check-updates" class="btn-secondary" type="button">Verificar agora</button>
+                  <button id="btn-download-update" class="btn-secondary hidden" type="button">Baixar</button>
+                  <button id="btn-install-update" class="btn-primary hidden" type="button">Instalar e reiniciar</button>
+                </div>
+                <p id="update-status" class="confirmation-mode-help" aria-live="polite">Nenhuma verificação realizada.</p>
+              </div>
+
               <!-- System Tools Card -->
               <div class="settings-card">
                 <div class="hud-switch-item">

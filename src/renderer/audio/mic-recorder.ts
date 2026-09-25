@@ -12,7 +12,8 @@ export class MicRecorder {
 
   // 100ms buffering at 16kHz (1600 samples = 3200 bytes)
   // Continuous real-time streaming to Gemini Live
-  private static readonly BUFFER_SAMPLES = 1600
+  // 40 ms at 16 kHz keeps Live API turns responsive without excessive IPC overhead.
+  private static readonly BUFFER_SAMPLES = 640
   private pcmBuffer = new Int16Array(MicRecorder.BUFFER_SAMPLES)
   private bufferOffset = 0
 
@@ -152,7 +153,7 @@ export class MicRecorder {
       const pcmVal = s < 0 ? s * 0x8000 : s * 0x7fff
       this.pcmBuffer[this.bufferOffset++] = pcmVal
 
-      // Continuous Full-Duplex streaming: every 100ms dispatch audio to Gemini Live
+      // Continuous full-duplex streaming: dispatch 40 ms PCM frames to Gemini Live.
       if (this.bufferOffset >= MicRecorder.BUFFER_SAMPLES) {
         window.electronAPI.sendAudioChunk(this.pcmBuffer.buffer.slice(0))
         this.bufferOffset = 0

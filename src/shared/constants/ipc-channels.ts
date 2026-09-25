@@ -46,7 +46,14 @@ export const IPC_CHANNELS = {
   LICENSE_ACTIVATE: 'license:activate',
   LICENSE_GET_HWID: 'license:get-hwid',
   LICENSE_REVOKED: 'license:revoked',
-  LICENSE_STATUS_CHANGED: 'license:status-changed'
+  LICENSE_STATUS_CHANGED: 'license:status-changed',
+
+  // Application updates
+  UPDATE_GET_STATE: 'update:get-state',
+  UPDATE_CHECK: 'update:check',
+  UPDATE_DOWNLOAD: 'update:download',
+  UPDATE_INSTALL: 'update:install',
+  UPDATE_STATUS: 'update:status'
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

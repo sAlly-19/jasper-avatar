@@ -198,7 +198,8 @@ export class SmartHomeService {
       title: 'Autorizar comando residencial',
       message: `Executar ${cleanService} em ${cleanEntity}?`,
       detail: `Home Assistant: ${validateBaseUrl(this.baseUrl)?.host || 'nao configurado'}. Cada comando exige autorizacao individual.`,
-      confirmLabel: 'Executar comando'
+      confirmLabel: 'Executar comando',
+      risk: 'mandatory'
     })
     if (!approved) return fail('Comando cancelado pelo usuario.', 'USER_CANCELLED')
 

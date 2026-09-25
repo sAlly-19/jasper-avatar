@@ -7,7 +7,8 @@ import {
   type AutonomyNotification,
   type WebhookTriggerResult,
   type LicenseInfo,
-  type LicenseValidationResult
+  type LicenseValidationResult,
+  type UpdateState
 } from '@shared'
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -72,6 +73,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on(IPC_CHANNELS.CONFIG_AGENT_NAME_UPDATED, handler)
     return (): void => {
       ipcRenderer.removeListener(IPC_CHANNELS.CONFIG_AGENT_NAME_UPDATED, handler)
+    }
+  },
+
+  // Application updates
+  getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_STATE),
+  checkForUpdates: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
+  downloadUpdate: (): Promise<UpdateState> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DOWNLOAD),
+  installUpdate: (): Promise<{ success: boolean; message: string }> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_INSTALL),
+  onUpdateStatus: (callback: (state: UpdateState) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: UpdateState): void => callback(state)
+    ipcRenderer.on(IPC_CHANNELS.UPDATE_STATUS, handler)
+    return (): void => {
+      ipcRenderer.removeListener(IPC_CHANNELS.UPDATE_STATUS, handler)
     }
   },
 

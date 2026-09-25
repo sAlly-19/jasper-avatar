@@ -5,6 +5,14 @@ import dotenv from 'dotenv'
 import type { JasperConfig, UpdateConfigPayload, ConfigSummary } from '@shared'
 import { getHardwareInfo } from '../services/hwid'
 
+const DEFAULT_LIVE_MODEL = 'gemini-3.8-live'
+const RETIRED_LIVE_MODELS = new Set(['gemini-3.1-flash-live-preview', 'gemini-2.0-flash-live-001'])
+
+function normalizeLiveModel(model?: string): string {
+  const value = model?.trim()
+  return !value || RETIRED_LIVE_MODELS.has(value) ? DEFAULT_LIVE_MODEL : value
+}
+
 // Load environment variables from .env
 dotenv.config()
 
@@ -64,7 +72,7 @@ class ConfigStore {
   private config: JasperConfig = {
     apiKey: process.env.GOOGLE_API_KEY || '',
     voiceName: process.env.GEMINI_VOICE || 'Charon',
-    model: process.env.GEMINI_MODEL || 'gemini-3.1-flash-live-preview',
+    model: normalizeLiveModel(process.env.GEMINI_MODEL),
     enableSystemTools: true,
     enableMediaTools: true,
     agentName: process.env.AGENT_NAME || 'Jasper',
@@ -98,6 +106,8 @@ class ConfigStore {
     enableOcrService: true,
     enablePresentationMode: true,
     enableFocusMode: true,
+    confirmationMode: 'strict',
+    checkUpdatesDaily: true,
     // Module specific configurations
     hassUrl: process.env.HASS_URL || 'http://homeassistant.local:8123',
     hassToken: process.env.HASS_TOKEN || '',
@@ -119,7 +129,7 @@ class ConfigStore {
   private loadEnvDefaults(): void {
     this.config.apiKey = process.env.GOOGLE_API_KEY || ''
     this.config.voiceName = process.env.GEMINI_VOICE || 'Charon'
-    this.config.model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-live-preview'
+    this.config.model = normalizeLiveModel(process.env.GEMINI_MODEL)
     this.config.agentName = process.env.AGENT_NAME || 'Jasper'
     this.config.hassUrl = process.env.HASS_URL || 'http://homeassistant.local:8123'
     this.config.hassToken = process.env.HASS_TOKEN || ''
@@ -148,7 +158,7 @@ class ConfigStore {
         const data = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'))
         if (data.apiKey !== undefined) this.config.apiKey = decryptSecret(data.apiKey)
         if (data.voiceName) this.config.voiceName = data.voiceName
-        if (data.model) this.config.model = data.model
+        if (data.model) this.config.model = normalizeLiveModel(data.model)
         if (data.enableSystemTools !== undefined) this.config.enableSystemTools = data.enableSystemTools
         if (data.enableMediaTools !== undefined) this.config.enableMediaTools = data.enableMediaTools
         if (data.agentName) this.config.agentName = data.agentName
@@ -181,6 +191,8 @@ class ConfigStore {
         if (data.enableOcrService !== undefined) this.config.enableOcrService = data.enableOcrService
         if (data.enablePresentationMode !== undefined) this.config.enablePresentationMode = data.enablePresentationMode
         if (data.enableFocusMode !== undefined) this.config.enableFocusMode = data.enableFocusMode
+        if (['strict', 'common', 'all'].includes(data.confirmationMode)) this.config.confirmationMode = data.confirmationMode
+        if (typeof data.checkUpdatesDaily === 'boolean') this.config.checkUpdatesDaily = data.checkUpdatesDaily
 
         // Module-specific configs
         if (data.hassUrl !== undefined) this.config.hassUrl = data.hassUrl
@@ -243,7 +255,7 @@ class ConfigStore {
     const previous = { ...this.config }
     if (payload.apiKey !== undefined) this.config.apiKey = payload.apiKey.trim()
     if (payload.voiceName !== undefined) this.config.voiceName = payload.voiceName.trim()
-    if (payload.model !== undefined) this.config.model = payload.model.trim()
+    if (payload.model !== undefined) this.config.model = normalizeLiveModel(payload.model)
     if (payload.enableSystemTools !== undefined) this.config.enableSystemTools = payload.enableSystemTools
     if (payload.enableMediaTools !== undefined) this.config.enableMediaTools = payload.enableMediaTools
     if (payload.agentName !== undefined) this.config.agentName = payload.agentName.trim()
@@ -276,6 +288,8 @@ class ConfigStore {
     if (payload.enableOcrService !== undefined) this.config.enableOcrService = payload.enableOcrService
     if (payload.enablePresentationMode !== undefined) this.config.enablePresentationMode = payload.enablePresentationMode
     if (payload.enableFocusMode !== undefined) this.config.enableFocusMode = payload.enableFocusMode
+    if (payload.confirmationMode !== undefined) this.config.confirmationMode = payload.confirmationMode
+    if (payload.checkUpdatesDaily !== undefined) this.config.checkUpdatesDaily = payload.checkUpdatesDaily
 
     // Module-specific configs
     if (payload.hassUrl !== undefined) this.config.hassUrl = payload.hassUrl.trim()
@@ -351,6 +365,8 @@ class ConfigStore {
       enableOcrService: this.config.enableOcrService,
       enablePresentationMode: this.config.enablePresentationMode,
       enableFocusMode: this.config.enableFocusMode,
+      confirmationMode: this.config.confirmationMode,
+      checkUpdatesDaily: this.config.checkUpdatesDaily,
       // Module-specific configs
       hassUrl: this.config.hassUrl || 'http://homeassistant.local:8123',
       hasHassToken: Boolean(this.config.hassToken && this.config.hassToken.length > 5),

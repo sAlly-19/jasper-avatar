@@ -29,6 +29,8 @@ const tempUserData = ${JSON.stringify(tempUserData)};
 export const app = {
   getPath: (name) => tempUserData,
   getAppPath: () => ${JSON.stringify(rootDir)},
+  getVersion: () => '1.0.1-test',
+  isPackaged: false,
   whenReady: () => Promise.resolve(),
   quit: () => {}
 };
@@ -114,6 +116,19 @@ export default { app, safeStorage, clipboard, nativeImage, BrowserWindow, shell,
 const mockPath = path.join(tempTestRoot, '_electron-mock.mjs')
 fs.writeFileSync(mockPath, electronMockShim, 'utf-8')
 
+const updaterMockShim = `
+export const autoUpdater = {
+  autoDownload: false,
+  autoInstallOnAppQuit: false,
+  on() { return this; },
+  checkForUpdates: () => Promise.resolve(null),
+  downloadUpdate: () => Promise.resolve([]),
+  quitAndInstall() {}
+};
+`
+const updaterMockPath = path.join(tempTestRoot, '_electron-updater-mock.mjs')
+fs.writeFileSync(updaterMockPath, updaterMockShim, 'utf-8')
+
 // Bundle tests with esbuild resolving real TypeScript classes and @shared aliases
 console.log('[run-tests] Empacotando testes com as implementações REAIS do sistema...')
 
@@ -134,6 +149,7 @@ for (const tf of testFiles) {
     format: 'esm',
     alias: {
       'electron': mockPath,
+      'electron-updater': updaterMockPath,
       '@shared': path.join(rootDir, 'src', 'shared', 'index.ts')
     },
     external: [

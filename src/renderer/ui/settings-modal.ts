@@ -4,6 +4,7 @@ import { WakeTrainerUI } from './wake-trainer-ui'
 import { SVG_ICONS } from './icons'
 import { showHudToast } from './toast'
 import { updateStatusBadge } from './status-badge'
+import type { ConfirmationMode, UpdateConfigPayload, UpdateState } from '@shared'
 
 export interface SettingsModalOptions {
   getAgentName: () => string
@@ -174,6 +175,61 @@ export class SettingsModal {
       hassTestFeedback
     } = DOM
 
+    const confirmationModeInputs = Array.from(
+      document.querySelectorAll<HTMLInputElement>('input[name="confirmation-mode"]')
+    )
+    const confirmationModeHelp = document.getElementById('confirmation-mode-help')
+    const checkUpdatesDaily = document.getElementById('check-updates-daily') as HTMLInputElement | null
+    const btnCheckUpdates = document.getElementById('btn-check-updates') as HTMLButtonElement | null
+    const btnDownloadUpdate = document.getElementById('btn-download-update') as HTMLButtonElement | null
+    const btnInstallUpdate = document.getElementById('btn-install-update') as HTMLButtonElement | null
+    const updateStatus = document.getElementById('update-status')
+    const confirmationModeDescriptions: Record<ConfirmationMode, string> = {
+      strict: 'Solicita confirmação antes de qualquer ação com efeito no computador.',
+      common: 'Libera aplicativos, mídia, volume, brilho, sites e pesquisas. Ações elevadas ainda pedem confirmação.',
+      all: 'Libera ações comuns e elevadas. As operações protegidas abaixo continuam exigindo confirmação.'
+    }
+    let acceptedConfirmationMode: ConfirmationMode = 'strict'
+
+    const setConfirmationMode = (mode: ConfirmationMode): void => {
+      confirmationModeInputs.forEach((input) => { input.checked = input.value === mode })
+      if (confirmationModeHelp) confirmationModeHelp.textContent = confirmationModeDescriptions[mode]
+    }
+
+    confirmationModeInputs.forEach((input) => {
+      input.addEventListener('change', () => {
+        if (!input.checked) return
+        const nextMode = input.value as ConfirmationMode
+        if (nextMode === 'all') {
+          const accepted = window.confirm(
+            'Todas as ações comuns e elevadas serão executadas sem diálogo. ' +
+            'Capturas de tela/OCR, credenciais, pagamentos, instalações, exclusão permanente, ' +
+            'processos críticos, licenças e segurança física continuarão protegidos. Continuar?'
+          )
+          if (!accepted) {
+            setConfirmationMode(acceptedConfirmationMode)
+            return
+          }
+        }
+        acceptedConfirmationMode = nextMode
+        setConfirmationMode(nextMode)
+      })
+    })
+
+    const renderUpdateState = (state: UpdateState): void => {
+      if (updateStatus) updateStatus.textContent = state.message
+      btnDownloadUpdate?.classList.toggle('hidden', state.phase !== 'available' || state.portable)
+      btnInstallUpdate?.classList.toggle('hidden', state.phase !== 'downloaded')
+      if (btnCheckUpdates) btnCheckUpdates.disabled = state.phase === 'checking' || state.phase === 'downloading'
+    }
+    window.electronAPI.onUpdateStatus(renderUpdateState)
+    btnCheckUpdates?.addEventListener('click', async () => renderUpdateState(await window.electronAPI.checkForUpdates()))
+    btnDownloadUpdate?.addEventListener('click', async () => renderUpdateState(await window.electronAPI.downloadUpdate()))
+    btnInstallUpdate?.addEventListener('click', async () => {
+      const result = await window.electronAPI.installUpdate()
+      if (!result.success && updateStatus) updateStatus.textContent = result.message
+    })
+
     // Live update of agent name preview badge
     inputAgentName?.addEventListener('input', () => {
       const val = inputAgentName.value.trim() || this.options.getAgentName() || 'Jasper'
@@ -232,7 +288,11 @@ export class SettingsModal {
         }
       }
       selectVoice.value = config.voiceName || 'Charon'
-      selectModel.value = config.model || 'gemini-3.1-flash-live-preview'
+      selectModel.value = config.model || 'gemini-3.8-live'
+      acceptedConfirmationMode = config.confirmationMode || 'strict'
+      setConfirmationMode(acceptedConfirmationMode)
+      if (checkUpdatesDaily) checkUpdatesDaily.checked = config.checkUpdatesDaily !== false
+      renderUpdateState(await window.electronAPI.getUpdateState())
 
       if (checkWakeWord) {
         checkWakeWord.checked = config.enableWakeWord !== false
@@ -580,10 +640,12 @@ export class SettingsModal {
     })
 
     btnSaveSettings.addEventListener('click', async () => {
+      const previousConfig = await window.electronAPI.getConfig()
       const newName = inputAgentName?.value.trim() || this.options.getAgentName() || 'Jasper'
       const apiKey = inputApiKey.value.trim()
       const voiceName = selectVoice.value
       const model = selectModel.value
+      const confirmationMode = (confirmationModeInputs.find((input) => input.checked)?.value || 'strict') as ConfirmationMode
       const enableWakeWord = checkWakeWord ? checkWakeWord.checked : true
       const enableBloom = checkBloom ? checkBloom.checked : true
       const enableNeuralBg = checkNeuralBg ? checkNeuralBg.checked : true
@@ -600,12 +662,14 @@ export class SettingsModal {
 
       settingsStatus.textContent = 'Salvando e conectando...'
       settingsStatus.className = 'modal-status'
+      btnSaveSettings.disabled = true
 
-      await window.electronAPI.saveConfig({
+      const update: UpdateConfigPayload = {
         agentName: newName,
-        apiKey: apiKey !== '' ? apiKey : (DOM.geminiKeyMaskedDisplay?.textContent === 'NENHUMA CHAVE CONFIGURADA' ? '' : undefined),
         voiceName,
         model,
+        confirmationMode,
+        checkUpdatesDaily: checkUpdatesDaily ? checkUpdatesDaily.checked : true,
         enableWakeWord,
         enableBloom,
         enableNeuralBg,
@@ -647,32 +711,60 @@ export class SettingsModal {
         webhookDefaultUrl: inputWebhookUrl?.value.trim() || undefined,
         hassUrl: inputHassUrl?.value.trim() || undefined,
         hassToken: inputHassToken?.value.trim() || undefined
-      })
+      }
+      if (apiKey !== '') update.apiKey = apiKey
+      else if (!previousConfig.hasFullKey) update.apiKey = ''
 
-      // Reinitialize TensorFlow.js Speech Commands engine with updated settings
-      await this.options.reinitWakeWord()
+      try {
+        await window.electronAPI.saveConfig(update)
 
-      const result = await window.electronAPI.connectGemini({
-        agentName: newName,
-        apiKey: apiKey || undefined,
-        voiceName,
-        model,
-        enableSystemTools,
-        enableMediaTools
-      })
+        if (previousConfig.enableWakeWord !== enableWakeWord) {
+          await this.options.reinitWakeWord()
+        }
 
-      if (result.success) {
-        settingsStatus.textContent = 'Conectado com sucesso!'
-        settingsStatus.className = 'modal-status success'
-        setTimeout(() => {
-          settingsModal.classList.add('hidden')
-        }, 800)
+        const connectionChanged =
+          Boolean(apiKey) ||
+          previousConfig.agentName !== newName ||
+          previousConfig.voiceName !== voiceName ||
+          previousConfig.model !== model ||
+          previousConfig.enableSystemTools !== enableSystemTools ||
+          previousConfig.enableMediaTools !== enableMediaTools
+
+        if (!connectionChanged && previousConfig.isConnected) {
+          settingsStatus.textContent = 'Configurações salvas!'
+          settingsStatus.className = 'modal-status success'
+          setTimeout(() => settingsModal.classList.add('hidden'), 800)
+          return
+        }
+
+        const result = await window.electronAPI.connectGemini({
+          agentName: newName,
+          apiKey: apiKey || undefined,
+          voiceName,
+          model,
+          enableSystemTools,
+          enableMediaTools
+        })
+
+        if (result.success) {
+          settingsStatus.textContent = 'Conectado com sucesso!'
+          settingsStatus.className = 'modal-status success'
+          setTimeout(() => {
+            settingsModal.classList.add('hidden')
+          }, 800)
       } else {
         settingsStatus.textContent = 'Configurações salvas. (Offline: ' + (result.error || 'sem conexão') + ')'
         settingsStatus.className = 'modal-status'
         setTimeout(() => {
           settingsModal.classList.add('hidden')
         }, 1400)
+      }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Falha ao salvar as configurações.'
+        settingsStatus.textContent = message.replace(/^Error invoking remote method '[^']+': Error:\s*/, '')
+        settingsStatus.className = 'modal-status error'
+      } finally {
+        btnSaveSettings.disabled = false
       }
     })
   }

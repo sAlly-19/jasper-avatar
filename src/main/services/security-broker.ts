@@ -2,12 +2,24 @@ import { app, dialog } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { getMainWindow } from '../windows/main-window'
+import { configStore } from '../config/config-store'
+import type { ConfirmationMode } from '@shared'
+
+export type ConfirmationRisk = 'common' | 'elevated' | 'mandatory'
+
+export function requiresConfirmation(mode: ConfirmationMode, risk: ConfirmationRisk): boolean {
+  if (risk === 'mandatory') return true
+  if (mode === 'all') return false
+  if (mode === 'common' && risk === 'common') return false
+  return true
+}
 
 export interface ConfirmationRequest {
   title: string
   message: string
   detail: string
   confirmLabel: string
+  risk?: ConfirmationRisk
 }
 
 export interface SafePathResult {
@@ -23,11 +35,17 @@ function isContained(root: string, target: string): boolean {
 
 export class SecurityBroker {
   public async confirmOperation(request: ConfirmationRequest): Promise<boolean> {
+    const risk = request.risk || 'elevated'
+    const mode = configStore.getConfig().confirmationMode || 'strict'
+    if (!requiresConfirmation(mode, risk)) {
+      console.log(`[SecurityBroker] Confirmation bypassed by ${mode} mode for ${risk} action.`)
+      return true
+    }
     const options = {
       type: 'question' as const,
       title: request.title.slice(0, 120),
       message: request.message.slice(0, 500),
-      detail: request.detail.slice(0, 1500),
+      detail: `${request.detail}\n\nModo atual: ${mode}. Ações permanentemente protegidas sempre exigem confirmação.`.slice(0, 1500),
       buttons: ['Cancelar', request.confirmLabel.slice(0, 80)],
       defaultId: 0,
       cancelId: 0,

@@ -33,10 +33,14 @@ nsis:
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: Jasper AI
-  artifactName: ${productName}-Setup-${version}.${ext}
+  artifactName: Jasper-AI-Setup-${version}.${ext}
 
 portable:
-  artifactName: ${productName}-${version}-Portable.${ext}
+  artifactName: Jasper-AI-${version}-Portable.${ext}
+
+publish:
+  provider: generic
+  url: https://github.com/sAlly-19/jasper-avatar-releases/releases/latest/download
 
 electronFuses:
   runAsNode: false

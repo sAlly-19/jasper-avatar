@@ -1,3 +1,5 @@
+export type ConfirmationMode = 'strict' | 'common' | 'all'
+
 export interface JasperConfig {
   apiKey: string
   voiceName: string
@@ -35,6 +37,8 @@ export interface JasperConfig {
   enableOcrService: boolean
   enablePresentationMode: boolean
   enableFocusMode: boolean
+  confirmationMode: ConfirmationMode
+  checkUpdatesDaily: boolean
   // Module specific configurations
   hassUrl?: string
   hassToken?: string
@@ -96,6 +100,8 @@ export interface UpdateConfigPayload {
   enableOcrService?: boolean
   enablePresentationMode?: boolean
   enableFocusMode?: boolean
+  confirmationMode?: ConfirmationMode
+  checkUpdatesDaily?: boolean
   // Module specific configurations
   hassUrl?: string
   hassToken?: string
@@ -158,6 +164,8 @@ export interface ConfigSummary {
   enableOcrService: boolean
   enablePresentationMode: boolean
   enableFocusMode: boolean
+  confirmationMode: ConfirmationMode
+  checkUpdatesDaily: boolean
   // Module specific configurations
   hassUrl?: string
   hasHassToken?: boolean

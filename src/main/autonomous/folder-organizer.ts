@@ -207,7 +207,8 @@ export class FolderOrganizer {
         title: 'Autorizar organização de arquivos',
         message: `Mover arquivos dentro de ${basename(dir)}?`,
         detail: `O Jasper organizará arquivos apenas dentro da pasta autorizada: ${dir}. Links simbólicos e junctions serão ignorados.`,
-        confirmLabel: 'Organizar arquivos'
+        confirmLabel: 'Organizar arquivos',
+        risk: 'elevated'
       })
       if (!approved) {
         return {

@@ -39,7 +39,8 @@ export class ScreenAwarenessService {
         title: 'Autorizar captura de tela',
         message: 'O Jasper solicitou uma captura da tela principal.',
         detail: 'A imagem será enviada ao Gemini para responder à solicitação atual. Autorize somente se não houver informações sensíveis visíveis.',
-        confirmLabel: 'Capturar e enviar'
+        confirmLabel: 'Capturar e enviar',
+        risk: 'mandatory'
       })
       if (!approved) {
         return { success: false, error: 'Captura de tela cancelada pelo usuário.' }
