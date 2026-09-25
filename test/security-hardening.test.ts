@@ -22,7 +22,7 @@ import { ReflexionEngine } from '../src/main/autonomous/reflexion-engine'
 import http from 'node:http'
 import { webcrypto } from 'node:crypto'
 import { getHardwareInfo } from '../src/main/services/hwid'
-import { licenseManager, LicenseManager } from '../src/main/services/license-manager'
+import { DEFAULT_LICENSE_API_URL, licenseManager, LicenseManager } from '../src/main/services/license-manager'
 import { configStore } from '../src/main/config/config-store'
 import { isTrustedRendererUrl } from '../src/main/utils/trusted-renderer'
 import { securityBroker } from '../src/main/services/security-broker'
@@ -439,6 +439,7 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
     })
 
     test('LicenseManager aceita apenas o formato atual de chaves aleatórias', () => {
+      assert.equal(DEFAULT_LICENSE_API_URL, 'https://jasper-api-production.jasper-avatar.workers.dev')
       assert.equal(licenseManager.validateKeyFormat('JASPER-ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2-34'), true)
       assert.equal(licenseManager.validateKeyFormat('jasper-abcde-fghjk-lmnpq-rstuv-wxyz2-34'), true)
       assert.equal(licenseManager.validateKeyFormat('JASPER-ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ2-35'), false)
