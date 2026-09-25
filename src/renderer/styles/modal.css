@@ -136,16 +136,20 @@
 
 /* Tabs Navigation Bar */
 .settings-tabs-nav {
-  display: flex;
-  gap: 4px;
-  padding: 6px 16px 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px 8px 0;
   background: rgba(5, 9, 17, 0.7);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .settings-tab-btn {
-  padding: 10px 14px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 4px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -156,10 +160,68 @@
   letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  gap: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
   border-radius: 6px 6px 0 0;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.settings-tab-btn svg { flex: 0 0 auto; }
+.settings-tab-btn span { min-width: 0; overflow-wrap: anywhere; }
+
+.confirmation-mode-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.confirmation-mode-control input { position: absolute; opacity: 0; pointer-events: none; }
+.confirmation-mode-control span {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+.confirmation-mode-control input:checked + span {
+  color: var(--cyan-neon);
+  border-color: rgba(0, 240, 255, 0.65);
+  background: rgba(0, 240, 255, 0.1);
+}
+.confirmation-mode-control .danger input:checked + span {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(127, 29, 29, 0.24);
+}
+.confirmation-mode-help { margin-top: 10px; color: #cbd5e1; font-size: 11px; }
+.mandatory-actions-note {
+  margin-top: 10px;
+  padding: 10px;
+  border-left: 3px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  color: #cbd5e1;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.update-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.update-actions .hidden { display: none; }
+.update-settings-card .toggle-row small { display: block; margin-top: 3px; color: #94a3b8; }
+
+@media (max-width: 720px) {
+  .confirmation-mode-control { grid-template-columns: 1fr; }
+  .settings-tab-btn { flex-direction: column; gap: 2px; font-size: 9px; }
 }
 
 .settings-tab-btn:hover {

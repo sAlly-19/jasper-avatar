@@ -180,7 +180,14 @@ export function createMainWindow(): BrowserWindow {
           console.log('[Capture] 01_avatar_hud.png salvo')
 
           // Abrir configurações
-          await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-settings')?.click();`)
+          await mainWindow.webContents.executeJavaScript(`{
+            const licenseModal = document.getElementById('modal-license-activation');
+            if (licenseModal) {
+              licenseModal.classList.add('hidden');
+              licenseModal.style.display = 'none';
+            }
+            document.getElementById('btn-settings')?.click();
+          }`)
           await new Promise((r) => setTimeout(r, 600))
 
           // 2. Aba Autonomia (17 módulos de autonomia)

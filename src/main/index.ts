@@ -8,6 +8,7 @@ import { registerIpcHandlers } from './ipc/register-ipc'
 import { GeminiLiveClient, setGlobalGeminiClient } from './gemini-live'
 import { autonomyCoordinator } from './autonomous'
 import { licenseManager } from './services/license-manager'
+import { updateManager } from './services/update-manager'
 
 let geminiClient: GeminiLiveClient | null = null
 let licenseCheckTimer: NodeJS.Timeout | null = null
@@ -92,6 +93,7 @@ app.whenReady().then(() => {
   setGlobalGeminiClient(geminiClient)
   registerIpcHandlers(() => geminiClient)
   createMainWindow()
+  updateManager.initialize()
   autonomyCoordinator.init()
 
   // Verificação inicial do lease no boot da aplicação.
@@ -121,6 +123,7 @@ app.on('window-all-closed', () => {
     licenseCheckTimer = null
   }
   autonomyCoordinator.stopAll()
+  updateManager.dispose()
   geminiClient?.disconnect()
   if (process.platform !== 'darwin') {
     app.quit()

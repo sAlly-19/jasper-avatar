@@ -21,6 +21,7 @@ import {
 import { licenseManager } from '../services/license-manager'
 import { getHardwareInfo } from '../services/hwid'
 import { isTrustedRendererUrl } from '../utils/trusted-renderer'
+import { updateManager } from '../services/update-manager'
 import {
   autonomyCoordinator,
   reflexionEngine,
@@ -53,7 +54,8 @@ const CONFIG_BOOLEAN_FIELDS = new Set([
   'enableKnowledgeGraph', 'enableHeadlessBrowser', 'enableGitWatcher', 'enableFolderOrganizer',
   'enableSubagents', 'enableReflexionLoop', 'enableCalendarEmail', 'enableWebhooks', 'enableSmartHome',
   'enableProcessManager', 'enableUiAutomation', 'enableMediaController', 'enableReportGenerator',
-  'enableFileSummarizer', 'enableQrService', 'enableOcrService', 'enablePresentationMode', 'enableFocusMode'
+  'enableFileSummarizer', 'enableQrService', 'enableOcrService', 'enablePresentationMode', 'enableFocusMode',
+  'checkUpdatesDaily'
 ])
 
 const CONFIG_STRING_LIMITS: Record<string, number> = {
@@ -74,6 +76,7 @@ const CONFIG_STRING_LIMITS: Record<string, number> = {
 function assertConfigPayload(payload: unknown): asserts payload is UpdateConfigPayload {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Configuração inválida.')
   for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined) continue
     if (CONFIG_BOOLEAN_FIELDS.has(key)) {
       if (typeof value !== 'boolean') throw new Error(`Campo de configuração inválido: ${key}.`)
       continue
@@ -84,6 +87,7 @@ function assertConfigPayload(payload: unknown): asserts payload is UpdateConfigP
       continue
     }
     if (key === 'emailImapPort' && Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 65_535) continue
+    if (key === 'confirmationMode' && ['strict', 'common', 'all'].includes(String(value))) continue
     throw new Error(`Campo de configuração não permitido: ${key}.`)
   }
 }
@@ -156,6 +160,7 @@ export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | nu
       updated.agentName
     )
     autonomyCoordinator.updateServicesConfig()
+    if (payload.checkUpdatesDaily !== undefined) updateManager.refreshSchedule()
     return { success: true }
   })
 
@@ -236,5 +241,25 @@ export function registerIpcHandlers(getGeminiClient: () => GeminiLiveClient | nu
   ipcMain.handle(IPC_CHANNELS.LICENSE_GET_HWID, (event) => {
     assertTrustedSender(event)
     return getHardwareInfo()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.UPDATE_GET_STATE, (event) => {
+    assertTrustedSender(event)
+    return updateManager.getState()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, (event) => {
+    assertTrustedSender(event)
+    return updateManager.check(true)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.UPDATE_DOWNLOAD, (event) => {
+    assertTrustedSender(event)
+    return updateManager.download()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.UPDATE_INSTALL, (event) => {
+    assertTrustedSender(event)
+    return updateManager.install()
   })
 }

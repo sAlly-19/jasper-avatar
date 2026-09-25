@@ -25,7 +25,7 @@ import { getHardwareInfo } from '../src/main/services/hwid'
 import { DEFAULT_LICENSE_API_URL, licenseManager, LicenseManager } from '../src/main/services/license-manager'
 import { configStore } from '../src/main/config/config-store'
 import { isTrustedRendererUrl } from '../src/main/utils/trusted-renderer'
-import { securityBroker } from '../src/main/services/security-broker'
+import { requiresConfirmation, securityBroker } from '../src/main/services/security-broker'
 
 describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => {
 
@@ -193,6 +193,16 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
   })
 
   describe('SecurityBroker (contenção de arquivos do usuário)', () => {
+    test('aplica os três modos sem liberar ações obrigatoriamente protegidas', () => {
+      assert.equal(requiresConfirmation('strict', 'common'), true)
+      assert.equal(requiresConfirmation('strict', 'elevated'), true)
+      assert.equal(requiresConfirmation('common', 'common'), false)
+      assert.equal(requiresConfirmation('common', 'elevated'), true)
+      assert.equal(requiresConfirmation('all', 'common'), false)
+      assert.equal(requiresConfirmation('all', 'elevated'), false)
+      assert.equal(requiresConfirmation('all', 'mandatory'), true)
+    })
+
     test('permite arquivo em Documentos e rejeita caminho externo', () => {
       const allowedFile = path.join(app.getPath('documents'), 'broker-test.txt')
       fs.writeFileSync(allowedFile, 'ok', 'utf-8')
@@ -415,12 +425,12 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.ok(audioPlayerSrc.includes('this.onPlaybackEnded?.()'))
     })
 
-    test('Gemini Live client utiliza o modelo configurado gemini-3.1-flash-live-preview', () => {
+    test('Gemini Live client utiliza o modelo Live atual configurado', () => {
       const liveClientSrc = fs.readFileSync(
         path.join(process.cwd(), 'src/main/gemini-live.ts'),
         'utf-8'
       )
-      assert.ok(liveClientSrc.includes('gemini-3.1-flash-live-preview'))
+      assert.ok(liveClientSrc.includes('gemini-3.8-live'))
     })
   })
 

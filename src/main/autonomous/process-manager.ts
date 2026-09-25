@@ -127,7 +127,8 @@ export class ProcessManagerService {
       title: 'Autorizar abertura de programa',
       message: `Permitir que o Jasper abra "${trimmed.slice(0, 160)}"?`,
       detail: 'O programa será iniciado como um processo separado, sem shell e sem comandos concatenados.',
-      confirmLabel: 'Abrir programa'
+      confirmLabel: 'Abrir programa',
+      risk: 'common'
     })
     if (!approved) return { success: false, message: 'Abertura de programa cancelada pelo usuário.' }
 
@@ -240,7 +241,8 @@ export class ProcessManagerService {
         title: 'Autorizar encerramento de processo',
         message: `Encerrar o processo externo PID ${pid}?`,
         detail: 'Este processo não foi iniciado pelo Jasper. Salve seu trabalho antes de autorizar.',
-        confirmLabel: 'Encerrar processo'
+        confirmLabel: 'Encerrar processo',
+        risk: 'elevated'
       })
       if (!approved) return { success: false, message: 'Encerramento cancelado pelo usuário.' }
     }

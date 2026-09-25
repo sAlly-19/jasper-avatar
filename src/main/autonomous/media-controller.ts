@@ -1,5 +1,6 @@
 import { execFile } from 'child_process'
 import { resolvePowerShellScript } from './script-path'
+import { securityBroker } from '../services/security-broker'
 
 export class MediaControllerService {
   private isEnabled: boolean = true
@@ -73,6 +74,15 @@ export class MediaControllerService {
 
   public async executeCommand(command: string, value?: number): Promise<string> {
     const cmd = command.toLowerCase().trim()
+    const approved = await securityBroker.confirmOperation({
+      title: 'Controlar mídia',
+      message: 'O Jasper quer alterar a reprodução ou o volume do computador.',
+      detail: `Comando solicitado: ${cmd}${value === undefined ? '' : ` (${value})`}.`,
+      confirmLabel: 'Executar',
+      risk: 'common'
+    })
+    if (!approved) return 'Comando de mídia cancelado pelo usuário.'
+
     switch (cmd) {
       case 'volume_up':
       case 'aumentar_volume':

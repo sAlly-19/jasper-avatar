@@ -41,7 +41,7 @@ export class GeminiLiveClient {
   constructor(options: GeminiLiveOptions) {
     this.apiKey = options.apiKey
     this.voiceName = options.voiceName || 'Charon'
-    this.model = options.model || 'gemini-3.1-flash-live-preview'
+    this.model = options.model || 'gemini-3.8-live'
     if (options.enableSystemTools !== undefined) this.enableSystemTools = options.enableSystemTools
     if (options.enableMediaTools !== undefined) this.enableMediaTools = options.enableMediaTools
     if (options.agentName) this.agentName = options.agentName

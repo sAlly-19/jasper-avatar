@@ -116,7 +116,8 @@ export class UIAutomationService {
       title: 'Autorizar clique na interface',
       message: `Permitir um clique em "${elementName}"?`,
       detail: `Janela de destino: ${windowTitle}. Confirme somente se esta aÃ§Ã£o corresponde ao que vocÃª solicitou.`,
-      confirmLabel: 'Executar clique'
+      confirmLabel: 'Executar clique',
+      risk: 'elevated'
     })
     if (!approved) return { success: false, message: 'Clique cancelado pelo usuÃ¡rio.' }
 
@@ -159,7 +160,8 @@ export class UIAutomationService {
       title: 'Autorizar preenchimento de campo',
       message: `Permitir que o Jasper preencha o campo "${elementName}"?`,
       detail: `Janela de destino: ${windowTitle}. O conteÃºdo digitado nÃ£o Ã© exibido nesta confirmaÃ§Ã£o nem no log.`,
-      confirmLabel: 'Preencher campo'
+      confirmLabel: 'Preencher campo',
+      risk: 'elevated'
     })
     if (!approved) return { success: false, message: 'Preenchimento cancelado pelo usuÃ¡rio.' }
 

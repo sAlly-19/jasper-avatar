@@ -5,7 +5,8 @@ import {
   AutonomyNotification,
   type WebhookTriggerResult,
   type LicenseInfo,
-  type LicenseValidationResult
+  type LicenseValidationResult,
+  type UpdateState
 } from '@shared'
 
 export interface ElectronAPI {
@@ -24,6 +25,13 @@ export interface ElectronAPI {
   getConfig: () => Promise<ConfigSummary>
   saveConfig: (config: UpdateConfigPayload) => Promise<{ success: boolean }>
   onAgentNameUpdated: (callback: (name: string) => void) => () => void
+
+  // Application updates
+  getUpdateState: () => Promise<UpdateState>
+  checkForUpdates: () => Promise<UpdateState>
+  downloadUpdate: () => Promise<UpdateState>
+  installUpdate: () => Promise<{ success: boolean; message: string }>
+  onUpdateStatus: (callback: (state: UpdateState) => void) => () => void
 
   // Memory APIs
   getMemory: () => Promise<JasperMemory>

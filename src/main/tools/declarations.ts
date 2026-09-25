@@ -3,6 +3,11 @@
  */
 export const SYSTEM_FUNCTION_DECLARATIONS = [
   {
+    name: 'check_for_updates',
+    description: 'Verifica se existe uma nova versão do aplicativo Jasper disponível para atualização.',
+    parameters: { type: 'OBJECT', properties: {} }
+  },
+  {
     name: 'open_app',
     description: 'Abre qualquer aplicativo, programa local ou executável no computador (ex: calculadora, notepad, spotify, chrome, discord, vscode, etc).',
     parameters: {

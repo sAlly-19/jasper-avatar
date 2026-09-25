@@ -1,20 +1,15 @@
-import { dialog, shell } from 'electron'
-import { getMainWindow } from '../windows/main-window'
+import { shell } from 'electron'
+import { securityBroker } from '../services/security-broker'
 
 async function confirmAndOpen(url: string, detail: string): Promise<boolean> {
-  const win = getMainWindow()
-  if (!win || win.isDestroyed()) return false
-  const result = await dialog.showMessageBox(win, {
-    type: 'question',
+  const approved = await securityBroker.confirmOperation({
     title: 'Abrir aplicativo externo',
     message: 'O Jasper solicitou a abertura de um destino externo.',
     detail,
-    buttons: ['Cancelar', 'Abrir'],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true
+    confirmLabel: 'Abrir',
+    risk: 'common'
   })
-  if (result.response !== 1) return false
+  if (!approved) return false
   await shell.openExternal(url)
   return true
 }

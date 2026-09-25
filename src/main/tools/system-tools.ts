@@ -14,6 +14,7 @@ import { presentationMode } from '../autonomous/presentation-mode'
 import { focusMode } from '../autonomous/focus-mode'
 import { folderOrganizer } from '../autonomous/folder-organizer'
 import { configStore } from '../config/config-store'
+import { updateManager } from '../services/update-manager'
 
 interface AppConfig {
   cmd: string
@@ -32,6 +33,11 @@ const QUICK_APPS: Record<string, AppConfig> = {
 
 export async function executeSystemTool(name: string, args: Record<string, any>): Promise<string> {
   switch (name) {
+    case 'check_for_updates': {
+      const state = await updateManager.check(true)
+      return state.message
+    }
+
     case 'open_app': {
       if (configStore.getConfig().enableProcessManager === false) {
         return 'O módulo de Gerenciamento de Processos está desativado nas configurações do Jasper.'
