@@ -26,6 +26,7 @@ function setAgentTitle(element: HTMLElement, prefix: string, agentName: string):
 
 export class WakeTrainerUI {
   private options: WakeTrainerOptions
+  private busy = false
 
   constructor(options: WakeTrainerOptions) {
     this.options = options
@@ -65,7 +66,7 @@ export class WakeTrainerUI {
     if (countOtherSamples) countOtherSamples.textContent = String(otherCount)
 
     if (btnTrainCustomModel) {
-      const ready = nameCount >= 3 && noiseCount >= 2 && otherCount >= 2
+      const ready = !this.busy && nameCount >= 3 && noiseCount >= 2 && otherCount >= 2
       btnTrainCustomModel.disabled = !ready
       btnTrainCustomModel.style.opacity = ready ? '1' : '0.5'
       btnTrainCustomModel.style.cursor = ready ? 'pointer' : 'not-allowed'
@@ -137,21 +138,26 @@ export class WakeTrainerUI {
     }
 
     const setSampleButtonsDisabled = (disabled: boolean): void => {
+      this.busy = disabled
       if (btnSampleName) btnSampleName.disabled = disabled
       if (btnSampleNoise) btnSampleNoise.disabled = disabled
       if (btnSampleOther) btnSampleOther.disabled = disabled
+      if (btnResetCustomModel) btnResetCustomModel.disabled = disabled
+      this.updateUI()
     }
 
     btnSampleName?.addEventListener('click', async () => {
+      if (this.busy) return
+      setSampleButtonsDisabled(true)
       stopMicIfRecording()
       await this.options.wakeWordManager.pause()
 
       let engine = this.options.wakeWordManager.getEngine()
       if (!engine) {
-        await this.options.wakeWordManager.init()
+        await this.options.wakeWordManager.init(true)
         engine = this.options.wakeWordManager.getEngine()
       }
-      if (!engine) return
+      if (!engine) { setSampleButtonsDisabled(false); return }
 
       const currentAgentName = this.options.getAgentName()
       const targetName = currentAgentName.toLowerCase().trim()
@@ -186,15 +192,17 @@ export class WakeTrainerUI {
     })
 
     btnSampleNoise?.addEventListener('click', async () => {
+      if (this.busy) return
+      setSampleButtonsDisabled(true)
       stopMicIfRecording()
       await this.options.wakeWordManager.pause()
 
       let engine = this.options.wakeWordManager.getEngine()
       if (!engine) {
-        await this.options.wakeWordManager.init()
+        await this.options.wakeWordManager.init(true)
         engine = this.options.wakeWordManager.getEngine()
       }
-      if (!engine) return
+      if (!engine) { setSampleButtonsDisabled(false); return }
 
       try {
         setSampleButtonsDisabled(true)
@@ -226,15 +234,17 @@ export class WakeTrainerUI {
     })
 
     btnSampleOther?.addEventListener('click', async () => {
+      if (this.busy) return
+      setSampleButtonsDisabled(true)
       stopMicIfRecording()
       await this.options.wakeWordManager.pause()
 
       let engine = this.options.wakeWordManager.getEngine()
       if (!engine) {
-        await this.options.wakeWordManager.init()
+        await this.options.wakeWordManager.init(true)
         engine = this.options.wakeWordManager.getEngine()
       }
-      if (!engine) return
+      if (!engine) { setSampleButtonsDisabled(false); return }
 
       try {
         setSampleButtonsDisabled(true)
@@ -266,11 +276,13 @@ export class WakeTrainerUI {
     })
 
     btnTrainCustomModel?.addEventListener('click', async () => {
+      if (this.busy) return
       const engine = this.options.wakeWordManager.getEngine()
       if (!engine) return
       const currentAgentName = this.options.getAgentName()
 
       try {
+        setSampleButtonsDisabled(true)
         btnTrainCustomModel.disabled = true
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.bolt, `Compilando e treinando modelo neural local de 3 classes para "${currentAgentName}"...`)
@@ -284,6 +296,7 @@ export class WakeTrainerUI {
         })
 
         this.options.wakeWordManager.syncRunningState()
+        await this.options.wakeWordManager.resume(this.options.micRecorder.isRecording())
         playWakeChime()
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.sparkle, `Sucesso! O assistente agora responde com alta precisão ao nome "${currentAgentName}". Fala comum será ignorada.`)
@@ -297,23 +310,34 @@ export class WakeTrainerUI {
           trainerFeedback.style.color = '#ff6666'
         }
       } finally {
+        setSampleButtonsDisabled(false)
         this.updateUI()
       }
     })
 
     btnResetCustomModel?.addEventListener('click', async () => {
+      if (this.busy) return
       const engine = this.options.wakeWordManager.getEngine()
       if (!engine) return
       const currentAgentName = this.options.getAgentName()
 
       if (confirm(`Deseja resetar as amostras e a calibração de voz para "${currentAgentName}"?`)) {
-        await engine.clearCustomModel()
-        this.options.wakeWordManager.syncRunningState()
-        if (trainerFeedback) {
-          trainerFeedback.textContent = 'Calibração resetada com sucesso.'
-          trainerFeedback.style.color = 'var(--text-dim)'
+        try {
+          setSampleButtonsDisabled(true)
+          await engine.clearCustomModel()
+          if (trainerFeedback) {
+            trainerFeedback.textContent = 'Calibração resetada com sucesso.'
+            trainerFeedback.style.color = 'var(--text-dim)'
+          }
+        } catch (err: unknown) {
+          if (trainerFeedback) {
+            trainerFeedback.textContent = `Erro ao resetar: ${err instanceof Error ? err.message : String(err)}`
+            trainerFeedback.style.color = '#ff6666'
+          }
+        } finally {
+          setSampleButtonsDisabled(false)
+          this.options.wakeWordManager.syncRunningState()
         }
-        this.updateUI()
       }
     })
   }

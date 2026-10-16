@@ -99,3 +99,19 @@ Documents/Jasper_Sessoes/
 *.bak
 *.orig
 *~
+
+# Screenshots & Automated Captures
+screenshots/
+showcase-screenshots/
+
+# Runtime OCR Models & Dynamic Assets
+*.traineddata
+*.traineddata.gz
+
+# V8 Bytecode Cache
+*.jsc
+
+# Test Results & Artifacts
+test-results/
+playwright-report/
+

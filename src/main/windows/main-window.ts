@@ -47,6 +47,9 @@ export function safeSend(channel: string, ...args: any[]): void {
 export function createMainWindow(): BrowserWindow {
   const isDevelopment = Boolean(process.env['ELECTRON_RENDERER_URL'])
   const developmentUrl = process.env['ELECTRON_RENDERER_URL']
+  const windowIconPath = isDevelopment
+    ? join(app.getAppPath(), 'assets', 'icon.ico')
+    : join(process.resourcesPath, 'icon.ico')
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 860,
@@ -56,6 +59,7 @@ export function createMainWindow(): BrowserWindow {
     frame: false, // Frameless HUD / Jarvis design
     titleBarStyle: 'hidden',
     backgroundColor: '#070b12',
+    icon: windowIconPath,
     webPreferences: {
       preload: fs.existsSync(join(__dirname, '../preload/index.mjs'))
         ? join(__dirname, '../preload/index.mjs')

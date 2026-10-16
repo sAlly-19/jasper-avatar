@@ -6,7 +6,7 @@ import type { JasperConfig, UpdateConfigPayload, ConfigSummary } from '@shared'
 import { getHardwareInfo } from '../services/hwid'
 
 const DEFAULT_LIVE_MODEL = 'gemini-3.8-live'
-const RETIRED_LIVE_MODELS = new Set(['gemini-3.1-flash-live-preview', 'gemini-2.0-flash-live-001'])
+const RETIRED_LIVE_MODELS = new Set(['gemini-2.0-flash-live-001'])
 
 function normalizeLiveModel(model?: string): string {
   const value = model?.trim()

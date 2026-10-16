@@ -27,6 +27,7 @@ jobs:
       - run: npm run verify
       - run: npm run audit:runtime
       - run: npm run package:dir
+      - run: node scripts/test-wake-lifecycle.mjs --packaged
       - run: npm run smoke:packaged
         env:
           JASPER_SMOKE_ROOT: ${{ runner.temp }}

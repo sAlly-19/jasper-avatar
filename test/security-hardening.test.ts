@@ -335,10 +335,8 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
         path.join(process.cwd(), 'src/renderer/audio/speech-commands.ts'),
         'utf-8'
       )
-      // Confirma a correção essencial para o "Erro no treinamento"
-      assert.ok(speechCommandsSrc.includes('tr.secondLastBaseDenseLayer = null'))
-      assert.ok(speechCommandsSrc.includes('tr.model = null'))
-      assert.ok(speechCommandsSrc.includes('tr.model.dispose()'))
+      assert.equal(speechCommandsSrc.includes('tr.secondLastBaseDenseLayer = null'), false)
+      assert.ok(speechCommandsSrc.includes('./speech-model/model.json'))
     })
 
     test('speech-commands implementa modelo neural de 3 classes com amostras negativas e threshold de 0.85', () => {
@@ -431,6 +429,19 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
         'utf-8'
       )
       assert.ok(liveClientSrc.includes('gemini-3.8-live'))
+    })
+
+    test('preserva modelos Live suportados ao salvar a configuracao', () => {
+      const previous = configStore.getConfig().model
+      try {
+        for (const model of ['gemini-3.8-live', 'gemini-3.8-live-extended-thinking',
+          'gemini-3.1-flash-live-preview', 'gemini-2.5-flash-native-audio-preview-12-2025']) {
+          assert.equal(configStore.updateConfig({ model }).model, model)
+        }
+        assert.equal(configStore.updateConfig({ model: 'gemini-2.0-flash-live-001' }).model, 'gemini-3.8-live')
+      } finally {
+        configStore.updateConfig({ model: previous })
+      }
     })
   })
 

@@ -14,6 +14,7 @@ export class SpeechCommandsWakeWord {
   private isCustomModelTrained = false
   private isLegacyTwoClassModel = false
   private isListening = false
+  private baseLoading: Promise<void> | null = null
   private options: Required<SpeechWakeWordOptions>
 
   public onDetect: ((word: string, score: number) => void) | null = null
@@ -47,6 +48,50 @@ export class SpeechCommandsWakeWord {
     return this.recognizer.createTransfer(modelKey)
   }
 
+  private async ensureBaseLoaded(): Promise<void> {
+    if (!this.baseLoading) {
+      this.baseLoading = (async () => {
+        await tf.ready()
+        let base = this.recognizer
+        if (!base) {
+          // Load explicitly through fetch: the library URL dispatcher only
+          // recognizes HTTP/file schemes, while packaged renderers use app://.
+          const metadataResponse = await fetch(new URL('./speech-model/metadata.json', window.location.href).href)
+          if (!metadataResponse.ok) throw new Error('Falha ao carregar metadados do modelo de voz local.')
+          const metadata = await metadataResponse.json()
+          const artifacts = await tf.io.browserHTTPRequest(
+            new URL('./speech-model/model.json', window.location.href).href
+          ).load!()
+          base = speechCommands.create('BROWSER_FFT', undefined, artifacts, metadata)
+        }
+        await base.ensureModelLoaded()
+        // Publish only a fully loaded recognizer, so failed loads can be retried.
+        this.recognizer = base
+      })().finally(() => { this.baseLoading = null })
+    }
+    await this.baseLoading
+  }
+
+  private releaseModels(): void {
+    // Transfer/base containers share weights without independent ownership in
+    // Speech Commands 0.5. Dispose each weight once, then abandon both graphs.
+    const models = new Set<tf.LayersModel>()
+    for (const recognizer of [this.transferRecognizer, this.recognizer]) {
+      const internal = recognizer as unknown as {
+        model?: tf.LayersModel; modelWithEmbeddingOutput?: tf.LayersModel
+      } | null
+      for (const model of [internal?.modelWithEmbeddingOutput, internal?.model]) {
+        if (model) models.add(model)
+      }
+    }
+    this.transferRecognizer = null
+    this.recognizer = null
+    const weights = new Set([...models].flatMap((model) => model.weights))
+    const optimizers = new Set([...models].map((model) => model.optimizer).filter(Boolean))
+    for (const weight of weights) weight.dispose()
+    for (const optimizer of optimizers) optimizer.dispose()
+  }
+
   public async load(agentName?: string): Promise<void> {
     if (agentName) {
       this.options.agentName = agentName.trim()
@@ -55,14 +100,7 @@ export class SpeechCommandsWakeWord {
 
     console.log('[SpeechCommands] Inicializando motor.')
 
-    // Initialize TensorFlow.js backend (WebGL or CPU)
-    await tf.ready()
-
-    if (!this.recognizer) {
-      this.recognizer = speechCommands.create('BROWSER_FFT')
-      await this.recognizer.ensureModelLoaded()
-      console.log('[SpeechCommands] Modelo base TensorFlow.js pronto.')
-    }
+    await this.ensureBaseLoaded()
 
     // Check if custom transfer-learned model exists in IndexedDB for this agent
     const modelKey = this.getModelName()
@@ -93,6 +131,14 @@ export class SpeechCommandsWakeWord {
     return this.isCustomModelTrained
   }
 
+  public async dispose(): Promise<void> {
+    await this.baseLoading
+    await this.stop()
+    this.releaseModels()
+    this.isCustomModelTrained = false
+    this.isLegacyTwoClassModel = false
+  }
+
   public isLegacyModel(): boolean {
     return this.isLegacyTwoClassModel
   }
@@ -108,9 +154,7 @@ export class SpeechCommandsWakeWord {
   }
 
   public async start(): Promise<void> {
-    if (!this.recognizer) {
-      await this.load()
-    }
+    await this.ensureBaseLoaded()
     if (this.isListening) return
 
     const activeRecognizer = (this.isCustomModelTrained && this.transferRecognizer)
@@ -245,9 +289,7 @@ export class SpeechCommandsWakeWord {
     const wasListening = this.isListening
     await this.stop()
 
-    if (!this.recognizer) {
-      await this.load()
-    }
+    await this.ensureBaseLoaded()
 
     const modelKey = this.getModelName()
     this.transferRecognizer = this.getOrCreateTransferRecognizer(modelKey)
@@ -282,25 +324,18 @@ export class SpeechCommandsWakeWord {
       )
     }
 
-    const wasListening = this.isListening
     await this.stop()
     await new Promise((resolve) => setTimeout(resolve, 150))
 
     console.log('[SpeechCommands] Treinando modelo neural com 3 classes.')
 
-    // Reset previous transfer model instances to avoid TypeError: Cannot set property 'trainable' of undefined
-    const tr = this.transferRecognizer as any
-    if (tr) {
-      if (tr.model) {
-        try {
-          tr.model.dispose()
-        } catch (e) {
-          console.warn('[SpeechCommands] Aviso ao descartar modelo anterior:', e)
-        }
-        tr.model = null
-      }
-      tr.secondLastBaseDenseLayer = null
-    }
+    const examples = this.transferRecognizer.serializeExamples()
+    this.isCustomModelTrained = false
+    this.isLegacyTwoClassModel = false
+    this.releaseModels()
+    await this.ensureBaseLoaded()
+    this.transferRecognizer = this.getOrCreateTransferRecognizer(this.getModelName())
+    this.transferRecognizer.loadExamples(examples)
 
     await this.transferRecognizer.train({
       epochs: 25,
@@ -316,29 +351,15 @@ export class SpeechCommandsWakeWord {
     this.isLegacyTwoClassModel = false
     console.log('[SpeechCommands] Modelo personalizado salvo no IndexedDB.')
 
-    await this.start()
   }
 
   public async clearCustomModel(): Promise<void> {
-    const wasListening = this.isListening
     await this.stop()
 
     const modelKey = this.getModelName()
-    if (this.transferRecognizer) {
-      try {
-        this.transferRecognizer.clearExamples()
-      } catch {}
-      try {
-        const tr = this.transferRecognizer as any
-        if (tr.model) {
-          tr.model.dispose()
-          tr.model = null
-        }
-        tr.secondLastBaseDenseLayer = null
-      } catch {}
-    }
     this.isCustomModelTrained = false
     this.isLegacyTwoClassModel = false
+    this.releaseModels()
 
     try {
       await speechCommands.deleteSavedTransferModel(modelKey)
@@ -346,8 +367,7 @@ export class SpeechCommandsWakeWord {
 
     console.log('[SpeechCommands] Modelo personalizado resetado.')
 
-    if (wasListening && this.isCustomModelTrained) {
-      await this.start()
-    }
+    await this.ensureBaseLoaded()
+    this.transferRecognizer = this.getOrCreateTransferRecognizer(modelKey)
   }
 }

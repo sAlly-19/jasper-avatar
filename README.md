@@ -74,6 +74,16 @@ npm run audit:runtime
 
 `npm run verify` executa typecheck, testes e build. A suite cobre os modulos reais com mocks apenas das fronteiras Electron e de rede quando necessario.
 
+`npm run test:wake` testa o TensorFlow real em Electron com microfone simulado,
+rede externa bloqueada e a CSP de producao. Cobre falha de carregamento,
+gravacao, treino, recarga do modelo salvo, reset, novo treino e liberacao de memoria.
+Depois de empacotar, `node scripts/test-wake-lifecycle.mjs --packaged` repete
+o teste lendo os assets de `release/win-unpacked/resources/app.asar`.
+
+O modelo base de voz acompanha o aplicativo em `public/speech-model` e funciona
+offline. Os scripts de desenvolvimento e build verificam seus checksums;
+somente arquivos ausentes ou corrompidos precisam ser baixados durante o build.
+
 Para validar o aplicativo empacotado:
 
 ```powershell

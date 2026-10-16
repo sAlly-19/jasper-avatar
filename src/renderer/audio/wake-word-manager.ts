@@ -51,10 +51,10 @@ export class WakeWordManager {
     }
   }
 
-  public async init(): Promise<void> {
+  public async init(forTraining = false): Promise<void> {
     await this.stopAll()
 
-    if (!this.options.getIsWakeWordEnabled()) {
+    if (!forTraining && !this.options.getIsWakeWordEnabled()) {
       console.log('[WakeWord] Detecção de ativação por voz desativada pelo usuário.')
       this.options.onTrainerUIUpdate?.()
       return
@@ -88,7 +88,7 @@ export class WakeWordManager {
         console.warn('[WakeWord] Erro no Speech Commands TensorFlow:', err)
       }
 
-      if (this.engine.isCustomModelActive()) {
+      if (!forTraining && this.engine.isCustomModelActive()) {
         await this.engine.start()
         this.isRunning = true
         console.log('[WakeWord] TensorFlow.js Speech Commands ativo com 3 classes.')
@@ -111,7 +111,7 @@ export class WakeWordManager {
   private async stopAll(): Promise<void> {
     if (this.engine) {
       try {
-        await this.engine.stop()
+        await this.engine.dispose()
       } catch {}
       this.engine = null
     }

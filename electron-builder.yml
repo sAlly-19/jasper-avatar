@@ -16,8 +16,11 @@ extraResources:
     to: scripts
     filter:
       - "*.ps1"
+  - from: assets/icon.ico
+    to: icon.ico
 
 win:
+  icon: assets/icon.ico
   target:
     - target: nsis
       arch:
@@ -27,6 +30,9 @@ win:
         - x64
 
 nsis:
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
