@@ -16,15 +16,22 @@ export function getMemoryFilePath(): string {
   return join(app.getPath('userData'), 'jasper-memory.json')
 }
 
+export function sanitizeFact(input: string): string {
+  // Strip all HTML tags and escape sensitive characters
+  const stripped = input.replace(/<[^>]*>/g, '')
+  return stripped
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .trim()
+}
+
 export function loadMemory(): JasperMemory {
   try {
     const memPath = getMemoryFilePath()
     if (fs.existsSync(memPath)) {
-      if (fs.statSync(memPath).mtimeMs < Date.now() - MEMORY_RETENTION_MS) {
-        const emptyMemory = freshDefaultMemory()
-        saveMemory(emptyMemory)
-        return emptyMemory
-      }
       const data = readJsonFileSync<JasperMemory>(memPath)
       const allFacts: MemoryItem[] = Array.isArray(data.facts) ? data.facts : []
       const cutoff = Date.now() - MEMORY_RETENTION_MS
@@ -32,7 +39,7 @@ export function loadMemory(): JasperMemory {
         const createdAt = Date.parse(item?.createdAt)
         return Number.isFinite(createdAt) && createdAt >= cutoff
       })
-      const memory = {
+      const memory: JasperMemory = {
         userName: data.userName || '',
         userPreferences: Array.isArray(data.userPreferences) ? data.userPreferences : [],
         facts: retainedFacts
@@ -58,8 +65,8 @@ export function saveMemory(memory: JasperMemory): void {
 
 export function addFact(fact: string): string {
   const mem = loadMemory()
-  const cleanFact = fact.trim()
-  if (!cleanFact) return 'Fato vazio.'
+  const cleanFact = sanitizeFact(fact)
+  if (!cleanFact) return 'Fato inválido ou vazio após sanitização.'
 
   // Prevent exact duplicates
   if (!mem.facts.some((f) => f.fact.toLowerCase() === cleanFact.toLowerCase())) {

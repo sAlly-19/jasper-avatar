@@ -4,6 +4,7 @@ import { nativeImage } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import { reportGenerator } from './report-generator'
+import { securityBroker } from '../services/security-broker'
 
 export interface QrGenerationResult {
   success: boolean
@@ -95,7 +96,11 @@ export class QrService {
    * Reads and decodes a QR Code from an image file
    */
   public async readQrCode(imagePath: string): Promise<{ success: boolean; data?: string; message: string }> {
-    const cleanPath = path.resolve(imagePath.trim())
+    const userPathCheck = securityBroker.resolveUserPath(imagePath)
+    if (!userPathCheck.allowed || !userPathCheck.resolvedPath) {
+      return { success: false, message: userPathCheck.reason || 'Caminho de imagem não autorizado.' }
+    }
+    const cleanPath = userPathCheck.resolvedPath
 
     try {
       const stat = await fs.stat(cleanPath)

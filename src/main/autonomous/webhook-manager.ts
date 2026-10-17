@@ -34,8 +34,39 @@ export function isPrivateOrLoopbackIP(ip: string): boolean {
     return true
   }
 
+  // IPv6 mapped IPv4 address (e.g. ::ffff:127.0.0.1 or ::ffff:7f00:1)
   if (cleanIp.startsWith('::ffff:')) {
-    return isPrivateOrLoopbackIP(cleanIp.slice('::ffff:'.length))
+    const rem = cleanIp.slice('::ffff:'.length)
+    if (rem.includes(':')) {
+      const parts = rem.split(':')
+      if (parts.length === 2) {
+        const high = parseInt(parts[0], 16)
+        const low = parseInt(parts[1], 16)
+        if (!isNaN(high) && !isNaN(low)) {
+          const ipStr = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`
+          return isPrivateOrLoopbackIP(ipStr)
+        }
+      }
+    }
+    return isPrivateOrLoopbackIP(rem)
+  }
+
+  // IPv4-compatible IPv6 addresses (::/96)
+  if (cleanIp.startsWith('::') && !cleanIp.startsWith('::ffff:')) {
+    const rem = cleanIp.slice(2)
+    if (rem.includes('.')) {
+      return isPrivateOrLoopbackIP(rem)
+    } else if (rem.includes(':')) {
+      const parts = rem.split(':')
+      if (parts.length === 2) {
+        const high = parseInt(parts[0], 16)
+        const low = parseInt(parts[1], 16)
+        if (!isNaN(high) && !isNaN(low)) {
+          const ipStr = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`
+          return isPrivateOrLoopbackIP(ipStr)
+        }
+      }
+    }
   }
 
   // Cloud metadata services
@@ -63,6 +94,12 @@ export function isPrivateOrLoopbackIP(ip: string): boolean {
     if (ipParts[0] === 127) return true
     // 100.64.0.0/10 (CGNAT)
     if (ipParts[0] === 100 && ipParts[1] >= 64 && ipParts[1] <= 127) return true
+    // 198.18.0.0/15 (Benchmarking)
+    if (ipParts[0] === 198 && (ipParts[1] === 18 || ipParts[1] === 19)) return true
+    // 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 (Documentation / TEST-NET)
+    if (ipParts[0] === 192 && ipParts[1] === 0 && ipParts[2] === 2) return true
+    if (ipParts[0] === 198 && ipParts[1] === 51 && ipParts[2] === 100) return true
+    if (ipParts[0] === 203 && ipParts[1] === 0 && ipParts[2] === 113) return true
     // 224.0.0.0/4 (Multicast)
     if (ipParts[0] >= 224) return true
   }
@@ -71,8 +108,8 @@ export function isPrivateOrLoopbackIP(ip: string): boolean {
 }
 
 export function isPrivateOrLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().trim()
-  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+  const host = hostname.toLowerCase().trim().replace(/^\[|\]$/g, '')
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0' || host === '::') {
     return true
   }
 

@@ -54,6 +54,7 @@ export interface AutonomyNotification {
   message: string
   timestamp: number
   data?: any
+  silentAudio?: boolean
 }
 
 export interface KnowledgeNode {

@@ -99,8 +99,8 @@ export class PresentationModeService {
     if (!this.isEnabled || this.isManualActive) return
 
     try {
-      // 1. Check active window title
-      const win = await windowTracker.getActiveWindow()
+      // 1. Check active window title from cache
+      const win = windowTracker.getCurrentCachedWindow()
       const titleLower = (win.windowTitle || '').toLowerCase()
       const procLower = (win.processName || '').toLowerCase()
 

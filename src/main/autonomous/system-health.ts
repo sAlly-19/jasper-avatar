@@ -45,6 +45,7 @@ export class SystemHealthService {
   private currentHealth: SystemHealthData
   private onHealthWarning?: (notification: AutonomyNotification) => void
   private highRamAlertSent: boolean = false
+  private diskCache: { diskFreeGb?: number; diskTotalGb?: number; timestamp: number } = { timestamp: 0 }
   private staticHardwareCache: {
     cpuBrand?: string
     cpuCores?: number
@@ -164,17 +165,24 @@ export class SystemHealthService {
     const base = this.getBasicMetrics(cpu)
 
     try {
-      const [disks, battery] = await Promise.all([
-        si.fsSize().catch(() => []),
-        si.battery().catch(() => null)
-      ])
-
-      const primaryDisk = disks.find((d) => d.mount.toLowerCase().startsWith('c:')) || disks[0]
-      if (primaryDisk) {
-        base.diskFreeGb = Math.round(primaryDisk.available / (1024 ** 3))
-        base.diskTotalGb = Math.round(primaryDisk.size / (1024 ** 3))
+      const now = Date.now()
+      // Cache fsSize for 5 minutes (300,000 ms) to avoid expensive WMI queries every 8 seconds
+      if (now - this.diskCache.timestamp > 300_000 || !this.diskCache.diskTotalGb) {
+        const disks = await si.fsSize().catch(() => [])
+        const primaryDisk = disks.find((d) => d.mount.toLowerCase().startsWith('c:')) || disks[0]
+        if (primaryDisk) {
+          this.diskCache = {
+            diskFreeGb: Math.round(primaryDisk.available / (1024 ** 3)),
+            diskTotalGb: Math.round(primaryDisk.size / (1024 ** 3)),
+            timestamp: now
+          }
+        }
       }
 
+      base.diskFreeGb = this.diskCache.diskFreeGb
+      base.diskTotalGb = this.diskCache.diskTotalGb
+
+      const battery = await si.battery().catch(() => null)
       if (battery && battery.hasBattery) {
         base.batteryPercent = battery.percent
         base.isCharging = battery.isCharging

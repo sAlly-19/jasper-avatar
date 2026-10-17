@@ -1,5 +1,5 @@
 import { app, BrowserWindow, net, protocol } from 'electron'
-import { relative, resolve } from 'path'
+import { isAbsolute, relative, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { IPC_CHANNELS } from '@shared'
 import { configStore } from './config/config-store'
@@ -28,7 +28,7 @@ function registerAppProtocol(): void {
       const requestedPath = decodeURIComponent(new URL(request.url).pathname).replace(/^\/+/, '') || 'index.html'
       const targetPath = resolve(rendererRoot, requestedPath)
       const relativePath = relative(rendererRoot, targetPath)
-      if (relativePath.startsWith('..') || relativePath.includes('\0')) {
+      if (relativePath.startsWith('..') || relativePath.includes('\0') || isAbsolute(relativePath)) {
         return new Response('Forbidden', { status: 403 })
       }
       return net.fetch(pathToFileURL(targetPath).toString())
@@ -83,6 +83,9 @@ app.whenReady().then(() => {
     try {
       geminiClient?.disconnect()
     } catch {}
+    try {
+      autonomyCoordinator.stopAll()
+    } catch {}
     safeSend(IPC_CHANNELS.LICENSE_REVOKED, {
       status: result.error || 'disabled',
       message: result.message || 'Sua licença foi desativada ou revogada pelo administrador.'
@@ -94,18 +97,29 @@ app.whenReady().then(() => {
   registerIpcHandlers(() => geminiClient)
   createMainWindow()
   updateManager.initialize()
-  autonomyCoordinator.init()
+
+  if (licenseManager.getLicenseInfo().isLicensed) {
+    autonomyCoordinator.init()
+  }
 
   // Verificação inicial do lease no boot da aplicação.
   setTimeout(() => {
-    licenseManager.checkAccess24h().catch((err) => {
+    licenseManager.checkAccess24h().then((res) => {
+      if (res.valid) {
+        autonomyCoordinator.init()
+      }
+    }).catch((err) => {
       console.warn('[Main] Erro na verificação inicial de licença:', err.message)
     })
   }, 3000)
 
   // Verificação periódica online; o lease assinado limita o modo offline a 72 horas.
   licenseCheckTimer = setInterval(() => {
-    licenseManager.checkAccess24h().catch((err) => {
+    licenseManager.checkAccess24h().then((res) => {
+      if (res.valid) {
+        autonomyCoordinator.init()
+      }
+    }).catch((err) => {
       console.warn('[Main] Erro no check periódico de licença:', err.message)
     })
   }, 60 * 60 * 1000)

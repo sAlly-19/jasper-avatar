@@ -20,6 +20,7 @@ export class MicRecorder {
   // Voice Activity & 30s Inactivity Tracking
   private hasSpoken = false
   private speechFramesCount = 0
+  private silenceFramesCount = 0
   private lastActivityTimestamp = 0
 
   // VAD Tuning Parameters
@@ -168,15 +169,20 @@ export class MicRecorder {
     // 2. Filter ambient noise and detect sustained human speech
     if (rms >= MicRecorder.SPEECH_RMS_THRESHOLD) {
       this.speechFramesCount++
+      this.silenceFramesCount = 0
       if (this.speechFramesCount >= MicRecorder.MIN_SPEECH_CHUNKS) {
         this.hasSpoken = true
         // Real human speech confirmed: reset 30s inactivity timeout
         this.lastActivityTimestamp = now
       }
     } else {
-      // Ambient noise or brief transient: decrement speech frame count
-      if (this.speechFramesCount > 0 && !this.hasSpoken) {
+      // Ambient noise or silence: decrement speech frames and increment silence frames
+      this.silenceFramesCount++
+      if (this.speechFramesCount > 0) {
         this.speechFramesCount--
+      }
+      if (this.silenceFramesCount >= MicRecorder.MIN_SPEECH_CHUNKS * 2) {
+        this.hasSpoken = false
       }
     }
 
@@ -197,6 +203,7 @@ export class MicRecorder {
     this.bufferOffset = 0
     this.hasSpoken = false
     this.speechFramesCount = 0
+    this.silenceFramesCount = 0
     this.lastActivityTimestamp = Date.now()
 
     try {
@@ -216,6 +223,7 @@ export class MicRecorder {
     this.flushRemainingBuffer()
     this.hasSpoken = false
     this.speechFramesCount = 0
+    this.silenceFramesCount = 0
   }
 
   public async resumeOrStart(callMode = true): Promise<void> {

@@ -25,7 +25,7 @@ export class HeadlessBrowser {
 
   private attachRequestGuard(win: BrowserWindow): void {
     win.webContents.session.webRequest.onBeforeRequest(
-      { urls: ['http://*/*', 'https://*/*'] },
+      { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
       (details, callback) => {
         this.validateRemoteUrl(details.url)
           .then((result) => callback({ cancel: !result.allowed }))

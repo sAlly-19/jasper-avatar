@@ -15,6 +15,7 @@ import { focusMode } from '../autonomous/focus-mode'
 import { folderOrganizer } from '../autonomous/folder-organizer'
 import { configStore } from '../config/config-store'
 import { updateManager } from '../services/update-manager'
+import { semanticMemory } from '../autonomous/semantic-memory'
 
 interface AppConfig {
   cmd: string
@@ -268,6 +269,7 @@ ${diskStr}
     case 'remember_fact': {
       const fact = (args.fact || '').trim()
       if (!fact) return 'Nenhum fato fornecido para memorização.'
+      semanticMemory.addMemory(fact, 'fact')
       return addFact(fact)
     }
 

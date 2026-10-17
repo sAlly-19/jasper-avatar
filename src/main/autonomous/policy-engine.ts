@@ -58,8 +58,12 @@ export class ToolPolicyEngine {
    * Validates Git operations.
    */
   public validateGitCommit(message: string, specificFiles?: string[]): PolicyCheckResult {
-    const lower = message.toLowerCase()
-    if (lower.includes('--force') || lower.includes('-f') || lower.includes('--amend')) {
+    const trimmed = (message || '').trim()
+    if (!trimmed) {
+      return { allowed: false, riskLevel: 'HIGH', reason: 'Mensagem de commit vazia.' }
+    }
+
+    if (/^--?(force|amend)/i.test(trimmed) || /(^|\s)(--force|-f|--amend)(\s|$)/i.test(trimmed)) {
       return {
         allowed: false,
         riskLevel: 'HIGH',

@@ -423,22 +423,21 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.ok(audioPlayerSrc.includes('this.onPlaybackEnded?.()'))
     })
 
-    test('Gemini Live client utiliza o modelo Live atual configurado', () => {
+    test('Gemini Live client utiliza o modelo Live oficial gemini-2.0-flash-live-001', () => {
       const liveClientSrc = fs.readFileSync(
         path.join(process.cwd(), 'src/main/gemini-live.ts'),
         'utf-8'
       )
-      assert.ok(liveClientSrc.includes('gemini-3.8-live'))
+      assert.ok(liveClientSrc.includes('gemini-2.0-flash-live-001'))
     })
 
     test('preserva modelos Live suportados ao salvar a configuracao', () => {
       const previous = configStore.getConfig().model
       try {
-        for (const model of ['gemini-3.8-live', 'gemini-3.8-live-extended-thinking',
-          'gemini-3.1-flash-live-preview', 'gemini-2.5-flash-native-audio-preview-12-2025']) {
+        for (const model of ['gemini-2.0-flash-live-001', 'gemini-2.5-flash-native-audio-preview-12-2025']) {
           assert.equal(configStore.updateConfig({ model }).model, model)
         }
-        assert.equal(configStore.updateConfig({ model: 'gemini-2.0-flash-live-001' }).model, 'gemini-3.8-live')
+        assert.equal(configStore.updateConfig({ model: 'gemini-2.0-flash-exp' }).model, 'gemini-2.0-flash-live-001')
       } finally {
         configStore.updateConfig({ model: previous })
       }

@@ -5,10 +5,10 @@ import { getMainWindow } from '../windows/main-window'
 import { configStore } from '../config/config-store'
 import type { ConfirmationMode } from '@shared'
 
-export type ConfirmationRisk = 'common' | 'elevated' | 'mandatory'
+export type ConfirmationRisk = 'common' | 'elevated' | 'mandatory' | 'critical'
 
 export function requiresConfirmation(mode: ConfirmationMode, risk: ConfirmationRisk): boolean {
-  if (risk === 'mandatory') return true
+  if (risk === 'mandatory' || risk === 'critical') return true
   if (mode === 'all') return false
   if (mode === 'common' && risk === 'common') return false
   return true

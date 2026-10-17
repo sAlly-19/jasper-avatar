@@ -1,4 +1,5 @@
 import crypto, { webcrypto } from 'crypto'
+import { app } from 'electron'
 import { configStore } from '../config/config-store'
 import { getHardwareInfo } from './hwid'
 import type { LicenseValidationResult, LicenseInfo } from '@shared'
@@ -21,15 +22,29 @@ interface ApiErrorBody {
 
 export const DEFAULT_LICENSE_API_URL = 'https://jasper-api-production.jasper-avatar.workers.dev'
 
+export const PINNED_PRODUCTION_PUBLIC_JWK: JsonWebKey = {
+  kty: 'OKP',
+  crv: 'Ed25519',
+  x: '6m25tI8dGf9mP3H7kR1yV5uW9xZ8bA2cD4eF6gH8jK0'
+}
+
 function decodeJsonSegment(segment: string): Record<string, any> {
   return JSON.parse(Buffer.from(segment, 'base64url').toString('utf-8'))
 }
 
 export class LicenseManager {
   private revocationListeners: Array<(result: LicenseValidationResult) => void> = []
-  private apiBaseUrl = (process.env.JASPER_API_URL || DEFAULT_LICENSE_API_URL).replace(/\/+$/, '')
+  private apiBaseUrl = (
+    typeof app !== 'undefined' && app.isPackaged
+      ? DEFAULT_LICENSE_API_URL
+      : (process.env.JASPER_API_URL || DEFAULT_LICENSE_API_URL)
+  ).replace(/\/+$/, '')
 
   public setCustomBaseUrl(url: string | null): void {
+    if (typeof app !== 'undefined' && app.isPackaged) {
+      console.warn('[LicenseManager] [SEC-01] Custom license URL is prohibited in packaged production mode.')
+      return
+    }
     this.apiBaseUrl = (url || '').replace(/\/+$/, '')
   }
 
@@ -83,7 +98,16 @@ export class LicenseManager {
       if (!Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)) return false
       if (payload.iat > nowSeconds + 300 || payload.exp <= nowSeconds || payload.exp - payload.iat > 259_200) return false
 
-      const jwk = JSON.parse(publicJwkJson) as JsonWebKey
+      let jwk: JsonWebKey
+      if (typeof app !== 'undefined' && app.isPackaged) {
+        jwk = PINNED_PRODUCTION_PUBLIC_JWK
+      } else {
+        try {
+          jwk = publicJwkJson ? (JSON.parse(publicJwkJson) as JsonWebKey) : PINNED_PRODUCTION_PUBLIC_JWK
+        } catch {
+          jwk = PINNED_PRODUCTION_PUBLIC_JWK
+        }
+      }
       if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519') return false
       const key = await webcrypto.subtle.importKey('jwk', jwk, { name: 'Ed25519' }, false, ['verify'])
       return webcrypto.subtle.verify(
@@ -194,8 +218,9 @@ export class LicenseManager {
 
   private async offlineLeaseResult(): Promise<LicenseValidationResult | null> {
     const cfg = configStore.getConfig()
-    if (!cfg.licenseLeaseToken || !cfg.licensePublicJwk || !cfg.licenseInstallationId) return null
-    if (!await this.verifyLease(cfg.licenseLeaseToken, cfg.licensePublicJwk, cfg.licenseInstallationId)) return null
+    if (!cfg.licenseLeaseToken || !cfg.licenseInstallationId) return null
+    const jwkToUse = cfg.licensePublicJwk || JSON.stringify(PINNED_PRODUCTION_PUBLIC_JWK)
+    if (!await this.verifyLease(cfg.licenseLeaseToken, jwkToUse, cfg.licenseInstallationId)) return null
     return {
       valid: true,
       status: 'ACTIVE',
@@ -242,7 +267,15 @@ export class LicenseManager {
       this.notifyRevoked(result)
       return result
     }
-    if (!force && cfg.licenseLastCheckedAt && Date.now() - Date.parse(cfg.licenseLastCheckedAt) < 24 * 60 * 60 * 1000) {
+    const lastChecked = cfg.licenseLastCheckedAt ? Date.parse(cfg.licenseLastCheckedAt) : NaN
+    const now = Date.now()
+
+    if (
+      !force &&
+      !isNaN(lastChecked) &&
+      lastChecked <= now &&
+      now - lastChecked < 24 * 60 * 60 * 1000
+    ) {
       const offline = await this.offlineLeaseResult()
       if (offline) return offline
     }

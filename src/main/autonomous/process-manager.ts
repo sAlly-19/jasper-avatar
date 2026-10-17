@@ -39,8 +39,11 @@ const PROTECTED_PROCESSES = new Set([
 
 const BLOCKED_INTERPRETERS = new Set([
   'cmd', 'powershell', 'pwsh', 'wscript', 'cscript', 'mshta', 'rundll32', 'regsvr32',
-  'wt', 'terminal', 'windows terminal'
+  'wt', 'terminal', 'windows terminal', 'python', 'pythonw', 'node', 'bash', 'wsl',
+  'git', 'certutil', 'bitsadmin', 'msiexec', 'conhost', 'forfiles', 'pcalua'
 ])
+
+const DANGEROUS_EXTENSIONS = /\.(bat|cmd|vbs|js|ps1|hta|msi|reg|wsf|scr|pif)$/i
 
 function isBlockedInterpreter(target: string): boolean {
   const fileName = target.split(/[\\/]/).pop()?.replace(/\.(exe|com)$/i, '').trim().toLowerCase() || ''
@@ -101,7 +104,7 @@ export class ProcessManagerService {
   }
 
   /**
-   * Launch any program, app or file
+   * Launch any program, app or file with strict containment and validation
    */
   public async launchProgram(target: string, args: string[] = []): Promise<{ success: boolean; message: string }> {
     if (!target || !target.trim()) {
@@ -114,37 +117,30 @@ export class ProcessManagerService {
       return { success: false, message: 'Interpretadores de comando nao podem ser abertos pelo assistente.' }
     }
 
-    // 1. Security validation: prevent command chaining / malicious injection
-    if (/[;&|`$><\r\n\0]/.test(trimmed) || trimmed.length > 512) {
+    // 1. Security validation: prevent command chaining, UNC paths, and dangerous extensions
+    if (/[;&|`$><\r\n\0]/.test(trimmed) || trimmed.length > 512 || trimmed.startsWith('\\\\')) {
       return { success: false, message: 'Entrada contém caracteres inválidos de injeção de comando.' }
+    }
+
+    if (DANGEROUS_EXTENSIONS.test(trimmed)) {
+      return { success: false, message: 'Execução de scripts (.bat, .cmd, .vbs, .ps1, etc.) é bloqueada por segurança.' }
     }
 
     if (args.some((arg) => typeof arg !== 'string' || arg.length > 2048 || /[\r\n\0]/.test(arg))) {
       return { success: false, message: 'Um ou mais argumentos do programa são inválidos.' }
     }
 
-    const approved = await securityBroker.confirmOperation({
-      title: 'Autorizar abertura de programa',
-      message: `Permitir que o Jasper abra "${trimmed.slice(0, 160)}"?`,
-      detail: 'O programa será iniciado como um processo separado, sem shell e sem comandos concatenados.',
-      confirmLabel: 'Abrir programa',
-      risk: 'common'
-    })
-    if (!approved) return { success: false, message: 'Abertura de programa cancelada pelo usuário.' }
-
-    // 2. Check if target is a known app ID or needs fuzzy search
+    // 2. Resolve launchTarget BEFORE asking for user confirmation (avoids UI TOCTOU)
     let launchTarget = trimmed
     let isAppId = false
 
-    // If it looks like a UWP App ID (e.g. Contains '!' or '_')
     if (trimmed.includes('!') || trimmed.includes('_8wekyb3d8bbwe')) {
       isAppId = true
-    } else if (!trimmed.toLowerCase().endsWith('.exe') && !trimmed.includes('\\') && !trimmed.includes('/')) {
-      // Try searching for the exact app in StartApps
+    } else if (!trimmed.toLowerCase().endsWith('.exe') && !trimmed.toLowerCase().endsWith('.com') && !trimmed.includes('\\') && !trimmed.includes('/')) {
       const matches = await this.searchPrograms(trimmed, 3)
       if (matches.length > 0) {
         const bestMatch = matches[0]
-        if (bestMatch.appId.includes('!')) {
+        if (bestMatch.appId && bestMatch.appId.includes('!')) {
           launchTarget = bestMatch.appId
           isAppId = true
         } else if (bestMatch.path) {
@@ -157,21 +153,57 @@ export class ProcessManagerService {
       return { success: false, message: 'Interpretadores de comando nao podem ser abertos pelo assistente.' }
     }
 
+    if (DANGEROUS_EXTENSIONS.test(launchTarget) || launchTarget.startsWith('\\\\')) {
+      return { success: false, message: 'O arquivo resolvido possui extensão de script perigosa e foi bloqueado.' }
+    }
+
+    const isLnk = /\.lnk$/i.test(launchTarget)
+    const isDirectExecutable = /\.(exe|com)$/i.test(launchTarget)
+
+    if (!isAppId && !isDirectExecutable && !isLnk) {
+      // If it's a bare command name (e.g. 'calc', 'notepad') without path, check if it's safe
+      if (!launchTarget.includes('\\') && !launchTarget.includes('/')) {
+        launchTarget = `${launchTarget}.exe`
+      } else {
+        return { success: false, message: 'Execução permitida apenas para arquivos .exe ou atalhos do Menu Iniciar.' }
+      }
+    }
+
+    if (isLnk && !/Microsoft\\Windows\\Start Menu\\Programs/i.test(launchTarget)) {
+      return { success: false, message: 'Atalhos .lnk só podem ser executados se estiverem no Menu Iniciar oficial.' }
+    }
+
+    const isStandardPath = /^(C:\\Program Files|C:\\Program Files \(x86\)|C:\\Windows\\System32)/i.test(launchTarget)
+    const requiresCriticalRisk = args.length > 0 || (!isStandardPath && !isAppId)
+
+    // 3. User confirmation showing resolved path and appropriate risk escalation
+    const approved = await securityBroker.confirmOperation({
+      title: 'Autorizar abertura de programa',
+      message: `Permitir que o Jasper execute "${launchTarget.slice(0, 160)}"?`,
+      detail: `Alvo resolvido: ${launchTarget}${args.length ? `\nArgumentos: ${args.join(' ')}` : ''}`,
+      confirmLabel: 'Executar programa',
+      risk: requiresCriticalRisk ? 'critical' : 'common'
+    })
+    if (!approved) return { success: false, message: 'Abertura de programa cancelada pelo usuário.' }
+
     return new Promise((resolve) => {
       try {
         if (isAppId) {
-          // Launch modern Windows app via shell:AppsFolder
           const child = spawn('explorer.exe', [`shell:AppsFolder\\${launchTarget}`], {
             detached: true,
             stdio: 'ignore'
           })
           child.unref()
           resolve({ success: true, message: `Aplicativo "${trimmed}" iniciado com sucesso via shell:AppsFolder.` })
+        } else if (isLnk) {
+          const child = spawn('explorer.exe', [launchTarget], {
+            detached: true,
+            stdio: 'ignore'
+          })
+          child.unref()
+          resolve({ success: true, message: `Atalho "${trimmed}" aberto com sucesso.` })
         } else {
-          const isExecutable = /\.(exe|com)$/i.test(launchTarget)
-          const executable = isExecutable ? launchTarget : 'explorer.exe'
-          const executableArgs = isExecutable ? args : [launchTarget]
-          const child = spawn(executable, executableArgs, {
+          const child = spawn(launchTarget, args, {
             detached: true,
             stdio: 'ignore',
             shell: false,

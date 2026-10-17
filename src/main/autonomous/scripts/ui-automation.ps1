@@ -4,7 +4,8 @@ param(
     [string]$WindowTitle = "",
     [string]$ElementName = "",
     [string]$Text = "",
-    [int]$Limit = 20
+    [int]$Limit = 20,
+    [int]$JasperPid = 0
 )
 
 # Load UI Automation Assemblies
@@ -12,6 +13,37 @@ Add-Type -AssemblyName UIAutomationClient -ErrorAction SilentlyContinue
 Add-Type -AssemblyName UIAutomationTypes -ErrorAction SilentlyContinue
 
 $root = [System.Windows.Automation.AutomationElement]::RootElement
+
+function Get-SafeTargetWindow([string]$title, [int]$pidToExclude) {
+    if ([string]::IsNullOrWhiteSpace($title)) { return $null }
+    $cond = [System.Windows.Automation.Condition]::TrueCondition
+    $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)
+    foreach ($w in $windows) {
+        $name = $w.Current.Name
+        $procId = $w.Current.ProcessId
+        if (-not [string]::IsNullOrWhiteSpace($name) -and $name.ToLower().Contains($title.ToLower())) {
+            # Security check 1: never interact with Jasper itself or its parent runner
+            if ($pidToExclude -gt 0 -and $procId -eq $pidToExclude) { continue }
+
+            # Security check 2: verify target process name against administrative / terminal apps
+            $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+            if ($proc) {
+                $pName = $proc.ProcessName.ToLower()
+                if ($pName -match '^(powershell|pwsh|cmd|wt|regedit|taskmgr|mmc|consent|electron|jasper|antigravity)$') {
+                    continue
+                }
+            }
+
+            # Security check 3: verify full window title
+            if ($name -match '(?i)(windows security|seguran[cç]a do windows|user account control|controle de conta|credential|credencial|secure desktop|powershell|prompt de comando|command prompt|windows terminal|gerenciador de tarefas|regedit|bitwarden|1password|keepass|lastpass|jasper)') {
+                continue
+            }
+
+            return $w
+        }
+    }
+    return $null
+}
 
 switch ($Action.ToLower()) {
     "list-windows" {
@@ -42,22 +74,14 @@ switch ($Action.ToLower()) {
             exit
         }
 
-        $cond = [System.Windows.Automation.Condition]::TrueCondition
-        $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)
-        $targetWin = $null
-        foreach ($w in $windows) {
-            if ($w.Current.Name.ToLower().Contains($WindowTitle.ToLower())) {
-                $targetWin = $w
-                break
-            }
-        }
-
+        $targetWin = Get-SafeTargetWindow -title $WindowTitle -pidToExclude $JasperPid
         if (-not $targetWin) {
-            $err = "Janela contendo '$WindowTitle' nao encontrada."
+            $err = "Janela contendo '$WindowTitle' nao encontrada ou bloqueada por politica de seguranca."
             [PSCustomObject]@{ error = $err } | ConvertTo-Json -Compress
             exit
         }
 
+        $cond = [System.Windows.Automation.Condition]::TrueCondition
         $elements = $targetWin.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond)
         $elementList = @()
         foreach ($el in $elements) {
@@ -90,22 +114,14 @@ switch ($Action.ToLower()) {
             exit
         }
 
-        $cond = [System.Windows.Automation.Condition]::TrueCondition
-        $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)
-        $targetWin = $null
-        foreach ($w in $windows) {
-            if ($w.Current.Name.ToLower().Contains($WindowTitle.ToLower())) {
-                $targetWin = $w
-                break
-            }
-        }
-
+        $targetWin = Get-SafeTargetWindow -title $WindowTitle -pidToExclude $JasperPid
         if (-not $targetWin) {
-            $err = "Janela contendo '$WindowTitle' nao encontrada."
+            $err = "Janela contendo '$WindowTitle' nao encontrada ou bloqueada por politica de seguranca."
             [PSCustomObject]@{ error = $err } | ConvertTo-Json -Compress
             exit
         }
 
+        $cond = [System.Windows.Automation.Condition]::TrueCondition
         $elements = $targetWin.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond)
         $found = $null
         foreach ($el in $elements) {
@@ -148,22 +164,14 @@ switch ($Action.ToLower()) {
             exit
         }
 
-        $cond = [System.Windows.Automation.Condition]::TrueCondition
-        $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $cond)
-        $targetWin = $null
-        foreach ($w in $windows) {
-            if ($w.Current.Name.ToLower().Contains($WindowTitle.ToLower())) {
-                $targetWin = $w
-                break
-            }
-        }
-
+        $targetWin = Get-SafeTargetWindow -title $WindowTitle -pidToExclude $JasperPid
         if (-not $targetWin) {
-            $err = "Janela contendo '$WindowTitle' nao encontrada."
+            $err = "Janela contendo '$WindowTitle' nao encontrada ou bloqueada por politica de seguranca."
             [PSCustomObject]@{ error = $err } | ConvertTo-Json -Compress
             exit
         }
 
+        $cond = [System.Windows.Automation.Condition]::TrueCondition
         $elements = $targetWin.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond)
         $found = $null
         foreach ($el in $elements) {
@@ -203,4 +211,3 @@ switch ($Action.ToLower()) {
         [PSCustomObject]@{ error = "Acao desconhecida: $Action" } | ConvertTo-Json -Compress
     }
 }
-

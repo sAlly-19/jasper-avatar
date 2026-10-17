@@ -21,6 +21,8 @@ import { smartHome } from './smart-home'
 import { processManager } from './process-manager'
 import { mediaController } from './media-controller'
 import { uiAutomation } from './ui-automation'
+import { presentationMode } from './presentation-mode'
+import { focusMode } from './focus-mode'
 
 export class AutonomyCoordinator {
   private isInitialized: boolean = false
@@ -113,11 +115,35 @@ export class AutonomyCoordinator {
     mediaController.setEnabled(cfg.enableMediaController !== false)
     uiAutomation.setEnabled(cfg.enableUiAutomation !== false)
 
+    // 19. Presentation / Smart Silent Mode
+    presentationMode.setEnabled(cfg.enablePresentationMode !== false)
+    presentationMode.setOnStateChange((status) => {
+      if (status.isActive) {
+        this.dispatchNotification({
+          id: `presentation-${status.timestamp}`,
+          type: 'info',
+          title: 'Modo Apresentação Ativado',
+          message: status.detectedReason || 'Jasper silenciou saídas de áudio durante a apresentação.',
+          timestamp: status.timestamp,
+          silentAudio: true
+        })
+      }
+    })
+
+    // 20. Smart Focus Session & Distraction Blocker
+    focusMode.setEnabled(cfg.enableFocusMode !== false)
+    focusMode.setOnNotification((notif) => {
+      this.dispatchNotification(notif)
+    })
+
     console.log('[AutonomyCoordinator] All autonomous services initialized successfully.')
   }
 
   public dispatchNotification(notif: AutonomyNotification): void {
-    console.log(`[Autonomy Notification] Event dispatched: ${notif.type}`)
+    if (presentationMode.getStatus().isSilentAudio) {
+      notif.silentAudio = true
+    }
+    console.log(`[Autonomy Notification] Event dispatched: ${notif.type} (silentAudio: ${Boolean(notif.silentAudio)})`)
     safeSend(IPC_CHANNELS.AUTONOMY_NOTIFICATION, notif)
   }
 
@@ -146,6 +172,8 @@ export class AutonomyCoordinator {
     processManager.setEnabled(cfg.enableProcessManager !== false)
     mediaController.setEnabled(cfg.enableMediaController !== false)
     uiAutomation.setEnabled(cfg.enableUiAutomation !== false)
+    presentationMode.setEnabled(cfg.enablePresentationMode !== false)
+    focusMode.setEnabled(cfg.enableFocusMode !== false)
   }
 
   public stopAll(): void {
@@ -155,6 +183,8 @@ export class AutonomyCoordinator {
     systemHealth.stop()
     gitWatcher.stop()
     calendarEmail.stop()
+    presentationMode.stop()
+    focusMode.stopFocus()
   }
 }
 

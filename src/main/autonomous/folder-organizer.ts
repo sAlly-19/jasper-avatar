@@ -35,15 +35,17 @@ export class FolderOrganizer {
   private calculateFileHash(filePath: string, size: number): string | null {
     let fd: number | null = null
     try {
-      // For quick duplicate detection, hash up to 512KB + file size
-      const maxRead = Math.min(size, 512 * 1024)
-      const buffer = Buffer.alloc(maxRead)
+      const hash = crypto.createHash('sha256')
       fd = fs.openSync(filePath, 'r')
-      fs.readSync(fd, buffer, 0, maxRead, 0)
+      const buffer = Buffer.alloc(64 * 1024)
+      let bytesRead = 0
+      let position = 0
 
-      const hash = crypto.createHash('md5')
-      hash.update(buffer)
-      hash.update(size.toString())
+      while ((bytesRead = fs.readSync(fd, buffer, 0, buffer.length, position)) > 0) {
+        hash.update(buffer.subarray(0, bytesRead))
+        position += bytesRead
+      }
+
       return hash.digest('hex')
     } catch {
       return null

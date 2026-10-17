@@ -51,11 +51,24 @@ export class ReportGeneratorService {
    */
   public async getTargetDirectory(): Promise<string> {
     const cfg = configStore.getConfig()
-    let target = cfg.folderDefaultTarget
+    let target = cfg.folderDefaultTarget?.trim()
 
-    if (!target || !target.trim()) {
+    if (target) {
+      const lower = target.toLowerCase()
+      if (lower === 'downloads' || lower === 'download') {
+        target = app.getPath('downloads')
+      } else if (lower === 'desktop' || lower === 'area de trabalho') {
+        target = app.getPath('desktop')
+      } else if (lower === 'documents' || lower === 'documentos') {
+        target = app.getPath('documents')
+      }
+    }
+
+    if (!target) {
       target = path.join(os.homedir(), 'Documents', 'Jasper_Relatorios')
     }
+
+    target = path.resolve(target)
 
     try {
       await fs.mkdir(target, { recursive: true })
@@ -86,6 +99,7 @@ export class ReportGeneratorService {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">
   <style>
     @page { margin: 20mm; size: A4 portrait; }
     body {
@@ -198,7 +212,18 @@ export class ReportGeneratorService {
         height: 900,
         webPreferences: {
           sandbox: true,
-          javascript: false
+          javascript: false,
+          webSecurity: true,
+          allowRunningInsecureContent: false
+        }
+      })
+
+      // SEC-06: Block network/file subrequests to prevent SSRF and local file leaks via <img> or @import
+      win.webContents.session.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
+        if (details.url.startsWith('data:')) {
+          callback({ cancel: false })
+        } else {
+          callback({ cancel: true })
         }
       })
 

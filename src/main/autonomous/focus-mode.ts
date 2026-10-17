@@ -101,7 +101,7 @@ export class FocusModeService {
     if (!this.isActive) return
 
     try {
-      const activeWin = await windowTracker.getActiveWindow()
+      const activeWin = windowTracker.getCurrentCachedWindow()
       const proc = (activeWin.processName || '').toLowerCase().replace(/\.exe$/, '')
 
       if (DEFAULT_DISTRACTION_APPS.has(proc) && proc !== this.lastAlertedApp) {

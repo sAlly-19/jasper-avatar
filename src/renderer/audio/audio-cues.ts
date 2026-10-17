@@ -1,11 +1,28 @@
 /**
- * Audio Cue Synthesizers using Web Audio API
+ * Audio Cue Synthesizers using Web Audio API (Singleton AudioContext)
  */
-export function playTone(freq: number, duration: number = 0.15): void {
+let sharedAudioCtx: AudioContext | null = null
+
+function getSharedAudioContext(): AudioContext | null {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-    if (!AudioCtx) return
-    const ctx = new AudioCtx()
+    if (!AudioCtx) return null
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioCtx()
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {})
+    }
+    return sharedAudioCtx
+  } catch {
+    return null
+  }
+}
+
+export function playTone(freq: number, duration: number = 0.15): void {
+  try {
+    const ctx = getSharedAudioContext()
+    if (!ctx) return
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.type = 'sine'
@@ -23,9 +40,8 @@ export function playTone(freq: number, duration: number = 0.15): void {
 
 export function playWakeChime(): void {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-    if (!AudioCtx) return
-    const ctx = new AudioCtx()
+    const ctx = getSharedAudioContext()
+    if (!ctx) return
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.type = 'sine'
@@ -43,4 +59,3 @@ export function playWakeChime(): void {
     console.warn('[Audio] Chime playback note:', e)
   }
 }
-

@@ -4,6 +4,7 @@ export class AudioPlayer {
   private nextPlayTime: number = 0
   private activeSources: AudioBufferSourceNode[] = []
   private isSpeaking: boolean = false
+  private drainTimeout: any = null
   public onSpeakingChange: ((speaking: boolean) => void) | null = null
   public onPlaybackEnded: (() => void) | null = null
 
@@ -80,6 +81,12 @@ export class AudioPlayer {
       source.connect(ctx.destination)
     }
 
+    // Clear any pending drain timeout
+    if (this.drainTimeout) {
+      clearTimeout(this.drainTimeout)
+      this.drainTimeout = null
+    }
+
     // 5. Schedule gapless continuous playback with drift compensation
     const now = ctx.currentTime
     // If there was a silence gap or nextPlayTime is in the past, realign to now
@@ -104,8 +111,13 @@ export class AudioPlayer {
         this.activeSources.splice(index, 1)
       }
       if (this.activeSources.length === 0) {
-        this.setSpeaking(false)
-        this.onPlaybackEnded?.()
+        if (this.drainTimeout) clearTimeout(this.drainTimeout)
+        this.drainTimeout = setTimeout(() => {
+          if (this.activeSources.length === 0) {
+            this.setSpeaking(false)
+            this.onPlaybackEnded?.()
+          }
+        }, 80)
       }
     }
   }
@@ -121,6 +133,10 @@ export class AudioPlayer {
    * Immediately stops all currently playing and queued audio (called on user interrupt)
    */
   public stopAll(): void {
+    if (this.drainTimeout) {
+      clearTimeout(this.drainTimeout)
+      this.drainTimeout = null
+    }
     for (const source of this.activeSources) {
       try {
         source.stop()

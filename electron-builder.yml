@@ -10,6 +10,7 @@ files:
   - package.json
   - "!**/node_modules/**/*.map"
   - "!**/node_modules/**/{test,tests,__tests__}/**"
+  - "!**/node_modules/{three,@tensorflow,@tensorflow-models}/**"
 
 extraResources:
   - from: src/main/autonomous/scripts

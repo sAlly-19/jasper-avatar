@@ -1,6 +1,7 @@
 import { DOM } from '../ui/dom'
 import { updateStatusBadge } from '../ui/status-badge'
 import { AvatarController } from '../scene/avatar'
+import { evaluateMathExpression } from '@shared'
 
 export class OfflineHandler {
   private avatar: AvatarController | null = null
@@ -90,11 +91,10 @@ export class OfflineHandler {
     if (calcMatch) {
       try {
         const expr = calcMatch[1].replace(/,/g, '.').replace(/x/g, '*')
-        if (/^[\d\s\+\-\*\/\(\)\.]+$/.test(expr)) {
-          const result = Function(`"use strict"; return (${expr})`)()
-          this.speak(`O resultado do cálculo é ${result}.`, agentName)
-          return true
-        }
+        const result = evaluateMathExpression(expr)
+        const formatted = Number.isInteger(result) ? result.toString() : result.toFixed(6).replace(/\.?0+$/, '')
+        this.speak(`O resultado do cálculo é ${formatted}.`, agentName)
+        return true
       } catch (e) {}
     }
 

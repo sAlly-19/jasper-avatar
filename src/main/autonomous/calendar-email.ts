@@ -6,8 +6,30 @@ import { randomUUID } from 'crypto'
 import { configStore } from '../config/config-store'
 import type { CalendarEvent, EmailSummary, AutonomyNotification } from '@shared'
 import { atomicWriteJsonSync, readJsonFileSync } from '../utils/atomic-json'
+import { redactSecrets } from './clipboard-watcher'
 
 const CALENDAR_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+
+export function decodeMimeHeader(header: string): string {
+  if (!header) return ''
+  return header.replace(/=\?([^?]+)\?([BQbq])\?([^?]+)\?=/g, (match, charset, encoding, text) => {
+    try {
+      const enc = encoding.toUpperCase()
+      if (enc === 'B') {
+        const buf = Buffer.from(text, 'base64')
+        return buf.toString(charset.toLowerCase().includes('utf') ? 'utf-8' : 'latin1')
+      } else if (enc === 'Q') {
+        const unescaped = text.replace(/_/g, ' ').replace(/=([0-9A-Fa-f]{2})/g, (_m: string, hex: string) => {
+          return String.fromCharCode(parseInt(hex, 16))
+        })
+        return unescaped
+      }
+    } catch {
+      return match
+    }
+    return match
+  }).trim()
+}
 
 function escapeIcsText(value: string): string {
   return value
@@ -312,7 +334,8 @@ export class CalendarEmailService {
               return
             }
             if (line.toLowerCase().startsWith('subject:')) {
-              const subj = line.slice(8).trim()
+              const rawSubj = line.slice(8).trim()
+              const subj = redactSecrets(decodeMimeHeader(rawSubj))
               results.push({
                 id: `mail-${Date.now()}-${results.length}`,
                 from: 'Carregando...',
@@ -323,7 +346,8 @@ export class CalendarEmailService {
                 isUrgent: /urgente|urgent|importante|alerta/i.test(subj)
               })
             } else if (line.toLowerCase().startsWith('from:') && results.length > 0) {
-              results[results.length - 1].from = line.slice(5).trim()
+              const rawFrom = line.slice(5).trim()
+              results[results.length - 1].from = redactSecrets(decodeMimeHeader(rawFrom))
             }
           }
         }

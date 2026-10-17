@@ -5,16 +5,18 @@ import dotenv from 'dotenv'
 import type { JasperConfig, UpdateConfigPayload, ConfigSummary } from '@shared'
 import { getHardwareInfo } from '../services/hwid'
 
-const DEFAULT_LIVE_MODEL = 'gemini-3.8-live'
-const RETIRED_LIVE_MODELS = new Set(['gemini-2.0-flash-live-001'])
+const DEFAULT_LIVE_MODEL = 'gemini-2.0-flash-live-001'
+const RETIRED_LIVE_MODELS = new Set(['gemini-2.0-flash-exp'])
 
 function normalizeLiveModel(model?: string): string {
   const value = model?.trim()
   return !value || RETIRED_LIVE_MODELS.has(value) ? DEFAULT_LIVE_MODEL : value
 }
 
-// Load environment variables from .env
-dotenv.config()
+// Load environment variables from .env only in development/unpackaged mode
+if (typeof app === 'undefined' || !app.isPackaged) {
+  dotenv.config()
+}
 
 function encryptSecret(val: string): string {
   if (!val) return ''
@@ -214,7 +216,7 @@ class ConfigStore {
         if (data.licenseInstallationId !== undefined) this.config.licenseInstallationId = data.licenseInstallationId
         if (data.licenseDeviceId !== undefined) this.config.licenseDeviceId = data.licenseDeviceId
         if (data.licenseDeviceSecret !== undefined) this.config.licenseDeviceSecret = decryptSecret(data.licenseDeviceSecret)
-        if (data.licenseLeaseToken !== undefined) this.config.licenseLeaseToken = data.licenseLeaseToken
+        if (data.licenseLeaseToken !== undefined) this.config.licenseLeaseToken = decryptSecret(data.licenseLeaseToken)
         if (data.licenseLeaseExpiresAt !== undefined) this.config.licenseLeaseExpiresAt = data.licenseLeaseExpiresAt
         if (data.licensePublicJwk !== undefined) this.config.licensePublicJwk = data.licensePublicJwk
 
@@ -236,7 +238,8 @@ class ConfigStore {
         hassToken: encryptSecret(this.config.hassToken || ''),
         emailPassword: encryptSecret(this.config.emailPassword || ''),
         licenseKey: encryptSecret(this.config.licenseKey || ''),
-        licenseDeviceSecret: encryptSecret(this.config.licenseDeviceSecret || '')
+        licenseDeviceSecret: encryptSecret(this.config.licenseDeviceSecret || ''),
+        licenseLeaseToken: encryptSecret(this.config.licenseLeaseToken || '')
       }
       const content = JSON.stringify(dataToPersist, null, 2)
       atomicWriteFileSync(cfgPath, content)

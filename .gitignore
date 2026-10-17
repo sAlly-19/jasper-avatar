@@ -4,15 +4,22 @@
 
 # Dependencies
 node_modules/
+**/node_modules/
 .pnp
 .pnp.js
 
 # Build Outputs & Bundles
 dist/
+**/dist/
 dist-electron/
 out/
 release/
 build/
+.expo/
+**/.expo/
+
+# Audit Harness & Ephemeral Outputs
+.audit/
 
 # TypeScript, Vite & Bundler Caches
 *.tsbuildinfo

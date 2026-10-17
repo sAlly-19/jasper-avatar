@@ -164,8 +164,8 @@ export function createMainWindow(): BrowserWindow {
     mainWindow.loadURL('app://jasper/index.html')
   }
 
-  // Automatic screenshot capture for visual verification when requested via CLI
-  if (process.argv.includes('--capture-screenshot') || process.argv.includes('--capture-showcase')) {
+  // Automatic screenshot capture for visual verification when requested via CLI (development only)
+  if (!app.isPackaged && (process.argv.includes('--capture-screenshot') || process.argv.includes('--capture-showcase'))) {
     setTimeout(async () => {
       try {
         if (!mainWindow || mainWindow.isDestroyed()) return

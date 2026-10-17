@@ -9,7 +9,7 @@ export interface ActiveWindowInfo {
 
 export class WindowTrackerService {
   private isEnabled: boolean = true
-  private pollIntervalMs: number = 4000
+  private pollIntervalMs: number = 8000
   private timer: NodeJS.Timeout | null = null
   private currentWindow: ActiveWindowInfo = {
     processName: 'Unknown',
@@ -35,6 +35,10 @@ export class WindowTrackerService {
     return this.isEnabled
   }
 
+  public getCurrentCachedWindow(): ActiveWindowInfo {
+    return this.currentWindow
+  }
+
   public setOnWindowChanged(cb: (info: ActiveWindowInfo) => void): void {
     this.onWindowChangedCallback = cb
   }
@@ -43,7 +47,7 @@ export class WindowTrackerService {
     if (this.timer) return
     this.poll()
     this.timer = setInterval(() => this.poll(), this.pollIntervalMs)
-    console.log('[WindowTracker] Service started (polling every 4s)')
+    console.log('[WindowTracker] Service started (polling every 8s)')
   }
 
   public stop(): void {
@@ -58,7 +62,12 @@ export class WindowTrackerService {
     return resolvePowerShellScript('get-active-window.ps1')
   }
 
-  public async getActiveWindow(): Promise<ActiveWindowInfo> {
+  public async getActiveWindow(forceRefresh: boolean = false): Promise<ActiveWindowInfo> {
+    const age = Date.now() - (this.currentWindow.timestamp || 0)
+    if (!forceRefresh && age < 3500 && this.currentWindow.processName !== 'Unknown') {
+      return this.currentWindow
+    }
+
     return new Promise((resolve) => {
       const scriptPath = this.getScriptPath()
       execFile(
@@ -73,7 +82,7 @@ export class WindowTrackerService {
           try {
             const parsed = JSON.parse(stdout.trim()) as ActiveWindowInfo
             if (parsed.processName) {
-              this.currentWindow = parsed
+              this.currentWindow = { ...parsed, timestamp: Date.now() }
             }
           } catch {
             // Keep previous window on parse error

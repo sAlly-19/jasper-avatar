@@ -1,8 +1,11 @@
 import { execFile } from 'child_process'
 import { join } from 'path'
+import path from 'path'
 import fs from 'fs'
 import type { GitStatusResult, AutonomyNotification } from '@shared'
 import { toolPolicyEngine } from './policy-engine'
+import { securityBroker } from '../services/security-broker'
+import { configStore } from '../config/config-store'
 
 export class GitWatcher {
   private enabled: boolean = true
@@ -11,7 +14,59 @@ export class GitWatcher {
   private onNotification?: (notif: AutonomyNotification) => void
 
   constructor() {
-    this.startPeriodicCheck()
+    // Constructor no longer starts timers eagerly.
+    // Periodic check is initiated when enabled or initialized via coordinator.
+  }
+
+  public resolveAndValidateRepo(repoPath?: string): { valid: boolean; path: string; error?: string } {
+    const target = (repoPath && repoPath.trim()) ? repoPath.trim() : this.defaultRepoPath
+    if (!target || target.includes('\0') || /^\\\\/.test(target)) {
+      return { valid: false, path: '', error: 'Caminho do repositório inválido ou UNC não permitido.' }
+    }
+
+    const resolved = path.resolve(target)
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+      return { valid: false, path: resolved, error: `Diretório não encontrado: "${resolved}"` }
+    }
+
+    const lower = resolved.toLowerCase()
+    if (
+      lower === 'c:\\' ||
+      lower === 'c:/' ||
+      lower.startsWith('c:\\windows') ||
+      lower.startsWith('c:/windows') ||
+      lower.startsWith('c:\\program files') ||
+      lower.startsWith('c:/program files')
+    ) {
+      return { valid: false, path: resolved, error: 'Acesso a diretórios do sistema ou raiz do drive é proibido.' }
+    }
+
+    const cfg = configStore.getConfig()
+    const configuredRepo = cfg.gitRepoPath ? path.resolve(cfg.gitRepoPath).toLowerCase() : null
+    const defaultPath = path.resolve(this.defaultRepoPath).toLowerCase()
+    const allowedRepos = [defaultPath]
+    if (configuredRepo) allowedRepos.push(configuredRepo)
+    if ((cfg as any).gitWatchedRepos && Array.isArray((cfg as any).gitWatchedRepos)) {
+      for (const r of (cfg as any).gitWatchedRepos) {
+        if (r) allowedRepos.push(path.resolve(r).toLowerCase())
+      }
+    }
+
+    const isAllowed = allowedRepos.some((allowed) => {
+      const rel = path.relative(allowed, lower)
+      return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+    })
+
+    const brokerCheck = securityBroker.resolveUserPath(resolved)
+    if (!isAllowed && !brokerCheck.allowed) {
+      return {
+        valid: false,
+        path: resolved,
+        error: `Repositório "${resolved}" não está na lista de repositórios autorizados nem em diretórios seguros do usuário.`
+      }
+    }
+
+    return { valid: true, path: resolved }
   }
 
   public setEnabled(enabled: boolean): void {
@@ -60,7 +115,21 @@ export class GitWatcher {
       }
     }
 
-    const isInsideWorkTree = await this.execGit(['rev-parse', '--is-inside-work-tree'], repoPath)
+    const validation = this.resolveAndValidateRepo(repoPath)
+    if (!validation.valid) {
+      return {
+        isGit: false,
+        branch: '',
+        modifiedFiles: [],
+        untrackedFiles: [],
+        deletedFiles: [],
+        lastCommit: '',
+        changesSummary: `[SEGURANÇA GIT]: ${validation.error}`
+      }
+    }
+    const resolvedPath = validation.path
+
+    const isInsideWorkTree = await this.execGit(['rev-parse', '--is-inside-work-tree'], resolvedPath)
     if (isInsideWorkTree.code !== 0 || isInsideWorkTree.stdout !== 'true') {
       return {
         isGit: false,
@@ -69,17 +138,17 @@ export class GitWatcher {
         untrackedFiles: [],
         deletedFiles: [],
         lastCommit: '',
-        changesSummary: `O diretório "${repoPath}" não é um repositório Git válido.`
+        changesSummary: `O diretório "${resolvedPath}" não é um repositório Git válido.`
       }
     }
 
-    const branchRes = await this.execGit(['branch', '--show-current'], repoPath)
+    const branchRes = await this.execGit(['branch', '--show-current'], resolvedPath)
     const branch = branchRes.stdout || 'main'
 
-    const logRes = await this.execGit(['log', '-1', '--pretty=format:%h - %s (%cr)'], repoPath)
+    const logRes = await this.execGit(['log', '-1', '--pretty=format:%h - %s (%cr)'], resolvedPath)
     const lastCommit = logRes.stdout || 'Nenhum commit ainda'
 
-    const statusRes = await this.execGit(['status', '--porcelain'], repoPath)
+    const statusRes = await this.execGit(['status', '--porcelain'], resolvedPath)
     const rawLines = statusRes.stdout ? statusRes.stdout.split(/\r?\n/).filter(Boolean) : []
 
     const modifiedFiles: string[] = []
@@ -128,7 +197,17 @@ export class GitWatcher {
     diffSummary: string
     branch: string
   }> {
-    const status = await this.checkRepo(repoPath)
+    const validation = this.resolveAndValidateRepo(repoPath)
+    if (!validation.valid) {
+      return {
+        suggestion: '',
+        diffSummary: `[SEGURANÇA GIT]: ${validation.error}`,
+        branch: ''
+      }
+    }
+    const resolvedPath = validation.path
+
+    const status = await this.checkRepo(resolvedPath)
     if (!status.isGit) {
       return {
         suggestion: '',
@@ -137,8 +216,8 @@ export class GitWatcher {
       }
     }
 
-    const diffStat = await this.execGit(['diff', '--stat'], repoPath)
-    const cachedStat = await this.execGit(['diff', '--cached', '--stat'], repoPath)
+    const diffStat = await this.execGit(['diff', '--stat'], resolvedPath)
+    const cachedStat = await this.execGit(['diff', '--cached', '--stat'], resolvedPath)
     const combinedDiff = (cachedStat.stdout ? `Staged:\n${cachedStat.stdout}\n\n` : '') + (diffStat.stdout || 'Nenhum diff detalhado.')
 
     return {
@@ -153,6 +232,12 @@ export class GitWatcher {
       return { success: false, output: 'Mensagem de commit não informada.' }
     }
 
+    const validation = this.resolveAndValidateRepo(repoPath)
+    if (!validation.valid) {
+      return { success: false, output: `[SEGURANÇA GIT]: ${validation.error}` }
+    }
+    const resolvedPath = validation.path
+
     // Zero-Trust policy validation: block destructive flags, enforce path safety and credential protection
     const policy = toolPolicyEngine.validateGitCommit(message, specificFiles)
     if (!policy.allowed) {
@@ -164,12 +249,12 @@ export class GitWatcher {
       ? ['add', '--', ...specificFiles]
       : ['add', '-u']
 
-    const addRes = await this.execGit(addArgs, repoPath)
+    const addRes = await this.execGit(addArgs, resolvedPath)
     if (addRes.code !== 0) {
       return { success: false, output: `Falha ao executar git add: ${addRes.stderr}` }
     }
 
-    const commitRes = await this.execGit(['commit', '-m', message], repoPath)
+    const commitRes = await this.execGit(['commit', '-m', message], resolvedPath)
     if (commitRes.code !== 0) {
       return { success: false, output: `Falha ao executar git commit: ${commitRes.stderr}` }
     }
@@ -178,15 +263,34 @@ export class GitWatcher {
   }
 
   public async runTests(repoPath: string = this.defaultRepoPath, signal?: AbortSignal): Promise<{ success: boolean; output: string }> {
+    const validation = this.resolveAndValidateRepo(repoPath)
+    if (!validation.valid) {
+      return { success: false, output: `[SEGURANÇA GIT]: ${validation.error}` }
+    }
+    const resolvedPath = validation.path
+
+    // Mandatory user confirmation for executing local test scripts
+    const confirmed = await securityBroker.confirmOperation({
+      title: 'Autorização: Execução de Testes',
+      message: `O Jasper executará os testes unitários do repositório em:\n${resolvedPath}`,
+      detail: 'Aviso: Esta operação executará scripts definidos no projeto (package.json / pytest).',
+      confirmLabel: 'Executar Testes',
+      risk: 'mandatory'
+    })
+
+    if (!confirmed) {
+      return { success: false, output: 'Execução de testes cancelada pelo usuário ou negada pela política de segurança.' }
+    }
+
     return new Promise((resolve) => {
-      const packageJsonPath = join(repoPath, 'package.json')
+      const packageJsonPath = join(resolvedPath, 'package.json')
       const isNodeProject = fs.existsSync(packageJsonPath)
       const command = isNodeProject
         ? (process.platform === 'win32' ? 'npm.cmd' : 'npm')
         : (process.platform === 'win32' ? 'pytest.exe' : 'pytest')
       const args = isNodeProject ? ['test'] : []
 
-      execFile(command, args, { cwd: repoPath, timeout: 60000, signal, windowsHide: true, shell: false }, (err, stdout, stderr) => {
+      execFile(command, args, { cwd: resolvedPath, timeout: 60000, signal, windowsHide: true, shell: process.platform === 'win32' }, (err, stdout, stderr) => {
         const out = (stdout ? stdout.toString() : '') + (stderr ? '\n' + stderr.toString() : '')
         resolve({
           success: !err,

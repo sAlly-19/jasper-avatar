@@ -146,6 +146,10 @@ async function init(): Promise<void> {
   function animate(): void {
     requestAnimationFrame(animate)
 
+    if (document.hidden) {
+      return
+    }
+
     const delta = clock.getDelta()
     const elapsed = clock.getElapsedTime()
 
@@ -238,15 +242,6 @@ async function init(): Promise<void> {
   DOM.btnMaximize?.addEventListener('click', () => window.electronAPI.windowMaximize())
   DOM.btnClose?.addEventListener('click', () => window.electronAPI.windowClose())
   DOM.btnPip?.addEventListener('click', async () => { await window.electronAPI.togglePip() })
-
-  // Global F12 shortcut listener in renderer
-  window.addEventListener('keydown', async (e) => {
-    if (e.key === 'F12') {
-      e.preventDefault()
-      const isFs = await window.electronAPI.toggleFullscreen()
-      updateFullscreenUI(isFs)
-    }
-  })
 
   // 6. Load Initial Persisted Config
   const initialConfig = await window.electronAPI.getConfig()

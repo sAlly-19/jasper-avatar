@@ -24,19 +24,19 @@ class UpdateManager {
     autoUpdater.autoInstallOnAppQuit = false
 
     autoUpdater.on('checking-for-update', () => this.updateState('checking', 'Verificando atualizações...'))
-    autoUpdater.on('update-available', (info) => {
+    autoUpdater.on('update-available', (info: { version: string }) => {
       this.updateState('available', `Versão ${info.version} disponível.`, { availableVersion: info.version })
     })
     autoUpdater.on('update-not-available', () => this.updateState('not-available', 'O Jasper está atualizado.'))
-    autoUpdater.on('download-progress', (progress) => {
+    autoUpdater.on('download-progress', (progress: { percent: number }) => {
       this.updateState('downloading', `Baixando atualização: ${Math.round(progress.percent)}%.`, {
         progressPercent: progress.percent
       })
     })
-    autoUpdater.on('update-downloaded', (info) => {
+    autoUpdater.on('update-downloaded', (info: { version: string }) => {
       this.updateState('downloaded', `Versão ${info.version} pronta para instalar.`, { availableVersion: info.version })
     })
-    autoUpdater.on('error', (error) => this.updateState('error', this.describeError(error)))
+    autoUpdater.on('error', (error: unknown) => this.updateState('error', this.describeError(error)))
 
     this.refreshSchedule()
     if (configStore.getConfig().checkUpdatesDaily) {

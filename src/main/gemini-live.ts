@@ -41,7 +41,7 @@ export class GeminiLiveClient {
   constructor(options: GeminiLiveOptions) {
     this.apiKey = options.apiKey
     this.voiceName = options.voiceName || 'Charon'
-    this.model = options.model || 'gemini-3.8-live'
+    this.model = options.model || 'gemini-2.0-flash-live-001'
     if (options.enableSystemTools !== undefined) this.enableSystemTools = options.enableSystemTools
     if (options.enableMediaTools !== undefined) this.enableMediaTools = options.enableMediaTools
     if (options.agentName) this.agentName = options.agentName
@@ -112,22 +112,35 @@ export class GeminiLiveClient {
 
     return new Promise((resolve, reject) => {
       const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${this.apiKey.trim()}`
+      let socket: WebSocket
 
       try {
-        this.ws = new WebSocket(url)
+        socket = new WebSocket(url)
+        this.ws = socket
       } catch (err: any) {
         this.isConnecting = false
         this.onStatus?.('error', err.message)
         return reject(err)
       }
 
-      this.ws.on('open', () => {
+      let isSetupResolved = false
+      const setupTimeout = setTimeout(() => {
+        if (!isSetupResolved && this.ws === socket) {
+          isSetupResolved = true
+          this.isConnecting = false
+          const timeoutErr = new Error('Tempo limite excedido aguardando setupComplete da API Gemini Live.')
+          this.onStatus?.('error', timeoutErr.message)
+          try {
+            socket.close()
+          } catch {}
+          reject(timeoutErr)
+        }
+      }, 15000)
+
+      socket.on('open', () => {
+        if (this.ws !== socket) return
         console.log('[GeminiLive] WebSocket connected. Sending initial setup payload...')
-        this.isConnecting = false
-        this.isConnected = true
         this.reconnectAttempts = 0
-        const activeName = this.agentName || 'Jasper'
-        this.onStatus?.('connected', `${activeName} Online`)
 
         // Build active function declarations dynamically based on user configuration
         const cfg = configStore.getConfig()
@@ -142,6 +155,7 @@ export class GeminiLiveClient {
 
         const modelPath = this.model.startsWith('models/') ? this.model : `models/${this.model}`
         const memoryContext = getMemorySummary()
+        const activeName = this.agentName || 'Jasper'
 
         // Send setup handshake
         const setupMessage: any = {
@@ -185,26 +199,60 @@ ${memoryContext}`
           setupMessage.setup.tools = [{ functionDeclarations: decls }]
         }
 
-        this.ws?.send(JSON.stringify(setupMessage))
-        resolve()
+        socket.send(JSON.stringify(setupMessage))
       })
 
-      this.ws.on('message', async (data: WebSocket.RawData) => {
-        await this.handleMessage(data)
+      socket.on('message', async (data: WebSocket.RawData) => {
+        if (this.ws !== socket) return
+        await this.handleMessage(
+          data,
+          () => {
+            if (!isSetupResolved) {
+              isSetupResolved = true
+              clearTimeout(setupTimeout)
+              this.isConnecting = false
+              this.isConnected = true
+              const activeName = this.agentName || 'Jasper'
+              this.onStatus?.('connected', `${activeName} Online`)
+              resolve()
+            }
+          },
+          (errMsg) => {
+            if (!isSetupResolved) {
+              isSetupResolved = true
+              clearTimeout(setupTimeout)
+              this.isConnecting = false
+              this.isConnected = false
+              reject(new Error(errMsg))
+            }
+          }
+        )
       })
 
-      this.ws.on('error', (error: Error) => {
+      socket.on('error', (error: Error) => {
+        if (this.ws !== socket) return
         console.error('[GeminiLive] WebSocket error:', error.message)
         this.isConnecting = false
         this.onStatus?.('error', error.message)
-        reject(error)
+        if (!isSetupResolved) {
+          isSetupResolved = true
+          clearTimeout(setupTimeout)
+          reject(error)
+        }
       })
 
-      this.ws.on('close', (code: number, reason: Buffer) => {
+      socket.on('close', (code: number, reason: Buffer) => {
+        if (this.ws !== socket) return
         console.log(`[GeminiLive] WebSocket closed: ${code} - ${reason.toString()}`)
         this.isConnecting = false
         this.isConnected = false
         this.ws = null
+
+        if (!isSetupResolved) {
+          isSetupResolved = true
+          clearTimeout(setupTimeout)
+          return reject(new Error(`Conexão encerrada antes do setupComplete: ${code} - ${reason.toString()}`))
+        }
 
         // Tentar reconectar caso a desconexão não tenha sido intencional
         if (!this.intentionalDisconnect && this.apiKey && this.apiKey.trim().length > 0) {
@@ -230,15 +278,21 @@ ${memoryContext}`
     })
   }
 
-  private async handleMessage(data: WebSocket.RawData): Promise<void> {
+  private async handleMessage(
+    data: WebSocket.RawData,
+    onSetupComplete?: () => void,
+    onServerError?: (msg: string) => void
+  ): Promise<void> {
     try {
       const text = data.toString('utf-8')
       const message = JSON.parse(text)
 
       // Check for errors from server
       if (message.error) {
-        console.error('[GeminiLive] Server returned an error response.')
-        this.onStatus?.('error', message.error.message || 'Erro da API Gemini')
+        const errMsg = message.error.message || 'Erro da API Gemini'
+        console.error('[GeminiLive] Server returned an error response:', errMsg)
+        this.onStatus?.('error', errMsg)
+        onServerError?.(errMsg)
         return
       }
 
@@ -246,6 +300,7 @@ ${memoryContext}`
       if (message.setupComplete) {
         console.log('[GeminiLive] Session setup confirmed by server.')
         this.onStatus?.('connected', 'Jasper Pronto')
+        onSetupComplete?.()
       }
 
       // Check for Tool Calls from model
@@ -253,15 +308,19 @@ ${memoryContext}`
         console.log(`[GeminiLive] Received ${message.toolCall.functionCalls.length} tool call(s).`)
         this.onStatus?.('speaking', 'Executando comando...')
 
+        const cfg = configStore.getConfig()
+        const activeSystemDecls = getActiveSystemDeclarations(cfg)
+        const activeAutonomyDecls = getActiveAutonomyDeclarations(cfg)
         const functionResponses: any[] = []
+
         for (const call of message.toolCall.functionCalls) {
           let output = ''
           try {
-            if (this.enableSystemTools && SYSTEM_FUNCTION_DECLARATIONS.some((d: any) => d.name === call.name)) {
+            if (this.enableSystemTools && activeSystemDecls.some((d: any) => d.name === call.name)) {
               output = await executeSystemTool(call.name, call.args || {})
             } else if (this.enableMediaTools && MEDIA_FUNCTION_DECLARATIONS.some((d: any) => d.name === call.name)) {
               output = await executeMediaTool(call.name, call.args || {})
-            } else if (getActiveAutonomyDeclarations(configStore.getConfig()).some((d: any) => d.name === call.name)) {
+            } else if (activeAutonomyDecls.some((d: any) => d.name === call.name)) {
               output = await executeAutonomyTool(call.name, call.args || {})
             } else {
               output = `A ferramenta "${call.name}" não está ativada ou permitida nas configurações do sistema.`
@@ -429,12 +488,14 @@ ${memoryContext}`
     this.reconnectAttempts = 0
 
     if (this.ws) {
+      const oldWs = this.ws
+      this.ws = null
       try {
-        this.ws.close()
+        oldWs.removeAllListeners()
+        oldWs.close()
       } catch (err) {
         // ignore
       }
-      this.ws = null
     }
     this.isConnecting = false
     this.isConnected = false
