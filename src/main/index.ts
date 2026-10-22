@@ -98,8 +98,16 @@ app.whenReady().then(() => {
   createMainWindow()
   updateManager.initialize()
 
+  const cfg = configStore.getConfig()
   if (licenseManager.getLicenseInfo().isLicensed) {
     autonomyCoordinator.init()
+    if (cfg.apiKey && cfg.apiKey.trim().length > 0 && cfg.licenseStatus === 'active') {
+      setTimeout(() => {
+        geminiClient?.connect().catch((err) => {
+          console.warn('[Main] Auto-connect to Gemini Live failed on startup:', err.message)
+        })
+      }, 1500)
+    }
   }
 
   // Verificação inicial do lease no boot da aplicação.

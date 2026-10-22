@@ -5,10 +5,14 @@ import dotenv from 'dotenv'
 import type { JasperConfig, UpdateConfigPayload, ConfigSummary } from '@shared'
 import { getHardwareInfo } from '../services/hwid'
 
-const DEFAULT_LIVE_MODEL = 'gemini-2.0-flash-live-001'
-const RETIRED_LIVE_MODELS = new Set(['gemini-2.0-flash-exp'])
+export const DEFAULT_LIVE_MODEL = 'gemini-3.8-live'
+export const RETIRED_LIVE_MODELS = new Set([
+  'gemini-2.0-flash-exp',
+  'gemini-2.0-flash-live-001',
+  'gemini-live-2.5-flash-preview'
+])
 
-function normalizeLiveModel(model?: string): string {
+export function normalizeLiveModel(model?: string): string {
   const value = model?.trim()
   return !value || RETIRED_LIVE_MODELS.has(value) ? DEFAULT_LIVE_MODEL : value
 }

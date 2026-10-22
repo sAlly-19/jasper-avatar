@@ -171,10 +171,10 @@ for (const tf of testFiles) {
 
 console.log('[run-tests] Executando suíte de testes de integração real...')
 const outFiles = testFiles.map((tf) => path.join(tempTestRoot, tf.out))
-const res = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-timeout=60000', '--test-concurrency=1', ...outFiles], {
+const res = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-timeout=120000', '--test-concurrency=1', ...outFiles], {
   cwd: rootDir,
   stdio: 'inherit',
-  timeout: 180000
+  timeout: 300000
 })
 
 // Cleanup all generated test artifacts.

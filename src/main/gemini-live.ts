@@ -8,7 +8,7 @@ import {
   executeMediaTool,
   executeAutonomyTool
 } from './tools'
-import { configStore } from './config/config-store'
+import { configStore, normalizeLiveModel } from './config/config-store'
 import { getMemorySummary } from './memory'
 import type { GeminiLiveOptions, GeminiStatus } from '@shared'
 
@@ -31,6 +31,7 @@ export class GeminiLiveClient {
   private reconnectTimeout: NodeJS.Timeout | null = null
   private reconnectAttempts: number = 0
   private maxReconnectAttempts: number = 5
+  private currentTurnTranscript: string = ''
 
   public onStatus: StatusCallback | null = null
   public onAudio: AudioCallback | null = null
@@ -41,7 +42,7 @@ export class GeminiLiveClient {
   constructor(options: GeminiLiveOptions) {
     this.apiKey = options.apiKey
     this.voiceName = options.voiceName || 'Charon'
-    this.model = options.model || 'gemini-2.0-flash-live-001'
+    this.model = normalizeLiveModel(options.model || 'gemini-3.8-live')
     if (options.enableSystemTools !== undefined) this.enableSystemTools = options.enableSystemTools
     if (options.enableMediaTools !== undefined) this.enableMediaTools = options.enableMediaTools
     if (options.agentName) this.agentName = options.agentName
@@ -62,7 +63,7 @@ export class GeminiLiveClient {
       }
     }
     if (voiceName) this.voiceName = voiceName
-    if (model) this.model = model
+    if (model) this.model = normalizeLiveModel(model)
     if (enableSystemTools !== undefined) this.enableSystemTools = enableSystemTools
     if (enableMediaTools !== undefined) this.enableMediaTools = enableMediaTools
     if (agentName) this.agentName = agentName
@@ -85,7 +86,7 @@ export class GeminiLiveClient {
   ): Promise<void> {
     if (customKey) this.apiKey = customKey
     if (customVoice) this.voiceName = customVoice
-    if (customModel) this.model = customModel
+    if (customModel) this.model = normalizeLiveModel(customModel)
     if (customSystemTools !== undefined) this.enableSystemTools = customSystemTools
     if (customMediaTools !== undefined) this.enableMediaTools = customMediaTools
     if (customAgentName) this.agentName = customAgentName
@@ -171,6 +172,8 @@ export class GeminiLiveClient {
                 }
               }
             },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
             systemInstruction: {
               parts: [
                 {
@@ -353,7 +356,17 @@ ${memoryContext}`
         // Interruption detected by Gemini
         if (sc.interrupted) {
           console.log('[GeminiLive] Model speech interrupted by user.')
+          this.currentTurnTranscript = ''
           this.onInterrupted?.()
+        }
+
+        // Incremental spoken output transcription (Gemini 3.8 Live / Native Audio)
+        if (sc.outputTranscription && typeof sc.outputTranscription.text === 'string' && sc.outputTranscription.text.length > 0) {
+          this.currentTurnTranscript += sc.outputTranscription.text
+          const fullText = this.currentTurnTranscript.trim()
+          if (fullText) {
+            this.onText?.(fullText)
+          }
         }
 
         // Model generated turn parts
@@ -364,7 +377,7 @@ ${memoryContext}`
             if (part.inlineData && part.inlineData.mimeType?.startsWith('audio/pcm')) {
               this.onAudio?.(part.inlineData.data)
             }
-            // Text transcription
+            // Text transcription (fallback if model emits text directly in modelTurn)
             if (part.text) {
               if ((part as any).thought) {
                 // Ignore internal model thought reasoning from public spoken subtitles
@@ -377,6 +390,7 @@ ${memoryContext}`
 
         // Turn complete
         if (sc.turnComplete) {
+          this.currentTurnTranscript = ''
           this.onTurnComplete?.()
           this.onStatus?.('listening')
         }
@@ -397,12 +411,10 @@ ${memoryContext}`
         : Buffer.from(chunk).toString('base64')
       const message = {
         realtimeInput: {
-          mediaChunks: [
-            {
-              mimeType: 'audio/pcm;rate=16000',
-              data: base64Data
-            }
-          ]
+          audio: {
+            data: base64Data,
+            mimeType: 'audio/pcm;rate=16000'
+          }
         }
       }
 
@@ -437,6 +449,7 @@ ${memoryContext}`
     }
 
     try {
+      this.currentTurnTranscript = ''
       const message = {
         clientContent: {
           turns: [
@@ -462,15 +475,11 @@ ${memoryContext}`
     }
 
     try {
+      const isAudio = mimeType.startsWith('audio/')
       const message = {
-        realtimeInput: {
-          mediaChunks: [
-            {
-              mimeType,
-              data: base64Data
-            }
-          ]
-        }
+        realtimeInput: isAudio
+          ? { audio: { data: base64Data, mimeType } }
+          : { video: { data: base64Data, mimeType } }
       }
       this.ws.send(JSON.stringify(message))
       console.log(`[GeminiLive] Realtime media chunk injected successfully (${mimeType}, ~${Math.round(base64Data.length / 1024)} KB)`)

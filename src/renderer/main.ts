@@ -47,6 +47,25 @@ async function enterCallMode(withGreeting = true): Promise<void> {
     return
   }
 
+  // Ensure Gemini Live connection is active before opening audio stream
+  if (!isConnected) {
+    console.log('[Jasper] Conectando ao Gemini Live antes de iniciar chamada...')
+    updateStatusBadge('connecting', 'Conectando ao Gemini...')
+    try {
+      const conn = await window.electronAPI.connectGemini()
+      if (!conn.success) {
+        updateStatusBadge('error', 'Falha ao conectar Gemini')
+        showHudToast('Erro de Conexão', conn.error || 'Não foi possível conectar à API Gemini Live.', 'error', 5000)
+        return
+      }
+      isConnected = true
+    } catch (err: any) {
+      updateStatusBadge('error', 'Erro ao conectar Gemini')
+      showHudToast('Erro de Conexão', err?.message || 'Falha na conexão com Gemini Live.', 'error', 5000)
+      return
+    }
+  }
+
   isCallMode = true
   shouldEndCallAfterPlayback = false
   console.log('[Jasper] Ativando Modo Chamada Full-Duplex...')
@@ -60,22 +79,25 @@ async function enterCallMode(withGreeting = true): Promise<void> {
     DOM.micStatusLabel.textContent = 'Modo Chamada (Full-Duplex)'
   }
 
-  // 3. Start continuous full-duplex mic streaming immediately
+  if (withGreeting) {
+    // Proactive greeting: agent greets user and asks what they desire
+    updateStatusBadge('speaking', `${getCurrentAgentName()} Chamando...`)
+    const greetingPrompt = `O usuário acabou de chamar você. Cumprimente-o com elegância e brevidade em português e pergunte o que deseja.`
+    window.electronAPI.sendTextMessage(greetingPrompt)
+    // Wait briefly so residual wake-word audio does not trigger server-side barge-in on the greeting
+    await new Promise((r) => setTimeout(r, 300))
+  } else {
+    updateStatusBadge('call', `${getCurrentAgentName()} Ouvindo... (Chamada)`)
+  }
+
+  // 3. Start continuous full-duplex mic streaming
+  if (!isCallMode) return
   try {
     await micRecorder.start(true)
   } catch (err) {
     console.error('[Jasper] Erro ao iniciar gravação no Modo Chamada:', err)
     await exitCallMode()
     return
-  }
-
-  if (withGreeting) {
-    // Proactive greeting: agent greets user and asks what they desire
-    updateStatusBadge('speaking', `${getCurrentAgentName()} Chamando...`)
-    const greetingPrompt = `O usuário acabou de chamar você. Cumprimente-o com elegância e brevidade em português e pergunte o que deseja.`
-    window.electronAPI.sendTextMessage(greetingPrompt)
-  } else {
-    updateStatusBadge('call', `${getCurrentAgentName()} Ouvindo... (Chamada)`)
   }
 }
 
@@ -93,7 +115,11 @@ async function exitCallMode(): Promise<void> {
   updateStatusBadge('connected', `${getCurrentAgentName()} Online`)
 
   if (isWakeWordEnabled) {
-    await wakeWordManager.resume(false)
+    setTimeout(async () => {
+      if (!isCallMode && isWakeWordEnabled) {
+        await wakeWordManager.resume(false)
+      }
+    }, 200)
   }
 }
 
@@ -135,11 +161,12 @@ async function init(): Promise<void> {
     updateStatusBadge('error', 'Erro ao carregar modelo')
   }
 
-  // 3. Connect LipSync to AudioPlayer
+  // 3. Connect LipSync to AudioPlayer and configure mic VAD speaker awareness
   const analyser = audioPlayer.getAnalyser()
   if (analyser) {
     lipSync.setAnalyser(analyser)
   }
+  micRecorder.isAssistantSpeaking = () => audioPlayer.getIsSpeaking()
 
   // 4. Render Loop at 60 FPS
   const clock = new THREE.Clock()
@@ -259,6 +286,15 @@ async function init(): Promise<void> {
     updateStatusBadge('error', 'Licença Pendente')
   } else if (!initialConfig.hasFullKey) {
     updateStatusBadge('disconnected', 'Configure a API Key')
+  } else if (!isConnected) {
+    updateStatusBadge('connecting', 'Conectando ao Gemini...')
+    window.electronAPI.connectGemini().then((res) => {
+      if (res.success) {
+        isConnected = true
+      }
+    }).catch((err) => {
+      console.warn('[Renderer] Auto-connect on startup failed:', err)
+    })
   }
 
   // 7. Setup Electron IPC Listeners

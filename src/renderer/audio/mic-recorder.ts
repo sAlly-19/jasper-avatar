@@ -10,10 +10,9 @@ export class MicRecorder {
   private recording: boolean = false
   private isCallMode: boolean = false
 
-  // 100ms buffering at 16kHz (1600 samples = 3200 bytes)
+  // 100ms buffering at 16kHz (1600 samples = 3200 bytes) per official Gemini Live spec
   // Continuous real-time streaming to Gemini Live
-  // 40 ms at 16 kHz keeps Live API turns responsive without excessive IPC overhead.
-  private static readonly BUFFER_SAMPLES = 640
+  private static readonly BUFFER_SAMPLES = 1600
   private pcmBuffer = new Int16Array(MicRecorder.BUFFER_SAMPLES)
   private bufferOffset = 0
 
@@ -33,6 +32,7 @@ export class MicRecorder {
 
   public onAudioLevel: AudioLevelCallback | null = null
   public onCallInactivityTimeout: (() => void) | null = null
+  public isAssistantSpeaking?: () => boolean
 
   public isRecording(): boolean {
     return this.recording
@@ -167,7 +167,9 @@ export class MicRecorder {
     const now = Date.now()
 
     // 2. Filter ambient noise and detect sustained human speech
-    if (rms >= MicRecorder.SPEECH_RMS_THRESHOLD) {
+    const assistantIsSpeaking = this.isAssistantSpeaking ? this.isAssistantSpeaking() : false
+
+    if (rms >= MicRecorder.SPEECH_RMS_THRESHOLD && !assistantIsSpeaking) {
       this.speechFramesCount++
       this.silenceFramesCount = 0
       if (this.speechFramesCount >= MicRecorder.MIN_SPEECH_CHUNKS) {
@@ -176,9 +178,12 @@ export class MicRecorder {
         this.lastActivityTimestamp = now
       }
     } else {
-      // Ambient noise or silence: decrement speech frames and increment silence frames
+      // Ambient noise or silence: increment silence frames and decay speech counter
       this.silenceFramesCount++
-      if (this.speechFramesCount > 0) {
+      if (this.silenceFramesCount > 6) {
+        // Fast decay on silence so transient clicks cannot latch
+        this.speechFramesCount = 0
+      } else if (this.speechFramesCount > 0) {
         this.speechFramesCount--
       }
       if (this.silenceFramesCount >= MicRecorder.MIN_SPEECH_CHUNKS * 2) {
@@ -187,7 +192,7 @@ export class MicRecorder {
     }
 
     // 3. 30-second Inactivity Timeout in Call Mode (ignoring ambient noise)
-    if (this.isCallMode) {
+    if (this.isCallMode && !assistantIsSpeaking) {
       const elapsed = now - this.lastActivityTimestamp
       if (elapsed >= MicRecorder.CALL_INACTIVITY_TIMEOUT_MS) {
         console.log(`[MicRecorder] Inatividade de ${MicRecorder.CALL_INACTIVITY_TIMEOUT_MS / 1000}s em Modo Chamada. Encerrando chamada...`)

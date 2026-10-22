@@ -1,6 +1,5 @@
 import { DOM } from './dom'
 import { WakeWordManager } from '../audio/wake-word-manager'
-import { playTone, playWakeChime } from '../audio/audio-cues'
 import { MicRecorder } from '../audio/mic-recorder'
 import { SVG_ICONS } from './icons'
 
@@ -164,7 +163,6 @@ export class WakeTrainerUI {
 
       try {
         setSampleButtonsDisabled(true)
-        playTone(880, 0.12)
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.dotRecord, `Gravando... Diga claramente "${currentAgentName}" agora!`)
           trainerFeedback.style.color = 'var(--accent-cyan)'
@@ -173,7 +171,6 @@ export class WakeTrainerUI {
 
         const result = await engine.collectCustomSample(targetName)
 
-        playTone(523.25, 0.15)
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.check, `Amostra de "${currentAgentName}" gravada com sucesso! (${result.count}/3)`)
           trainerFeedback.style.color = '#00ff88'
@@ -206,7 +203,6 @@ export class WakeTrainerUI {
 
       try {
         setSampleButtonsDisabled(true)
-        playTone(659.25, 0.12)
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.micOff, 'Gravando ruído ambiente... Fique em silêncio por 1 segundo.')
           trainerFeedback.style.color = 'var(--accent-cyan)'
@@ -215,7 +211,6 @@ export class WakeTrainerUI {
 
         const result = await engine.collectCustomSample('_background_noise_')
 
-        playTone(523.25, 0.15)
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.check, `Silêncio capturado com sucesso! (${result.count}/2)`)
           trainerFeedback.style.color = '#00ff88'
@@ -248,7 +243,6 @@ export class WakeTrainerUI {
 
       try {
         setSampleButtonsDisabled(true)
-        playTone(740, 0.12)
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.dotRecord, 'Gravando... Diga qualquer palavra comum (ex: "olá", "teste", "ok")!')
           trainerFeedback.style.color = '#c084fc'
@@ -257,7 +251,6 @@ export class WakeTrainerUI {
 
         const result = await engine.collectCustomSample('_other_')
 
-        playTone(523.25, 0.15)
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.check, `Amostra de outras palavras gravada com sucesso! (${result.count}/3)`)
           trainerFeedback.style.color = '#00ff88'
@@ -297,7 +290,6 @@ export class WakeTrainerUI {
 
         this.options.wakeWordManager.syncRunningState()
         await this.options.wakeWordManager.resume(this.options.micRecorder.isRecording())
-        playWakeChime()
         if (trainerFeedback) {
           setTrustedIconText(trainerFeedback, SVG_ICONS.sparkle, `Sucesso! O assistente agora responde com alta precisão ao nome "${currentAgentName}". Fala comum será ignorada.`)
           trainerFeedback.style.color = '#00ff88'

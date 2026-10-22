@@ -1,5 +1,4 @@
 import { SpeechCommandsWakeWord } from './speech-commands'
-import { playWakeChime } from './audio-cues'
 import { updateStatusBadge } from '../ui/status-badge'
 
 export interface WakeWordManagerOptions {
@@ -12,6 +11,7 @@ export interface WakeWordManagerOptions {
 export class WakeWordManager {
   private engine: SpeechCommandsWakeWord | null = null
   private isRunning = false
+  private isTriggering = false
   private options: WakeWordManagerOptions
 
   constructor(options: WakeWordManagerOptions) {
@@ -65,7 +65,7 @@ export class WakeWordManager {
       console.log('[WakeWord] Inicializando TensorFlow.js.')
 
       this.engine = new SpeechCommandsWakeWord({
-        probabilityThreshold: 0.85,
+        probabilityThreshold: 0.90,
         suppressionTimeMillis: 2500,
         agentName
       })
@@ -73,15 +73,19 @@ export class WakeWordManager {
       await this.engine.load(agentName)
 
       // Bind detection exclusively via TensorFlow
-      this.engine.onDetect = (word: string, score: number) => {
+      this.engine.onDetect = (_word: string, score: number) => {
+        if (this.isTriggering) return
+        this.isTriggering = true
         console.log(`[WakeWord] Ativação detectada com confiança de ${(score * 100).toFixed(1)}%.`)
-        playWakeChime()
+        try {
+          this.engine?.stop()
+        } catch {}
+        this.isRunning = false
         updateStatusBadge('listening', `${agentName} Ouvindo...`)
-        // Aguarda o término do sinal sonoro (260ms) antes de abrir o microfone,
-        // evitando que o chime seja captado e acione prematuramente o fim do turno
         setTimeout(() => {
+          this.isTriggering = false
           this.options.onWakeTriggered()
-        }, 300)
+        }, 120)
       }
 
       this.engine.onError = (err: any) => {
@@ -131,6 +135,7 @@ export class WakeWordManager {
 
   public async resume(isMicRecording: boolean): Promise<void> {
     if (!this.options.getIsWakeWordEnabled() || isMicRecording) return
+    this.isTriggering = false
 
     if (this.engine && this.engine.isCustomModelActive() && !this.isRunning) {
       try {

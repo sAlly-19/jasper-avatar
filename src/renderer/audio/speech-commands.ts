@@ -24,7 +24,7 @@ export class SpeechCommandsWakeWord {
   constructor(options: SpeechWakeWordOptions = {}) {
     const agent = (options.agentName && options.agentName.trim()) || 'Jasper'
     this.options = {
-      probabilityThreshold: options.probabilityThreshold ?? 0.85,
+      probabilityThreshold: options.probabilityThreshold ?? 0.90,
       suppressionTimeMillis: options.suppressionTimeMillis ?? 2500,
       agentName: agent,
       wakeWords: options.wakeWords ?? [agent.toLowerCase()]
@@ -310,6 +310,82 @@ export class SpeechCommandsWakeWord {
     return { word, count, total: counts }
   }
 
+  private augmentDatasetForTraining(transfer: speechCommands.TransferSpeechCommandRecognizer, targetLabel: string): void {
+    try {
+      const dataset = (transfer as any).dataset
+      if (!dataset || typeof dataset.addExample !== 'function') return
+
+      const noiseItems = transfer.getExamples('_background_noise_') || []
+      const noiseSpec = noiseItems[0]?.example?.spectrogram?.data
+
+      // 1. Time-shift target wake word spectrograms (-5 and +5 frames) for translation invariance
+      const targetItems = transfer.getExamples(targetLabel) || []
+      for (const item of targetItems) {
+        const spec = item.example.spectrogram
+        const frameSize = spec.frameSize
+        const totalLen = spec.data.length
+        const numFrames = Math.floor(totalLen / frameSize)
+        if (numFrames < 12) continue
+
+        for (const shift of [-5, 5]) {
+          const shifted = new Float32Array(totalLen)
+          if (noiseSpec && noiseSpec.length === totalLen) {
+            shifted.set(noiseSpec)
+          }
+          for (let f = 0; f < numFrames; f++) {
+            const srcFrame = f - shift
+            if (srcFrame >= 0 && srcFrame < numFrames) {
+              const srcOffset = srcFrame * frameSize
+              const dstOffset = f * frameSize
+              shifted.set(spec.data.subarray(srcOffset, srcOffset + frameSize), dstOffset)
+            }
+          }
+          dataset.addExample({
+            label: targetLabel,
+            spectrogram: { data: shifted, frameSize, keyFrameIndex: Math.floor(numFrames / 2) }
+          })
+        }
+      }
+
+      // 2. Circular-shift negative classes (_background_noise_ and _other_) to prevent softmax overconfidence
+      for (const negLabel of ['_background_noise_', '_other_']) {
+        let negItems: Array<{ uid: string; example: speechCommands.Example }> = []
+        try {
+          negItems = transfer.getExamples(negLabel) || []
+        } catch {
+          continue
+        }
+        for (const item of negItems) {
+          const spec = item.example.spectrogram
+          const frameSize = spec.frameSize
+          const totalLen = spec.data.length
+          const numFrames = Math.floor(totalLen / frameSize)
+          if (numFrames < 12) continue
+
+          for (const roll of [14, 28]) {
+            const rolled = new Float32Array(totalLen)
+            for (let f = 0; f < numFrames; f++) {
+              const srcFrame = (f + roll) % numFrames
+              const srcOffset = srcFrame * frameSize
+              const dstOffset = f * frameSize
+              rolled.set(spec.data.subarray(srcOffset, srcOffset + frameSize), dstOffset)
+            }
+            dataset.addExample({
+              label: negLabel,
+              spectrogram: { data: rolled, frameSize, keyFrameIndex: Math.floor(numFrames / 2) }
+            })
+          }
+        }
+      }
+
+      if (typeof (transfer as any).collateTransferWords === 'function') {
+        ;(transfer as any).collateTransferWords()
+      }
+    } catch (err) {
+      console.warn('[SpeechCommands] Aviso ao aplicar data augmentation:', err)
+    }
+  }
+
   public async trainCustomModel(onProgress?: (epoch: number, loss: number) => void): Promise<void> {
     if (!this.transferRecognizer) throw new Error('Nenhum exemplo de áudio foi gravado ainda.')
     const counts = this.transferRecognizer.countExamples()
@@ -336,9 +412,11 @@ export class SpeechCommandsWakeWord {
     await this.ensureBaseLoaded()
     this.transferRecognizer = this.getOrCreateTransferRecognizer(this.getModelName())
     this.transferRecognizer.loadExamples(examples)
+    this.augmentDatasetForTraining(this.transferRecognizer, nameKey)
 
     await this.transferRecognizer.train({
       epochs: 25,
+      augmentByMixingNoiseRatio: 0.25,
       callback: {
         onEpochEnd: (epoch, logs) => {
           onProgress?.(epoch + 1, logs?.loss || 0)
@@ -347,10 +425,11 @@ export class SpeechCommandsWakeWord {
     })
 
     await this.transferRecognizer.save()
+    // Restore original user example counts after training with augmented copies
+    this.transferRecognizer.loadExamples(examples, true)
     this.isCustomModelTrained = true
     this.isLegacyTwoClassModel = false
     console.log('[SpeechCommands] Modelo personalizado salvo no IndexedDB.')
-
   }
 
   public async clearCustomModel(): Promise<void> {

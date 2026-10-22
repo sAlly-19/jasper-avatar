@@ -339,7 +339,7 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.ok(speechCommandsSrc.includes('./speech-model/model.json'))
     })
 
-    test('speech-commands implementa modelo neural de 3 classes com amostras negativas e threshold de 0.85', () => {
+    test('speech-commands implementa modelo neural de 3 classes com amostras negativas e threshold de 0.90', () => {
       const speechCommandsSrc = fs.readFileSync(
         path.join(process.cwd(), 'src/renderer/audio/speech-commands.ts'),
         'utf-8'
@@ -349,7 +349,7 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.ok(speechCommandsSrc.includes("detectedWord === '_background_noise_'"))
 
       // Confirma hiperparâmetros anti-falso-positivo
-      assert.ok(speechCommandsSrc.includes('probabilityThreshold: options.probabilityThreshold ?? 0.85'))
+      assert.ok(speechCommandsSrc.includes('probabilityThreshold: options.probabilityThreshold ?? 0.90'))
       assert.ok(speechCommandsSrc.includes('overlapFactor: 0.25'))
       assert.ok(speechCommandsSrc.includes('hasNegativeSpeechSamples()'))
       assert.ok(speechCommandsSrc.includes('isLegacyModel()'))
@@ -423,21 +423,22 @@ describe('Suíte de Testes de Integração com Classes e Módulos Reais', () => 
       assert.ok(audioPlayerSrc.includes('this.onPlaybackEnded?.()'))
     })
 
-    test('Gemini Live client utiliza o modelo Live oficial gemini-2.0-flash-live-001', () => {
+    test('Gemini Live client utiliza o modelo Live oficial gemini-3.8-live', () => {
       const liveClientSrc = fs.readFileSync(
         path.join(process.cwd(), 'src/main/gemini-live.ts'),
         'utf-8'
       )
-      assert.ok(liveClientSrc.includes('gemini-2.0-flash-live-001'))
+      assert.ok(liveClientSrc.includes('gemini-3.8-live'))
     })
 
-    test('preserva modelos Live suportados ao salvar a configuracao', () => {
+    test('preserva modelos Live suportados ao salvar a configuracao e aposenta modelos descontinuados', () => {
       const previous = configStore.getConfig().model
       try {
-        for (const model of ['gemini-2.0-flash-live-001', 'gemini-2.5-flash-native-audio-preview-12-2025']) {
+        for (const model of ['gemini-3.8-live', 'gemini-2.5-flash-native-audio-preview-12-2025']) {
           assert.equal(configStore.updateConfig({ model }).model, model)
         }
-        assert.equal(configStore.updateConfig({ model: 'gemini-2.0-flash-exp' }).model, 'gemini-2.0-flash-live-001')
+        assert.equal(configStore.updateConfig({ model: 'gemini-2.0-flash-exp' }).model, 'gemini-3.8-live')
+        assert.equal(configStore.updateConfig({ model: 'gemini-2.0-flash-live-001' }).model, 'gemini-3.8-live')
       } finally {
         configStore.updateConfig({ model: previous })
       }
